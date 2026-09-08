@@ -47,34 +47,26 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      {/* Center: App Logo 'منصة نحن معك' strictly centered */}
+      {/* Center: transparent cat logo + brand name */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="flex items-center gap-1.5 select-none pointer-events-auto">
-          {/* Glowing Sparkle Icon */}
-          <div className="relative flex items-center justify-center">
-            <span
-              className="text-lg font-black filter"
-              style={{
-                color: theme.colors.secondary,
-                filter: `drop-shadow(0 0 8px ${theme.colors.secondary})`,
-              }}
-            >
-              ✦
-            </span>
-          </div>
-
-          {/* Calligraphic / Modern Logo Text */}
-          <h1 className="text-base sm:text-lg font-black tracking-wide leading-none flex items-center gap-1">
-            <span className={`${theme.classes.textMain} drop-shadow-sm font-sans`}>منصة</span>
-            <span
-              className="font-sans"
-              style={{
-                color: theme.colors.secondary,
-                filter: `drop-shadow(0 0 10px ${theme.colors.glow})`,
-              }}
-            >
-              نحن معك
-            </span>
+        <div className="flex items-center gap-1 select-none pointer-events-auto" dir="rtl">
+          <img
+            src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663908422791/nXbwnAHfaisJyile.png"
+            alt="شعار نحن معك"
+            className="h-10 w-10 shrink-0 object-contain"
+            loading="eager"
+            decoding="async"
+            draggable={false}
+            style={{ filter: `drop-shadow(0 2px 5px ${theme.colors.glow})` }}
+          />
+          <h1
+            className="text-base sm:text-lg font-black tracking-wide leading-none font-sans"
+            style={{
+              color: theme.colors.secondary,
+              filter: `drop-shadow(0 0 10px ${theme.colors.glow})`,
+            }}
+          >
+            نحن معك
           </h1>
         </div>
       </div>
