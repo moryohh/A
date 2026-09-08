@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   CheckCircle2,
   PenTool,
@@ -55,6 +57,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
   const [exam, setExam] = useState<DailyExamConfig | null>(customExam || null);
   const [isLoading, setIsLoading] = useState(false);
   const [examRound, setExamRound] = useState(0);
+  const [currentQuestionPage, setCurrentQuestionPage] = useState<1 | 2>(1);
 
   // Student Drafts (textual notes per branch)
   const [studentDrafts, setStudentDrafts] = useState<Record<string, string>>({});
@@ -81,8 +84,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
   const q1FileInputRef = useRef<HTMLInputElement | null>(null);
   const q2FileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Timer State (15 min default = 900 sec)
-  const [timeLeft, setTimeLeft] = useState(900);
+  // Timer State (10 min default = 600 sec)
+  const [timeLeft, setTimeLeft] = useState(600);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitState, setSubmitState] = useState<'idle' | 'confirming' | 'processing' | 'completed'>('idle');
@@ -110,7 +113,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
     setIsSubmitted(false);
     setSubmitState('idle');
     setCompletedAt(null);
-    setTimeLeft(900);
+    setTimeLeft(600);
+    setCurrentQuestionPage(1);
     setIsTimerRunning(true);
     setProcessingPhase(0);
 
@@ -348,7 +352,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
     rewardIssuedRef.current = false;
     assessmentReportedRef.current = false;
     submissionIdRef.current = null;
-    setTimeLeft(900);
+    setTimeLeft(600);
+    setCurrentQuestionPage(1);
     setIsTimerRunning(true);
     setIsSubmitted(false);
     setSubmitState('idle');
@@ -599,84 +604,74 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
               </div>
             ) : (
               <>
-                <main className="mx-auto max-w-2xl space-y-4 px-4 pb-28 pt-4">
-                  <div className="flex items-center justify-between border-b border-[#dedbd0] pb-3 text-xs font-bold text-[#716b65]">
-                    <span>{exam.subject}</span>
-                    <span className="text-[#6c4b88]">الدرجة الكلية: {exam.totalPoints}</span>
-                  </div>
-
-                  {isSubmitted && (
-                    <div className="flex items-center justify-between gap-3 border border-[#b7d5bd] bg-[#edf6ee] p-3 text-xs font-bold text-[#377348]">
-                      <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> تم تسليم الامتحان بنجاح.</span>
-                      <button type="button" onClick={handleRestartExam} className="shrink-0 underline">إعادة</button>
-                    </div>
-                  )}
-
-                  <section
-                    className="relative overflow-hidden border border-[#ddd9ce] bg-[#fbfaf4] shadow-[0_8px_24px_rgba(63,52,38,0.12)]"
-                    style={{ backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 33px, rgba(181,191,194,0.42) 34px)' }}
-                  >
-                    <input
-                      type="file"
-                      ref={q1FileInputRef}
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(event) => {
-                        if (event.target.files?.[0]) handleImageSelected('q1', event.target.files[0]);
-                      }}
-                    />
-                    <div className="relative z-10 px-5 pb-5 pt-7 sm:px-8">
-                      <h2 className="text-lg font-black leading-8 text-[#2f2d31]">س1: {exam.question1.title}</h2>
-                      <p className="mt-1 text-sm font-bold text-[#716b65]">{exam.question1.instruction || 'الإجابة:'}</p>
-                      <div className="mt-3 divide-y divide-[#dedbd0]">
-                        {exam.question1.branches.map((branch) => (
-                          <div key={branch.id} className="py-3 first:pt-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-black leading-7 text-[#37343a]">{branch.label ? `${branch.label}: ` : ''}{branch.prompt}</p>
-                              <span className="shrink-0 text-[10px] font-black text-[#806a45]">{branch.points} د</span>
-                            </div>
-                            <textarea
-                              value={studentDrafts[branch.id] || ''}
-                              onChange={(event) => handleDraftChange(branch.id, event.target.value)}
-                              placeholder="اكتب إجابتك هنا..."
-                              rows={2}
-                              disabled={submitState !== 'idle' || isSubmitted}
-                              className="mt-2 w-full resize-y bg-transparent text-sm font-semibold leading-[34px] text-[#343238] placeholder-[#9a9188] outline-none disabled:opacity-70"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      {questionErrors.q1 && <p className="mt-2 border border-[#e3a1a8] bg-[#fff0f1] p-2 text-xs font-bold text-[#a33846]">{questionErrors.q1}</p>}
-                      {questionImages.q1 && (
-                        <div className="mt-4 border border-[#d4ccb9] bg-white/80 p-3">
-                          <div className="flex items-center justify-between gap-2 text-xs font-black text-[#514a42]">
-                            <span className="flex items-center gap-1.5"><ImageIcon className="h-4 w-4 text-[#6c4b88]" /> تم حفظ صورة الإجابة</span>
-                            <button type="button" onClick={() => handleRemoveImage('q1')} className="flex items-center gap-1 text-[#a33846] disabled:opacity-40" disabled={submitState !== 'idle'}>
-                              <Trash2 className="h-3.5 w-3.5" /> حذف
-                            </button>
-                          </div>
-                          <img src={questionImages.q1.previewUrl} alt="صورة إجابة السؤال الأول" className="mt-2 max-h-48 w-full object-contain" />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => q1FileInputRef.current?.click()}
-                        disabled={submitState !== 'idle' || isSubmitted}
-                        className="mt-4 flex w-full items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3 text-sm font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
-                      >
-                        <Camera className="h-5 w-5" />
-                        {questionImages.q1 ? 'تغيير صورة الحل' : 'تصوير ورقة الحل'}
-                      </button>
-                    </div>
-                  </section>
-
-                  {exam.question2.branches.map((branch) => (
+                <main className="min-h-full px-3 pb-28 pt-3 sm:px-5">
+                  {currentQuestionPage === 1 ? (
                     <section
-                      key={branch.id}
-                      className="relative overflow-hidden border border-[#ddd9ce] bg-[#fbfaf4] shadow-[0_8px_24px_rgba(63,52,38,0.12)]"
+                      className="relative mx-auto min-h-[calc(100dvh-11.5rem)] max-w-2xl overflow-hidden border border-[#ddd9ce] bg-[#fbfaf4] shadow-[0_8px_24px_rgba(63,52,38,0.12)]"
                       style={{ backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 33px, rgba(181,191,194,0.42) 34px)' }}
                     >
+                      <div className="pointer-events-none absolute inset-y-0 right-[11%] w-px bg-[#d87878]/45" aria-hidden="true" />
+                      <input
+                        type="file"
+                        ref={q1FileInputRef}
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(event) => {
+                          if (event.target.files?.[0]) handleImageSelected('q1', event.target.files[0]);
+                        }}
+                      />
+                      <div className="relative z-10 px-6 pb-6 pt-8 sm:px-10">
+                        <p className="text-right text-xl font-black leading-9 text-[#2f2d31]">
+                          س1: {exam.question1.title}
+                        </p>
+                        <p className="mt-2 text-right text-base font-bold text-[#514b47]">الإجابة:</p>
+                        <div className="mt-3 space-y-1">
+                          {exam.question1.branches.slice(0, 2).map((branch, index) => (
+                            <div key={branch.id}>
+                              <p className="text-right text-base font-black leading-8 text-[#37343a]">
+                                {branch.label || `${index === 0 ? 'أ' : 'ب'}`}: {branch.prompt}
+                              </p>
+                              <textarea
+                                value={studentDrafts[branch.id] || ''}
+                                onChange={(event) => handleDraftChange(branch.id, event.target.value)}
+                                aria-label={`إجابة الفرع ${branch.label || (index === 0 ? 'أ' : 'ب')}`}
+                                rows={4}
+                                disabled={submitState !== 'idle' || isSubmitted}
+                                className="mt-1 w-full resize-none bg-transparent text-base font-semibold leading-[34px] text-[#343238] outline-none placeholder:text-transparent disabled:opacity-70"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        {questionErrors.q1 && <p className="mt-3 border border-[#e3a1a8] bg-[#fff0f1] p-2 text-xs font-bold text-[#a33846]">{questionErrors.q1}</p>}
+                        {questionImages.q1 && (
+                          <div className="mt-4 border border-[#d4ccb9] bg-white/80 p-3">
+                            <div className="flex items-center justify-between gap-2 text-xs font-black text-[#514a42]">
+                              <span>تم حفظ صورة الحل</span>
+                              <button type="button" onClick={() => handleRemoveImage('q1')} className="text-[#a33846] disabled:opacity-40" disabled={submitState !== 'idle'}>
+                                حذف
+                              </button>
+                            </div>
+                            <img src={questionImages.q1.previewUrl} alt="صورة حل السؤال الأول" className="mt-2 max-h-40 w-full object-contain" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => q1FileInputRef.current?.click()}
+                          disabled={submitState !== 'idle' || isSubmitted}
+                          className="mt-5 flex w-full items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3 text-base font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+                        >
+                          <Camera className="h-5 w-5" />
+                          {questionImages.q1 ? 'تغيير صورة الحل' : 'تصوير ورقة الحل'}
+                        </button>
+                      </div>
+                    </section>
+                  ) : (
+                    <section
+                      className="relative mx-auto min-h-[calc(100dvh-11.5rem)] max-w-2xl overflow-hidden border border-[#ddd9ce] bg-[#fbfaf4] shadow-[0_8px_24px_rgba(63,52,38,0.12)]"
+                      style={{ backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 33px, rgba(181,191,194,0.42) 34px)' }}
+                    >
+                      <div className="pointer-events-none absolute inset-y-0 right-[11%] w-px bg-[#d87878]/45" aria-hidden="true" />
                       <input
                         type="file"
                         ref={q2FileInputRef}
@@ -687,62 +682,73 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
                           if (event.target.files?.[0]) handleImageSelected('q2', event.target.files[0]);
                         }}
                       />
-                      <div className="relative z-10 px-5 pb-5 pt-7 sm:px-8">
-                        <h2 className="text-lg font-black leading-8 text-[#2f2d31]">س2: {exam.question2.title}</h2>
-                        <p className="mt-1 text-sm font-bold text-[#716b65]">{exam.question2.instruction || 'الإجابة:'}</p>
-                        <div className="mt-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-black leading-7 text-[#37343a]">{branch.label ? `${branch.label}: ` : ''}{branch.prompt}</p>
-                            <span className="shrink-0 text-[10px] font-black text-[#806a45]">{branch.points} د</span>
+                      <div className="relative z-10 px-6 pb-6 pt-8 sm:px-10">
+                        <p className="text-right text-xl font-black leading-9 text-[#2f2d31]">
+                          س2: {exam.question2.title}
+                        </p>
+                        <p className="mt-2 text-right text-base font-bold text-[#514b47]">الإجابة:</p>
+                        {exam.question2.branches.slice(0, 1).map((branch) => (
+                          <div key={branch.id} className="mt-3">
+                            <p className="text-right text-base font-black leading-8 text-[#37343a]">
+                              {branch.label ? `${branch.label}: ` : ''}{branch.prompt}
+                            </p>
+                            <textarea
+                              value={studentDrafts[branch.id] || ''}
+                              onChange={(event) => handleDraftChange(branch.id, event.target.value)}
+                              aria-label="إجابة السؤال الثاني"
+                              rows={10}
+                              disabled={submitState !== 'idle' || isSubmitted}
+                              className="mt-1 w-full resize-none bg-transparent text-base font-semibold leading-[34px] text-[#343238] outline-none placeholder:text-transparent disabled:opacity-70"
+                            />
                           </div>
-                          <textarea
-                            value={studentDrafts[branch.id] || ''}
-                            onChange={(event) => handleDraftChange(branch.id, event.target.value)}
-                            placeholder="اكتب إجابتك هنا..."
-                            rows={6}
-                            disabled={submitState !== 'idle' || isSubmitted}
-                            className="mt-2 w-full resize-y bg-transparent text-sm font-semibold leading-[34px] text-[#343238] placeholder-[#9a9188] outline-none disabled:opacity-70"
-                          />
-                        </div>
-                        {questionErrors.q2 && <p className="mt-2 border border-[#e3a1a8] bg-[#fff0f1] p-2 text-xs font-bold text-[#a33846]">{questionErrors.q2}</p>}
+                        ))}
+                        {questionErrors.q2 && <p className="mt-3 border border-[#e3a1a8] bg-[#fff0f1] p-2 text-xs font-bold text-[#a33846]">{questionErrors.q2}</p>}
                         {questionImages.q2 && (
                           <div className="mt-4 border border-[#d4ccb9] bg-white/80 p-3">
                             <div className="flex items-center justify-between gap-2 text-xs font-black text-[#514a42]">
-                              <span className="flex items-center gap-1.5"><ImageIcon className="h-4 w-4 text-[#6c4b88]" /> تم حفظ صورة الإجابة</span>
-                              <button type="button" onClick={() => handleRemoveImage('q2')} className="flex items-center gap-1 text-[#a33846] disabled:opacity-40" disabled={submitState !== 'idle'}>
-                                <Trash2 className="h-3.5 w-3.5" /> حذف
+                              <span>تم حفظ صورة الحل</span>
+                              <button type="button" onClick={() => handleRemoveImage('q2')} className="text-[#a33846] disabled:opacity-40" disabled={submitState !== 'idle'}>
+                                حذف
                               </button>
                             </div>
-                            <img src={questionImages.q2.previewUrl} alt="صورة إجابة السؤال الثاني" className="mt-2 max-h-52 w-full object-contain" />
+                            <img src={questionImages.q2.previewUrl} alt="صورة حل السؤال الثاني" className="mt-2 max-h-40 w-full object-contain" />
                           </div>
                         )}
                         <button
                           type="button"
                           onClick={() => q2FileInputRef.current?.click()}
                           disabled={submitState !== 'idle' || isSubmitted}
-                          className="mt-4 flex w-full items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3 text-sm font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+                          className="mt-5 flex w-full items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3 text-base font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
                         >
                           <Camera className="h-5 w-5" />
                           {questionImages.q2 ? 'تغيير صورة الحل' : 'تصوير ورقة الحل'}
                         </button>
                       </div>
                     </section>
-                  ))}
+                  )}
                 </main>
 
                 <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[#d7d3ca] bg-[#f8f7f1]/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_18px_rgba(63,52,38,0.10)] backdrop-blur">
-                  <div className="mx-auto flex max-w-2xl items-center gap-3 px-4">
+                  <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentQuestionPage((page) => (page === 2 ? 1 : 2))}
+                      disabled={submitState !== 'idle' || isSubmitted}
+                      aria-label={currentQuestionPage === 1 ? 'الانتقال إلى السؤال الثاني' : 'العودة إلى السؤال الأول'}
+                      className="flex h-12 w-12 shrink-0 items-center justify-center border border-[#cfcac0] bg-[#efede4] text-[#514b47] transition hover:bg-[#e4e1d7] active:scale-95 disabled:pointer-events-none disabled:opacity-45"
+                    >
+                      {currentQuestionPage === 1 ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
+                    </button>
                     <div className="flex min-w-[76px] flex-col items-center justify-center text-[#5d5650]">
-                      <span className="text-[10px] font-bold">الوقت المتبقي</span>
-                      <span className={`text-lg font-black ${timeLeft < 180 ? 'text-[#b14450]' : 'text-[#6c4b88]'}`}>{formatTime(timeLeft)}</span>
+                      <span className="text-[10px] font-bold">الوقت</span>
+                      <span className={`text-xl font-black ${timeLeft < 120 ? 'text-[#b14450]' : 'text-[#6c4b88]'}`}>{formatTime(timeLeft)}</span>
                     </div>
                     <button
                       type="button"
                       onClick={handleSubmitExam}
                       disabled={submitState !== 'idle' || isSubmitted}
-                      className="flex flex-1 items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3.5 text-sm font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+                      className="flex flex-1 items-center justify-center gap-2 bg-[#6c4b88] px-4 py-3.5 text-base font-black text-white transition hover:bg-[#5b3d76] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
                     >
-                      <PenTool className="h-4 w-4" />
                       تسليم الامتحان
                     </button>
                   </div>
