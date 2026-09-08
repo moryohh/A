@@ -19,7 +19,7 @@ export default defineConfig(() => {
         strategies: 'injectManifest',
         srcDir: 'src',
         filename: 'sw.ts',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+        includeAssets: ['favicon.ico', 'favicon-32x32.png', 'favicon-64x64.png', 'apple-touch-icon.png'],
         manifest: {
           name: 'منصة نحن معك',
           short_name: 'نحن معك',
