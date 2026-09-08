@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="flex items-center gap-1 select-none pointer-events-auto" dir="rtl">
           <img
-            src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663908422791/nXbwnAHfaisJyile.png"
+            src={`${import.meta.env.BASE_URL}cat-logo-header.png?v=cat-brand-20260908`}
             alt="شعار نحن معك"
             className="h-10 w-10 shrink-0 object-contain"
             loading="eager"

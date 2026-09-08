@@ -9,6 +9,7 @@ import {registerRoute} from 'workbox-routing';
 const serviceWorker = self as unknown as ServiceWorkerGlobalScope;
 const appBaseUrl = new URL('./', serviceWorker.registration.scope || serviceWorker.location.href);
 const appAsset = (name: string) => new URL(name, appBaseUrl).toString();
+const appRelease = 'cat-brand-20260908';
 
 precacheAndRoute((self as unknown as {__WB_MANIFEST: Array<{revision: string | null; url: string}>}).__WB_MANIFEST);
 cleanupOutdatedCaches();
@@ -43,7 +44,13 @@ serviceWorker.addEventListener('install', () => {
 });
 
 serviceWorker.addEventListener('activate', (event) => {
-  event.waitUntil(serviceWorker.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      serviceWorker.clients.claim(),
+      serviceWorker.registration.update(),
+      Promise.resolve(appRelease),
+    ]),
+  );
 });
 
 serviceWorker.addEventListener('push', (event) => {
