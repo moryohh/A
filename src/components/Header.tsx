@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src={`${import.meta.env.BASE_URL}cat-logo-header.png?v=cat-brand-20260908`}
             alt="شعار نحن معك"
-            className="h-10 w-10 shrink-0 object-contain"
+            className="h-10 w-10 shrink-0 object-contain transform scale-[1.5]"
             loading="eager"
             decoding="async"
             draggable={false}
