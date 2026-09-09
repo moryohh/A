@@ -261,8 +261,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
 
   return (
     <div className="relative w-full max-w-xl mx-auto flex flex-col items-center select-none font-cairo">
-      {currentChapter && <ChapterExamIcons subjectId={subjectId} subjectName={subjectName} chapterNumber={currentChapter.number} />}
-      
       {/* ========================================================= */}
       {/* 🧭 CHAPTER SELECTOR DROPDOWN (اختر الفصل / تحديد الفصل) */}
       {/* ========================================================= */}
@@ -588,6 +586,15 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               <line x1="15" y1="-15" x2="-15" y2="15" stroke="#ef4444" strokeWidth="5" strokeLinecap="round" filter="url(#redSemiGlow)" />
             </g>
           </svg>
+
+          {currentChapter && (
+            <ChapterExamIcons
+              subjectId={subjectId}
+              subjectName={subjectName}
+              chapterNumber={currentChapter.number}
+              className="absolute right-[10%] top-[9%]"
+            />
+          )}
 
           {/* ========================================================= */}
           {/* COMPACT INTERACTIVE TREASURE CHESTS (1 per Biome Image) */}
