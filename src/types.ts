@@ -61,6 +61,12 @@ export interface CommunityComment {
   replies?: CommunityComment[];
 }
 
+export interface CommunityMember {
+  id?: string;
+  name: string;
+  avatarUrl?: string;
+}
+
 export interface CommunityPost {
   id: string;
   userId?: string;

@@ -4,6 +4,7 @@ import {
   Plus,
   Heart,
   MessageSquare,
+  MessageCircle,
   Share2,
   MoreHorizontal,
   HelpCircle,
@@ -16,7 +17,7 @@ import {
   X,
   ArrowRight,
 } from 'lucide-react';
-import { CommunityPost } from '../types';
+import { CommunityMember, CommunityPost } from '../types';
 import { useAppTheme } from '../services/themeService';
 
 interface CommunityViewProps {
@@ -26,6 +27,8 @@ interface CommunityViewProps {
   onToggleLikePost: (postId: string) => void;
   onSharePost: (post: CommunityPost) => void;
   onReportPost: (postId: string) => void;
+  onOpenProfile: (member: CommunityMember) => void;
+  onMessage: (member: CommunityMember) => void;
   onBack?: () => void;
 }
 
@@ -36,6 +39,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   onToggleLikePost,
   onSharePost,
   onReportPost,
+  onOpenProfile,
+  onMessage,
   onBack,
 }) => {
   const { theme } = useAppTheme();
@@ -152,7 +157,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
                 {/* Post Header */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })}
+                    className="flex min-w-0 items-center gap-2.5 text-right transition active:scale-[0.98]"
+                    aria-label={`فتح ملف ${post.userName}`}
+                  >
                     <img
                       src={post.userAvatar}
                       alt={post.userName}
@@ -196,7 +206,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                         {post.timeAgo}
                       </span>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Options Menu Button */}
                   <div className="relative">
@@ -210,6 +220,19 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     {/* Dropdown Menu */}
                     {isMenuOpen && (
                       <div className={`absolute top-8 left-0 border rounded-2xl shadow-2xl z-30 py-1.5 text-xs w-44 animate-in fade-in ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+                        {post.userId && !post.isOwnPost && (
+                          <button
+                            onClick={() => {
+                              onMessage({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar });
+                              setActiveMenuPostId(null);
+                            }}
+                            className="w-full px-3.5 py-2 text-right hover:opacity-80 flex items-center gap-2 text-sky-400 font-medium cursor-pointer"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>مراسلة خاصة</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => {
                             handleShare(post);
@@ -364,7 +387,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 )}
 
                 {/* Interaction Action Buttons */}
-                <div className={`grid grid-cols-3 gap-1.5 pt-2 border-t text-sm font-bold ${theme.classes.cardBorder}`}>
+                <div className={`grid grid-cols-4 gap-1.5 pt-2 border-t text-xs font-bold ${theme.classes.cardBorder}`}>
                   {/* Like Button */}
                   <button
                     onClick={() => onToggleLikePost(post.id)}
@@ -389,6 +412,17 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                   >
                     <MessageSquare className="w-4 h-4" style={{ color: theme.colors.primary }} />
                     <span>تعليق ({post.commentsCount})</span>
+                  </button>
+
+                  {/* Private message button */}
+                  <button
+                    onClick={() => post.userId && !post.isOwnPost && onMessage({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })}
+                    disabled={!post.userId || post.isOwnPost}
+                    className={`py-3 rounded-xl border flex items-center justify-center gap-1 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMuted}`}
+                    title={!post.userId ? 'هذا الحساب غير متاح للمراسلة' : post.isOwnPost ? 'هذا منشورك' : 'مراسلة خاصة'}
+                  >
+                    <MessageCircle className="w-4 h-4 text-sky-400" />
+                    <span>مراسلة</span>
                   </button>
 
                   {/* Share Button */}

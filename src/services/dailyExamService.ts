@@ -328,11 +328,11 @@ export function extractDailyExamFromCurriculum(
     lessonTitle: (curriculum?.lesson_info as any)?.lesson_title || lessonTitle,
     subject: curriculum?.lesson_info?.subject || subject,
     grade: curriculum?.lesson_info?.grade || 'السادس الإعدادي - الفرع العلمي',
-    durationMinutes: 15,
+    durationMinutes: 10,
     totalPoints: q1Total + q2Total,
     question1: {
       id: 'q1',
-      title: `السؤال الأول (${q1Total} درجات)`,
+      title: 'السؤال الأول',
       instruction: q1Instruction,
       branches: q1Branches,
     },

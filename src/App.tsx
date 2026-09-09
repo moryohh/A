@@ -13,6 +13,7 @@ import {
   CommentItem,
   CommunityPost,
   CommunityComment,
+  CommunityMember,
   OpenLessonContext,
   LearningPosition,
   CompetitionSnapshot,
@@ -32,6 +33,8 @@ import { SettingsView } from './components/SettingsView';
 import { CommunityView } from './components/CommunityView';
 import { CreatePostModal } from './components/CreatePostModal';
 import { CommunityCommentsModal } from './components/CommunityCommentsModal';
+import { MessengerModal } from './components/MessengerModal';
+import { CommunityProfileModal } from './components/CommunityProfileModal';
 import { MainHomeView } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
@@ -63,6 +66,7 @@ import {
   reportCommunityPost,
   updateUserProfileData,
 } from './services/communityService';
+import { fetchUnreadMessageCount } from './services/messengerService';
 import { getLevelSnapshot } from './services/pointsService';
 import {
   fetchCompetitionSnapshot,
@@ -201,6 +205,10 @@ function AppContent() {
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [activeCommunityPostForComments, setActiveCommunityPostForComments] = useState<CommunityPost | null>(null);
+  const [isMessengerOpen, setIsMessengerOpen] = useState(false);
+  const [messengerContact, setMessengerContact] = useState<CommunityMember | null>(null);
+  const [communityProfileMember, setCommunityProfileMember] = useState<CommunityMember | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   // Load Community posts and stories from Supabase on startup and when user changes
   React.useEffect(() => {
@@ -220,6 +228,22 @@ function AppContent() {
       isMounted = false;
     };
   }, [currentUser?.id]);
+
+  React.useEffect(() => {
+    if (!currentUser?.id) {
+      setUnreadMessageCount(0);
+      return;
+    }
+    fetchUnreadMessageCount(currentUser)
+      .then(setUnreadMessageCount)
+      .catch(() => setUnreadMessageCount(0));
+  }, [currentUser?.id]);
+
+  const openMessenger = (member: CommunityMember | null = null) => {
+    setMessengerContact(member);
+    setCommunityProfileMember(null);
+    setIsMessengerOpen(true);
+  };
 
   // Modals & Drawers state
   const [selectedStory, setSelectedStory] = useState<TeacherStory | null>(null);
@@ -896,7 +920,8 @@ function AppContent() {
           onOpenNotifications={() => setIsNotificationsOpen(true)}
           onOpenProfile={() => setActiveTab('profile')}
           onOpenGames={() => setIsGamesOpen(true)}
-          onOpenExams={() => setIsDailyExamOpen(true)}
+          onOpenMessenger={() => openMessenger()}
+          unreadMessagesCount={unreadMessageCount}
         />
 
         {/* Tab Content Router */}
@@ -977,6 +1002,8 @@ function AppContent() {
               onToggleLikePost={handleToggleLikeCommunityPost}
               onSharePost={handleShareCommunityPost}
               onReportPost={handleReportCommunityPost}
+              onOpenProfile={(member) => setCommunityProfileMember(member)}
+              onMessage={(member) => openMessenger(member)}
               onBack={() => {
                 setActiveTab('home');
                 setHomeSubView('main_home');
@@ -1059,6 +1086,34 @@ function AppContent() {
         isOpen={!!activeCommunityPostForComments}
         onClose={() => setActiveCommunityPostForComments(null)}
         onAddComment={handleAddCommunityComment}
+        currentUserId={currentUser?.id}
+        onOpenProfile={(member) => {
+          setActiveCommunityPostForComments(null);
+          setCommunityProfileMember(member);
+        }}
+        onMessage={(member) => {
+          setActiveCommunityPostForComments(null);
+          openMessenger(member);
+        }}
+      />
+
+      <CommunityProfileModal
+        member={communityProfileMember}
+        posts={communityPosts}
+        currentUserId={currentUser?.id}
+        onClose={() => setCommunityProfileMember(null)}
+        onMessage={(member) => openMessenger(member)}
+      />
+
+      <MessengerModal
+        isOpen={isMessengerOpen}
+        onClose={() => {
+          setIsMessengerOpen(false);
+          setMessengerContact(null);
+        }}
+        currentUser={currentUser}
+        initialContact={messengerContact}
+        onUnreadCountChange={setUnreadMessageCount}
       />
 
       <NotificationsModal

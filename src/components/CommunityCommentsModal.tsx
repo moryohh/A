@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { X, Send, MessageSquare } from 'lucide-react';
-import { CommunityComment, CommunityPost } from '../types';
+import { X, Send, MessageSquare, MessageCircle } from 'lucide-react';
+import { CommunityMember, CommunityPost } from '../types';
 
 interface CommunityCommentsModalProps {
   post: CommunityPost | null;
   isOpen: boolean;
   onClose: () => void;
   onAddComment: (postId: string, text: string) => void | Promise<void>;
+  currentUserId?: string;
+  onOpenProfile: (member: CommunityMember) => void;
+  onMessage: (member: CommunityMember) => void;
 }
 
 export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
@@ -14,6 +17,9 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
   isOpen,
   onClose,
   onAddComment,
+  currentUserId,
+  onOpenProfile,
+  onMessage,
 }) => {
   const [newText, setNewText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,7 +60,9 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
 
         {/* Post snippet */}
         <div className="bg-[#0D0D12]/60 p-3 rounded-2xl border border-white/5 my-3 text-xs text-gray-300">
-          <span className="text-gray-400 font-bold block mb-1">صاحب المنشور: {post.userName}</span>
+          <button type="button" onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })} className="mb-1 block font-bold text-gray-400 transition hover:text-sky-400">
+            صاحب المنشور: {post.userName}
+          </button>
           <p className="line-clamp-2 text-white">{post.content}</p>
         </div>
 
@@ -70,17 +78,26 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
                 key={comment.id}
                 className="bg-[#0D0D12]/80 p-3.5 rounded-2xl border border-white/5 flex gap-3 text-right relative"
               >
-                <img
-                  src={comment.userAvatar}
-                  alt={comment.userName}
-                  className="w-9 h-9 rounded-full object-cover shrink-0 border border-white/10"
-                />
+                <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="shrink-0 transition active:scale-95" aria-label={`فتح ملف ${comment.userName}`}>
+                  <img
+                    src={comment.userAvatar}
+                    alt={comment.userName}
+                    className="w-9 h-9 rounded-full object-cover shrink-0 border border-white/10"
+                  />
+                </button>
                 <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-white">
+                      <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="text-xs font-bold text-white transition hover:text-sky-400">
                         {comment.userName}
-                      </h4>
-                      <span className="text-[10px] text-gray-500">{comment.timeAgo}</span>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {comment.userId && comment.userId !== currentUserId && (
+                          <button type="button" onClick={() => onMessage({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="text-sky-400 transition active:scale-95" aria-label={`مراسلة ${comment.userName}`}>
+                            <MessageCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                        <span className="text-[10px] text-gray-500">{comment.timeAgo}</span>
+                      </div>
                     </div>
 
                   <p className="text-xs text-gray-300 leading-relaxed mt-1">
