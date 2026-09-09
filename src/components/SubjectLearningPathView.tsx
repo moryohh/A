@@ -388,6 +388,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
         <div className="relative">
           <AdventureWorldMap
             chapters={chapters}
+            subjectId={subject.id}
             subjectName={subject.name}
             subjectColor={subject.color}
             activeLesson={currentResumeLesson}

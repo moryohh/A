@@ -8,6 +8,7 @@ import biome4Img from '../assets/images/biome4_night_realm_1786898703967.webp';
 import { SubjectChapter, SubjectChapterLesson } from '../types';
 import { useAppTheme } from '../services/themeService';
 import { formatArabicLessonTitle } from '../services/lessonsService';
+import { ChapterExamIcons } from './ChapterExamIcons';
 import {
   Check,
   Lock,
@@ -25,6 +26,7 @@ import {
 
 interface AdventureWorldMapProps {
   chapters: SubjectChapter[];
+  subjectId: string;
   subjectName: string;
   subjectColor: string;
   activeLesson: SubjectChapterLesson | null;
@@ -52,6 +54,7 @@ const ALL_SIX_IMAGES = [
 
 export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   chapters,
+  subjectId,
   subjectName,
   subjectColor,
   activeLesson,
@@ -258,6 +261,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
 
   return (
     <div className="relative w-full max-w-xl mx-auto flex flex-col items-center select-none font-cairo">
+      {currentChapter && <ChapterExamIcons subjectId={subjectId} subjectName={subjectName} chapterNumber={currentChapter.number} />}
       
       {/* ========================================================= */}
       {/* 🧭 CHAPTER SELECTOR DROPDOWN (اختر الفصل / تحديد الفصل) */}
