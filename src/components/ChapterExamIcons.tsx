@@ -48,6 +48,18 @@ function formatQuestionItem(item: unknown, index: number) {
   return question ? `${label}. ${question}` : '';
 }
 
+function readPartCollection(value: unknown): QuestionEntry[] {
+  if (!value) return [];
+  const collection = Array.isArray(value)
+    ? value.map((partValue, index) => [`${index + 1}`, partValue] as const)
+    : typeof value === 'object'
+      ? Object.entries(value as Record<string, unknown>)
+      : [];
+  return collection
+    .map(([partTitle, partValue]) => readQuestion(partValue, partTitle))
+    .filter(Boolean) as QuestionEntry[];
+}
+
 function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   if (isAnswerKey(title) || IGNORED_KEY_PATTERN.test(title)) return null;
   if (typeof value === 'string') {
@@ -74,15 +86,14 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
 }
 
 function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry[] {
-  const entry = readQuestion(value, fallbackTitle);
-  if (entry) return [entry];
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   const obj = value as Record<string, unknown>;
-  const parts = obj.parts;
-  if (!parts || typeof parts !== 'object' || Array.isArray(parts)) return [];
-  return Object.entries(parts as Record<string, unknown>)
-    .map(([partTitle, partValue]) => readQuestion(partValue, partTitle))
-    .filter(Boolean) as QuestionEntry[];
+  const nestedParts = readPartCollection(obj.parts);
+  if (nestedParts.length > 0) return nestedParts;
+  const nestedItems = readPartCollection(obj.items);
+  if (nestedItems.length > 0) return nestedItems;
+  const entry = readQuestion(value, fallbackTitle);
+  return entry ? [entry] : [];
 }
 
 export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] {
@@ -90,6 +101,11 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
   if (rawText && rawText !== payload.raw_text && typeof rawText === 'object') {
     const parsedEntries = examQuestions(rawText as Record<string, unknown>);
     if (parsedEntries.length > 0) return parsedEntries;
+  }
+
+  const standaloneParts = readPartCollection(payload.parts || payload.items);
+  if (standaloneParts.length > 0) {
+    return [{ title: cleanText(payload.question_number) || 'س1', parts: standaloneParts }];
   }
 
   const source = payload.exam_paper || payload.questions || payload.exam;
