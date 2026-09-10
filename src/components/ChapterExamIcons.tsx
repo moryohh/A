@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BookOpenCheck, ChevronLeft, Loader2, Shuffle, X } from 'lucide-react';
+import { Award, BookOpenCheck, Camera, ChevronLeft, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 
 interface ChapterExamIconsProps {
@@ -12,7 +12,8 @@ interface ChapterExamIconsProps {
 type QuestionEntry = { title: string; text: string; answer?: string };
 
 const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
-const QUESTION_KEY_PATTERN = /question|prompt|text|content|body|^q\d*$|^س\d*$/i;
+const QUESTION_KEY_PATTERN = /question|prompt|content|body|^q\d*$|^س\d*$/i;
+const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|date|year|round|dawr|chapter|subject/i;
 
 function isAnswerKey(key: string) {
   return ANSWER_KEY_PATTERN.test(key);
@@ -23,9 +24,21 @@ function titleFromKey(key: string) {
   return clean || 'سؤال';
 }
 
+function parseJsonString(value: string): unknown {
+  const text = value.trim();
+  if (!text.startsWith('{') && !text.startsWith('[')) return value;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return value;
+  }
+}
+
 function readQuestion(value: unknown, title = ''): QuestionEntry | null {
-  if (isAnswerKey(title)) return null;
+  if (isAnswerKey(title) || IGNORED_KEY_PATTERN.test(title)) return null;
   if (typeof value === 'string') {
+    const parsed = parseJsonString(value);
+    if (parsed !== value) return readQuestion(parsed, title);
     const text = value.trim();
     if (!text || text.length < 4 || !QUESTION_KEY_PATTERN.test(title)) return null;
     return { title: titleFromKey(title), text };
@@ -39,7 +52,13 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
 }
 
 export function questionEntries(payload: Record<string, unknown>): QuestionEntry[] {
-  const source = payload.exam_paper || payload.questions || payload.exam;
+  const rawText = typeof payload.raw_text === 'string' ? parseJsonString(payload.raw_text) : null;
+  if (rawText && rawText !== payload.raw_text && typeof rawText === 'object') {
+    const parsedEntries = questionEntries(rawText as Record<string, unknown>);
+    if (parsedEntries.length > 0) return parsedEntries;
+  }
+
+  const source = payload.exam_paper || payload.questions || payload.exam || payload.items || payload.parts;
   if (Array.isArray(source)) {
     const direct = source.map((item, index) => readQuestion(item, `س${index + 1}`)).filter(Boolean) as QuestionEntry[];
     if (direct.length > 0) return direct;
@@ -57,8 +76,11 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
       return;
     }
     if (Array.isArray(value)) value.forEach((item, index) => walk(item, `س${index + 1}`));
-    else if (value && typeof value === 'object') Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => {
-      if (!isAnswerKey(childKey)) walk(childValue, childKey);
+    else if (typeof value === 'string') {
+      const parsed = parseJsonString(value);
+      if (parsed !== value) walk(parsed, key);
+    } else if (value && typeof value === 'object') Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => {
+      if (!isAnswerKey(childKey) && !IGNORED_KEY_PATTERN.test(childKey)) walk(childValue, childKey);
     });
   };
   walk(payload);
@@ -68,6 +90,8 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
 const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; onClose: () => void }> = ({ exam, subjectName, onClose }) => {
   const entries = questionEntries(exam.payload);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = entries[activeQuestionIndex];
   const examLabel = exam.exam_type === 'monthly' ? 'امتحان شهري' : 'امتحان وزاري';
   const examDate = typeof exam.payload.exam_date === 'string'
@@ -85,7 +109,19 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
 
   useEffect(() => {
     setActiveQuestionIndex(0);
+    setAnswers({});
+    setImages({});
   }, [exam.id]);
+
+  const handleImageSelected = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const previous = images[activeQuestionIndex];
+    if (previous) URL.revokeObjectURL(previous);
+    setImages((current) => ({
+      ...current,
+      [activeQuestionIndex]: URL.createObjectURL(file),
+    }));
+  };
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm" dir="rtl">
@@ -147,6 +183,44 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                 </span>
               </div>
               <p className="whitespace-pre-wrap text-sm leading-8 text-slate-900">{activeQuestion.text}</p>
+              <div className="mt-5 border-t border-slate-100 pt-4">
+                <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${activeQuestionIndex}`}>
+                  اكتب إجابتك هنا
+                </label>
+                <textarea
+                  id={`exam-answer-${exam.id}-${activeQuestionIndex}`}
+                  value={answers[activeQuestionIndex] || ''}
+                  onChange={(event) => setAnswers((current) => ({ ...current, [activeQuestionIndex]: event.target.value }))}
+                  className="mt-2 min-h-32 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-7 outline-none focus:border-sky-400 focus:bg-white"
+                  placeholder="اكتب جوابك بدون أن تظهر الإجابة النموذجية للطالب..."
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">
+                    <Camera className="h-4 w-4" />
+                    رفع صورة للإجابة
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) handleImageSelected(file);
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {images[activeQuestionIndex] && (
+                    <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                      <ImageIcon className="h-4 w-4" />
+                      تم رفع صورة
+                    </span>
+                  )}
+                </div>
+                {images[activeQuestionIndex] && (
+                  <img src={images[activeQuestionIndex]} alt="معاينة إجابة الطالب" className="mt-3 max-h-48 w-full rounded-xl border border-slate-200 object-contain" />
+                )}
+              </div>
             </article>
           )}
         </div>
