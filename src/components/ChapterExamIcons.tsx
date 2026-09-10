@@ -257,11 +257,11 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [activePartIndex, setActivePartIndex] = useState(0);
   const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
   const activePart = activeQuestion?.parts[activePartIndex];
-  const examLabel = exam.exam_type === 'monthly' ? 'امتحان شهري' : 'امتحان وزاري';
   const examDate = typeof exam.payload.exam_date === 'string'
     ? exam.payload.exam_date
     : typeof exam.payload.date === 'string'
@@ -280,6 +280,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setActiveQuestionIndex(0);
     setActivePartIndex(0);
     setPageTurnDirection(1);
+    setTouchStartX(null);
     setAnswers({});
     setImages({});
   }, [exam.id]);
@@ -308,18 +309,26 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setActivePartIndex(nextIndex);
   };
 
+  const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+    if (touchStartX === null) return;
+    const endX = event.changedTouches[0]?.clientX;
+    setTouchStartX(null);
+    if (typeof endX !== 'number') return;
+    const distance = touchStartX - endX;
+    if (Math.abs(distance) < 45) return;
+    turnPartPage(distance > 0 ? 1 : -1);
+  };
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm" dir="rtl">
-      <div className="flex h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl sm:h-[88vh]">
+    <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
+      <div className="flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl sm:h-[92vh] sm:rounded-2xl">
         <header className="border-b border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-700">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-right">
               <p>جمهورية العراق - وزارة التربية</p>
               <p className="mt-1 text-slate-500">{subjectName}</p>
             </div>
-            <div className="min-w-0 flex-1 text-center">
-              <p className="text-[10px] text-emerald-600">{examLabel}</p>
-            </div>
+            <div className="min-w-0 flex-1" aria-hidden="true" />
             <button type="button" onClick={onClose} className="shrink-0 rounded-full border border-slate-200 bg-slate-100 p-2 text-slate-700 shadow-sm" aria-label="خروج من الامتحان">
               <X className="h-4 w-4" />
             </button>
@@ -354,18 +363,20 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           </nav>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           {questions.length === 0 ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
           ) : activeQuestion && activePart && (
             <article
               key={`${activeQuestionIndex}-${activePartIndex}`}
-              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm`}
+              onTouchStart={(event) => setTouchStartX(event.touches[0]?.clientX ?? null)}
+              onTouchEnd={handleTouchEnd}
+              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm`}
             >
-              <div className="mb-3 border-b border-slate-100 pb-3">
+              <div className="mb-2 border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
               </div>
-              <p className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-900">{activePart.text}</p>
+              <p className="whitespace-pre-line rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-900">{activePart.text}</p>
               {activeQuestion.parts.length > 1 && (
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <button type="button" onClick={() => turnPartPage(-1)} disabled={activePartIndex === 0} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">
