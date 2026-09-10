@@ -96,6 +96,36 @@ function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry
   return entry ? [entry] : [];
 }
 
+function questionNumber(title: string) {
+  const match = title.match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function groupResettingQuestionSeries(entries: ExamQuestion[]): ExamQuestion[] {
+  if (entries.length < 4) return entries;
+  const numbers = entries.map((entry) => questionNumber(entry.title));
+  if (numbers.some((number) => number === null)) return entries;
+
+  const groups: ExamQuestion[][] = [];
+  let current: ExamQuestion[] = [];
+  entries.forEach((entry, index) => {
+    const currentNumber = numbers[index] || 0;
+    const previousNumber = index > 0 ? numbers[index - 1] || 0 : 0;
+    if (index > 0 && currentNumber <= previousNumber) {
+      groups.push(current);
+      current = [];
+    }
+    current.push(entry);
+  });
+  if (current.length > 0) groups.push(current);
+
+  if (groups.length < 2 || groups.some((group) => group.length < 2)) return entries;
+  return groups.map((group, index) => ({
+    title: `س${index + 1}`,
+    parts: group.flatMap((question) => question.parts),
+  }));
+}
+
 export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] {
   const rawText = typeof payload.raw_text === 'string' ? parseJsonString(payload.raw_text) : null;
   if (rawText && rawText !== payload.raw_text && typeof rawText === 'object') {
@@ -118,7 +148,7 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
         return parts.length > 0 ? { title, parts } : null;
       })
       .filter(Boolean) as ExamQuestion[];
-    if (direct.length > 0) return direct;
+    if (direct.length > 0) return groupResettingQuestionSeries(direct);
   }
   if (source && typeof source === 'object') {
     const entries = Object.entries(source as Record<string, unknown>);
