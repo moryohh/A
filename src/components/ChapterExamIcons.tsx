@@ -226,47 +226,10 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
 
 function playPageFlipSound() {
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-    const bufferSize = ctx.sampleRate * 0.42;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i += 1) {
-      const progress = i / bufferSize;
-      const flutter = Math.sin(progress * Math.PI * 26) * 0.22;
-      data[i] = (Math.random() * 2 - 1 + flutter) * Math.pow(1 - progress, 1.6);
-    }
-    const noise = ctx.createBufferSource();
-    const filter = ctx.createBiquadFilter();
-    const lowpass = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-    const click = ctx.createOscillator();
-    const clickGain = ctx.createGain();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(950, now);
-    filter.frequency.exponentialRampToValueAtTime(260, now + 0.38);
-    lowpass.type = 'lowpass';
-    lowpass.frequency.setValueAtTime(3600, now);
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
-    click.type = 'triangle';
-    click.frequency.setValueAtTime(170, now);
-    click.frequency.exponentialRampToValueAtTime(80, now + 0.12);
-    clickGain.gain.setValueAtTime(0.03, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    noise.buffer = buffer;
-    noise.connect(filter);
-    filter.connect(lowpass);
-    lowpass.connect(gain);
-    gain.connect(ctx.destination);
-    click.connect(clickGain);
-    clickGain.connect(ctx.destination);
-    noise.start(now);
-    noise.stop(now + 0.42);
-    click.start(now);
-    click.stop(now + 0.12);
-    setTimeout(() => ctx.close().catch(() => {}), 520);
+    const audio = new Audio('/audio/book-page-flip.mp3');
+    audio.volume = 0.8;
+    audio.currentTime = 0;
+    void audio.play();
   } catch {}
 }
 
@@ -427,8 +390,13 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
               } as React.CSSProperties}
               className={`exam-page-turn ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
             >
-              <div className="mb-2 border-b border-slate-100 pb-2">
+              <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
+                {activeQuestion.parts.length > 1 && (
+                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                    اقلب الصفحة
+                  </span>
+                )}
               </div>
               <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
               <div className="mt-5 border-t border-slate-100 pt-4">
