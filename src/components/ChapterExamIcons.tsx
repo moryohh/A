@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BookOpenCheck, ChevronLeft, Loader2, X } from 'lucide-react';
+import { Award, BookOpenCheck, ChevronLeft, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 
 interface ChapterExamIconsProps {
@@ -10,6 +10,7 @@ interface ChapterExamIconsProps {
 }
 
 type QuestionEntry = { title: string; text: string; answer?: string };
+type ExamPickerMode = 'monthly' | 'ministry';
 
 function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -67,8 +68,8 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   }, [exam.id]);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" dir="rtl">
-      <div className="max-h-[88vh] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm" dir="rtl">
+      <div className="flex h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl sm:h-[88vh]">
         <header className="border-b border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-700">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-right">
@@ -114,11 +115,11 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           </nav>
         )}
 
-        <div className="max-h-[62vh] overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           {entries.length === 0 ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
           ) : activeQuestion && (
-            <article className="min-h-[300px] rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
+            <article className="min-h-full rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title || `س${activeQuestionIndex + 1}`}</h3>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">
@@ -138,7 +139,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
   const [monthly, setMonthly] = useState<CurriculumExamRecord[]>([]);
   const [ministry, setMinistry] = useState<CurriculumExamRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
-  const [isMinistryOpen, setIsMinistryOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<ExamPickerMode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadBank = async () => {
@@ -154,14 +155,25 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
   };
 
   const openMonthly = async () => {
-    const bank = monthly.length || ministry.length ? { monthly, ministry } : await loadBank();
-    setSelected(chooseRandomExam(bank.monthly));
+    if (!monthly.length && !ministry.length) await loadBank();
+    setPickerMode('monthly');
   };
 
   const openMinistry = async () => {
-    const bank = monthly.length || ministry.length ? { monthly, ministry } : await loadBank();
-    setIsMinistryOpen(true);
-    if (bank.ministry.length === 1) setSelected(bank.ministry[0]);
+    if (!monthly.length && !ministry.length) await loadBank();
+    setPickerMode('ministry');
+  };
+
+  const pickerExams = pickerMode === 'monthly' ? monthly : ministry;
+  const pickerTitle = pickerMode === 'monthly' ? 'الامتحانات الشهرية' : 'الامتحانات الوزارية';
+  const pickerEmpty = pickerMode === 'monthly' ? 'لا توجد نماذج شهرية لهذا الفصل حاليًا.' : 'لا توجد نماذج وزارية لهذا الموضوع حاليًا.';
+
+  const openRandomFromPicker = () => {
+    const randomExam = chooseRandomExam(pickerExams);
+    if (randomExam) {
+      setSelected(randomExam);
+      setPickerMode(null);
+    }
   };
 
   return (
@@ -176,12 +188,33 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
         </button>
       </div>
 
-      {isMinistryOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center" dir="rtl">
-          <div className="max-h-[78vh] w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-white shadow-2xl">
-            <header className="flex items-center justify-between border-b border-white/10 p-4"><div><p className="text-[10px] font-bold text-sky-300">{subjectName}</p><h2 className="text-base font-black">الامتحانات الوزارية</h2></div><button type="button" onClick={() => setIsMinistryOpen(false)} className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button></header>
-            <div className="space-y-2 overflow-y-auto p-4">
-              {ministry.length === 0 ? <p className="p-4 text-center text-sm text-white/60">لا توجد نماذج وزارية لهذا الموضوع حاليًا.</p> : ministry.map((exam) => <button key={exam.id} type="button" onClick={() => { setSelected(exam); setIsMinistryOpen(false); }} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:bg-sky-500/15"><span className="min-w-0 text-xs font-bold leading-6">{exam.title} · {questionEntries(exam.payload).length} سؤال</span><ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" /></button>)}
+      {pickerMode && !selected && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm" dir="rtl">
+          <div className="flex max-h-[84vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-white/10 p-4">
+              <div>
+                <p className="text-[10px] font-bold text-sky-300">{subjectName}</p>
+                <h2 className="text-base font-black">{pickerTitle}</h2>
+              </div>
+              <button type="button" onClick={() => setPickerMode(null)} className="rounded-full bg-white/10 p-2" aria-label="خروج">
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+              {pickerExams.length > 0 && (
+                <button type="button" onClick={openRandomFromPicker} className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 p-3 text-xs font-black text-slate-950 transition hover:bg-amber-300">
+                  <Shuffle className="h-4 w-4" />
+                  اختيار امتحان عشوائي
+                </button>
+              )}
+              {pickerExams.length === 0 ? (
+                <p className="p-4 text-center text-sm text-white/60">{pickerEmpty}</p>
+              ) : pickerExams.map((exam) => (
+                <button key={exam.id} type="button" onClick={() => { setSelected(exam); setPickerMode(null); }} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:bg-sky-500/15">
+                  <span className="min-w-0 text-xs font-bold leading-6">{exam.title} · {questionEntries(exam.payload).length} سؤال</span>
+                  <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
+                </button>
+              ))}
             </div>
           </div>
         </div>
