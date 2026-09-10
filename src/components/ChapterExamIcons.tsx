@@ -226,7 +226,7 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
 
 function playPageFlipSound() {
   try {
-    const audio = new Audio('/audio/book-page-flip.mp3');
+    const audio = new Audio(`${import.meta.env.BASE_URL}audio/book-page-flip.mp3`);
     audio.volume = 0.8;
     audio.currentTime = 0;
     void audio.play();
