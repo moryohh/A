@@ -245,7 +245,9 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
-  const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [submitState, setSubmitState] = useState<'idle' | 'confirming' | 'processing' | 'completed' | 'error'>('idle');
+  const [processingPhase, setProcessingPhase] = useState(0);
+  const [submitMessage, setSubmitMessage] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -279,9 +281,19 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setTouchStartX(null);
     setTouchDeltaX(0);
     setSubmitState('idle');
+    setProcessingPhase(0);
+    setSubmitMessage('');
     setAnswers({});
     setImages({});
   }, [exam.id]);
+
+  useEffect(() => {
+    if (submitState !== 'processing') return undefined;
+    const timer = window.setInterval(() => {
+      setProcessingPhase((current) => (current + 1) % 4);
+    }, 1200);
+    return () => window.clearInterval(timer);
+  }, [submitState]);
 
   const handleImageSelected = (file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -348,7 +360,13 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     }
   };
 
-  const saveSubmission = async () => {
+  const requestSubmit = () => {
+    if (submitState !== 'idle' && submitState !== 'error') return;
+    setSubmitState('confirming');
+    setSubmitMessage('');
+  };
+
+  const confirmSubmission = async () => {
     const submittedAt = new Date().toISOString();
     const entries = questions.flatMap((question, questionIndex) => question.parts.map((part, partIndex) => {
       const key = questionIndex * 100 + partIndex;
@@ -371,24 +389,37 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
       entries,
     };
 
-    setSubmitState('saving');
-    localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(submission));
-    localStorage.setItem('chapter-exam-submission:last', JSON.stringify(submission));
-    await supabase.from('curriculum_exam_submissions').insert({
-      exam_id: exam.id,
-      subject_id: exam.subject_id,
-      chapter_number: exam.chapter_number,
-      payload: submission,
-      submitted_at: submittedAt,
-    });
-    setSubmitState('saved');
+    setSubmitState('processing');
+    setProcessingPhase(0);
+    try {
+      localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(submission));
+      localStorage.setItem('chapter-exam-submission:last', JSON.stringify(submission));
+      const { error } = await supabase.from('curriculum_exam_submissions').insert({
+        exam_id: exam.id,
+        subject_id: exam.subject_id,
+        chapter_number: exam.chapter_number,
+        payload: submission,
+        submitted_at: submittedAt,
+      });
+      if (error) {
+        setSubmitMessage('تم حفظ الإجابات على الجهاز، لكن Supabase رفض الحفظ. يحتاج جدول curriculum_exam_submissions أو صلاحيات RLS.');
+      } else {
+        setSubmitMessage('تم إرسال إجاباتك وحفظها.');
+      }
+      setSubmitState('completed');
+      window.setTimeout(onClose, 1800);
+    } catch {
+      setSubmitMessage('تم حفظ الإجابات على الجهاز، لكن تعذر الاتصال بالحفظ الخارجي.');
+      setSubmitState('error');
+    }
   };
 
   const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
+  const processingMessages = ['جاري إرسال الإجابات', 'جاري حفظ الإجابات', 'جاري انتظار نتيجة التصحيح', 'جاري تجهيز صفحة النتيجة'];
 
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
-      <div className="flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl sm:h-[92vh] sm:rounded-2xl">
+      <div className="relative flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl sm:h-[92vh] sm:rounded-2xl">
         <header className="border-b border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-700">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-right">
@@ -511,21 +542,58 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                 )}
                 <button
                   type="button"
-                  onClick={saveSubmission}
-                  disabled={submitState === 'saving'}
+                  onClick={requestSubmit}
+                  disabled={submitState === 'processing' || submitState === 'completed'}
                   className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
                 >
-                  {submitState === 'saving' ? 'جاري رفع الإجابات...' : 'رفع الإجابات'}
+                  {submitState === 'processing' ? 'جاري رفع الإجابات...' : 'رفع الإجابات'}
                 </button>
-                {submitState === 'saved' && (
-                  <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
-                    تم حفظ {submittedCount} إجابة.
+                {(submitState === 'completed' || submitState === 'error') && submitMessage && (
+                  <p className={`mt-2 rounded-xl px-3 py-2 text-xs font-black ${submitState === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+                    {submitMessage}
                   </p>
                 )}
               </div>
             </article>
           )}
         </div>
+        {submitState === 'confirming' && (
+          <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 text-right shadow-2xl">
+              <h3 className="text-base font-black text-slate-950">تأكيد إرسال الإجابات</h3>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                سيتم إرسال {submittedCount} إجابة. يمكنك الرجوع الآن وتعديل الإجابة قبل الإرسال النهائي.
+              </p>
+              <div className="mt-5 flex gap-2">
+                <button type="button" onClick={() => setSubmitState('idle')} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
+                  تعديل الإجابات
+                </button>
+                <button type="button" onClick={confirmSubmission} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">
+                  تأكيد الإرسال
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {(submitState === 'processing' || submitState === 'completed') && (
+          <div className="absolute inset-0 z-[90] flex items-center justify-center bg-white/95 p-5 text-center">
+            <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-6 shadow-xl">
+              {submitState === 'processing' ? (
+                <>
+                  <Loader2 className="mx-auto h-9 w-9 animate-spin text-emerald-600" />
+                  <h3 className="mt-4 text-lg font-black text-slate-950">{processingMessages[processingPhase]}</h3>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">ابقَ قليلا، سيتم الخروج من صفحة الامتحان بعد اكتمال الإرسال.</p>
+                </>
+              ) : (
+                <>
+                  <Award className="mx-auto h-10 w-10 text-emerald-600" />
+                  <h3 className="mt-4 text-lg font-black text-slate-950">تم إرسال إجاباتك</h3>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">{submitMessage || 'جاري الخروج من صفحة الامتحان.'}</p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
