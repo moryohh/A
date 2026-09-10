@@ -48,6 +48,25 @@ function formatQuestionItem(item: unknown, index: number) {
   return question ? `${label}. ${question}` : '';
 }
 
+function formatQuestionPoint(item: unknown, index: number) {
+  if (typeof item === 'string') return `${index + 1}. ${item.trim()}`;
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
+  const obj = item as Record<string, unknown>;
+  const label = cleanText(obj.point_number) || cleanText(obj.label) || cleanText(obj.number) || `${index + 1}`;
+  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  return question ? `${label}. ${question}` : '';
+}
+
+function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return readQuestion(value, fallbackTitle);
+  const obj = value as Record<string, unknown>;
+  const points = Array.isArray(obj.points) ? obj.points.map(formatQuestionPoint).filter(Boolean) : [];
+  const title = cleanText(obj.branch_label) || cleanText(obj.title) || titleFromKey(fallbackTitle);
+  const heading = cleanText(obj.title);
+  if (points.length > 0) return { title, text: [heading, ...points].filter(Boolean).join('\n\n') };
+  return readQuestion(value, fallbackTitle);
+}
+
 function readPartCollection(value: unknown): QuestionEntry[] {
   if (!value) return [];
   const collection = Array.isArray(value)
@@ -56,7 +75,7 @@ function readPartCollection(value: unknown): QuestionEntry[] {
       ? Object.entries(value as Record<string, unknown>)
       : [];
   return collection
-    .map(([partTitle, partValue]) => readQuestion(partValue, partTitle))
+    .map(([partTitle, partValue]) => readBranch(partValue, partTitle))
     .filter(Boolean) as QuestionEntry[];
 }
 
@@ -88,6 +107,8 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
 function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   const obj = value as Record<string, unknown>;
+  const branches = readPartCollection(obj.branches);
+  if (branches.length > 0) return branches;
   const nestedParts = readPartCollection(obj.parts);
   if (nestedParts.length > 0) return nestedParts;
   const nestedItems = readPartCollection(obj.items);
@@ -133,12 +154,15 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
     if (parsedEntries.length > 0) return parsedEntries;
   }
 
-  const standaloneParts = readPartCollection(payload.parts || payload.items);
+  const standaloneParts = readPartCollection(payload.branches || payload.parts || payload.items);
   if (standaloneParts.length > 0) {
     return [{ title: cleanText(payload.question_number) || 'س1', parts: standaloneParts }];
   }
 
-  const source = payload.exam_paper || payload.questions || payload.exam;
+  const examPaper = payload.exam_paper && typeof payload.exam_paper === 'object' && !Array.isArray(payload.exam_paper)
+    ? payload.exam_paper as Record<string, unknown>
+    : null;
+  const source = examPaper?.questions || payload.questions || payload.exam_paper || payload.exam;
   if (Array.isArray(source)) {
     const direct = source
       .map((item, index) => {
