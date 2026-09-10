@@ -10,21 +10,39 @@ interface ChapterExamIconsProps {
 }
 
 type QuestionEntry = { title: string; text: string; answer?: string };
-type ExamPickerMode = 'monthly' | 'ministry';
+
+const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
+const QUESTION_KEY_PATTERN = /question|prompt|text|content|body|^q\d*$|^س\d*$/i;
+
+function isAnswerKey(key: string) {
+  return ANSWER_KEY_PATTERN.test(key);
+}
+
+function titleFromKey(key: string) {
+  const clean = key.replace(/[_-]+/g, ' ').trim();
+  return clean || 'سؤال';
+}
 
 function readQuestion(value: unknown, title = ''): QuestionEntry | null {
+  if (isAnswerKey(title)) return null;
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text || text.length < 4 || !QUESTION_KEY_PATTERN.test(title)) return null;
+    return { title: titleFromKey(title), text };
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  const question = obj.question || obj.text || obj.prompt;
+  const question = obj.question || obj.text || obj.prompt || obj.content || obj.body;
   const answer = obj.answer || obj.model_answer;
   if (typeof question !== 'string' || !question.trim()) return null;
-  return { title, text: question.trim(), answer: typeof answer === 'string' ? answer : undefined };
+  return { title: titleFromKey(title), text: question.trim(), answer: typeof answer === 'string' ? answer : undefined };
 }
 
 export function questionEntries(payload: Record<string, unknown>): QuestionEntry[] {
   const source = payload.exam_paper || payload.questions || payload.exam;
   if (Array.isArray(source)) {
-    return source.map((item, index) => readQuestion(item, `السؤال ${index + 1}`)).filter(Boolean) as QuestionEntry[];
+    const direct = source.map((item, index) => readQuestion(item, `س${index + 1}`)).filter(Boolean) as QuestionEntry[];
+    if (direct.length > 0) return direct;
   }
   if (source && typeof source === 'object') {
     const entries = Object.entries(source as Record<string, unknown>);
@@ -38,8 +56,10 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
       if (!fallback.some((item) => item.text === entry.text)) fallback.push(entry);
       return;
     }
-    if (Array.isArray(value)) value.forEach((item, index) => walk(item, `السؤال ${index + 1}`));
-    else if (value && typeof value === 'object') Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => walk(childValue, childKey));
+    if (Array.isArray(value)) value.forEach((item, index) => walk(item, `س${index + 1}`));
+    else if (value && typeof value === 'object') Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => {
+      if (!isAnswerKey(childKey)) walk(childValue, childKey);
+    });
   };
   walk(payload);
   return fallback;
@@ -139,7 +159,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
   const [monthly, setMonthly] = useState<CurriculumExamRecord[]>([]);
   const [ministry, setMinistry] = useState<CurriculumExamRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
-  const [pickerMode, setPickerMode] = useState<ExamPickerMode | null>(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadBank = async () => {
@@ -154,67 +174,111 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
     }
   };
 
-  const openMonthly = async () => {
+  const openExamPicker = async () => {
     if (!monthly.length && !ministry.length) await loadBank();
-    setPickerMode('monthly');
+    setIsPickerOpen(true);
   };
 
-  const openMinistry = async () => {
-    if (!monthly.length && !ministry.length) await loadBank();
-    setPickerMode('ministry');
-  };
+  const readableExams = (exams: CurriculumExamRecord[]) => exams.filter((exam) => questionEntries(exam.payload).length > 0);
 
-  const pickerExams = pickerMode === 'monthly' ? monthly : ministry;
-  const pickerTitle = pickerMode === 'monthly' ? 'الامتحانات الشهرية' : 'الامتحانات الوزارية';
-  const pickerEmpty = pickerMode === 'monthly' ? 'لا توجد نماذج شهرية لهذا الفصل حاليًا.' : 'لا توجد نماذج وزارية لهذا الموضوع حاليًا.';
-
-  const openRandomFromPicker = () => {
-    const randomExam = chooseRandomExam(pickerExams);
+  const openRandomExam = (exams: CurriculumExamRecord[]) => {
+    const randomExam = chooseRandomExam(readableExams(exams));
     if (randomExam) {
       setSelected(randomExam);
-      setPickerMode(null);
+      setIsPickerOpen(false);
     }
   };
+
+  const renderExamColumn = (
+    title: string,
+    description: string,
+    exams: CurriculumExamRecord[],
+    emptyMessage: string,
+    accentClass: string,
+  ) => (
+    <section className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3">
+        <p className={`text-[11px] font-black ${accentClass}`}>{description}</p>
+        <h3 className="text-lg font-black text-white">{title}</h3>
+      </div>
+      {readableExams(exams).length > 0 && (
+        <button type="button" onClick={() => openRandomExam(exams)} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 p-3 text-xs font-black text-slate-950 transition hover:bg-amber-300">
+          <Shuffle className="h-4 w-4" />
+          اختيار عشوائي
+        </button>
+      )}
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
+        {exams.length === 0 ? (
+          <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">{emptyMessage}</p>
+        ) : exams.map((exam) => {
+          const questionCount = questionEntries(exam.payload).length;
+          const isReadable = questionCount > 0;
+          return (
+            <button
+              key={exam.id}
+              type="button"
+              onClick={() => {
+                if (!isReadable) return;
+                setSelected(exam);
+                setIsPickerOpen(false);
+              }}
+              disabled={!isReadable}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-black leading-6 text-white">{exam.title}</span>
+                <span className="block text-[10px] font-bold text-white/55">
+                  {isReadable ? `${questionCount} سؤال` : 'صيغة غير مقروءة'}
+                </span>
+              </span>
+              <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 
   return (
     <>
       <div className={`${className || 'absolute left-3 top-3'} z-40 flex items-center gap-2`} dir="rtl">
-        <button type="button" onClick={openMonthly} disabled={isLoading} className="group flex items-center gap-2 rounded-2xl border border-amber-200/50 bg-amber-400 px-3 py-2 text-right text-[11px] font-black text-slate-950 shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label={`الامتحان الشهري للفصل ${chapterNumber}`}>
+        <button type="button" onClick={openExamPicker} disabled={isLoading} className="group flex items-center gap-2 rounded-2xl border border-amber-200/50 bg-amber-400 px-3 py-2 text-right text-[11px] font-black text-slate-950 shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label={`الامتحان الشهري للفصل ${chapterNumber}`}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
           <span>الامتحان الشهري</span>
         </button>
-        <button type="button" onClick={openMinistry} disabled={isLoading} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-200/50 bg-sky-500 text-white shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label="الامتحانات الوزارية">
+        <button type="button" onClick={openExamPicker} disabled={isLoading} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-200/50 bg-sky-500 text-white shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label="الامتحانات الوزارية">
           <Award className="h-5 w-5" />
         </button>
       </div>
 
-      {pickerMode && !selected && (
+      {isPickerOpen && !selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm" dir="rtl">
-          <div className="flex max-h-[84vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl">
+          <div className="flex h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl">
             <header className="flex items-center justify-between border-b border-white/10 p-4">
               <div>
                 <p className="text-[10px] font-bold text-sky-300">{subjectName}</p>
-                <h2 className="text-base font-black">{pickerTitle}</h2>
+                <h2 className="text-base font-black">اختر نموذج الامتحان</h2>
               </div>
-              <button type="button" onClick={() => setPickerMode(null)} className="rounded-full bg-white/10 p-2" aria-label="خروج">
+              <button type="button" onClick={() => setIsPickerOpen(false)} className="rounded-full bg-white/10 p-2" aria-label="خروج">
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
-              {pickerExams.length > 0 && (
-                <button type="button" onClick={openRandomFromPicker} className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 p-3 text-xs font-black text-slate-950 transition hover:bg-amber-300">
-                  <Shuffle className="h-4 w-4" />
-                  اختيار امتحان عشوائي
-                </button>
+            <div className="grid min-h-0 flex-1 grid-cols-[1fr_auto_1fr] gap-3 p-4">
+              {renderExamColumn(
+                'شهري',
+                'نماذج الفصل المتوفرة',
+                monthly,
+                'لا توجد امتحانات شهرية لهذا الفصل حاليًا.',
+                'text-amber-300',
               )}
-              {pickerExams.length === 0 ? (
-                <p className="p-4 text-center text-sm text-white/60">{pickerEmpty}</p>
-              ) : pickerExams.map((exam) => (
-                <button key={exam.id} type="button" onClick={() => { setSelected(exam); setPickerMode(null); }} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:bg-sky-500/15">
-                  <span className="min-w-0 text-xs font-bold leading-6">{exam.title} · {questionEntries(exam.payload).length} سؤال</span>
-                  <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
-                </button>
-              ))}
+              <div className="w-px bg-white/10" aria-hidden="true" />
+              {renderExamColumn(
+                'وزاري',
+                'أسئلة السنوات والأدوار',
+                ministry,
+                'لا توجد امتحانات وزارية لهذا الموضوع حاليًا.',
+                'text-sky-300',
+              )}
             </div>
           </div>
         </div>
