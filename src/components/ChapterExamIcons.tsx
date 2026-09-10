@@ -229,26 +229,44 @@ function playPageFlipSound() {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AudioCtx();
     const now = ctx.currentTime;
-    const bufferSize = ctx.sampleRate * 0.18;
+    const bufferSize = ctx.sampleRate * 0.42;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i += 1) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      const progress = i / bufferSize;
+      const flutter = Math.sin(progress * Math.PI * 26) * 0.22;
+      data[i] = (Math.random() * 2 - 1 + flutter) * Math.pow(1 - progress, 1.6);
     }
     const noise = ctx.createBufferSource();
     const filter = ctx.createBiquadFilter();
+    const lowpass = ctx.createBiquadFilter();
     const gain = ctx.createGain();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(700, now);
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    const click = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(950, now);
+    filter.frequency.exponentialRampToValueAtTime(260, now + 0.38);
+    lowpass.type = 'lowpass';
+    lowpass.frequency.setValueAtTime(3600, now);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+    click.type = 'triangle';
+    click.frequency.setValueAtTime(170, now);
+    click.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+    clickGain.gain.setValueAtTime(0.03, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     noise.buffer = buffer;
     noise.connect(filter);
-    filter.connect(gain);
+    filter.connect(lowpass);
+    lowpass.connect(gain);
     gain.connect(ctx.destination);
+    click.connect(clickGain);
+    clickGain.connect(ctx.destination);
     noise.start(now);
-    noise.stop(now + 0.18);
-    setTimeout(() => ctx.close().catch(() => {}), 260);
+    noise.stop(now + 0.42);
+    click.start(now);
+    click.stop(now + 0.12);
+    setTimeout(() => ctx.close().catch(() => {}), 520);
   } catch {}
 }
 
@@ -258,6 +276,8 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const [activePartIndex, setActivePartIndex] = useState(0);
   const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDeltaX, setTouchDeltaX] = useState(0);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -289,6 +309,8 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setActivePartIndex(0);
     setPageTurnDirection(1);
     setTouchStartX(null);
+    setTouchDeltaX(0);
+    setIsSubmitted(false);
     setAnswers({});
     setImages({});
   }, [exam.id]);
@@ -306,6 +328,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const openQuestion = (index: number) => {
     setActiveQuestionIndex(index);
     setActivePartIndex(0);
+    setTouchDeltaX(0);
   };
 
   const turnPartPage = (direction: 1 | -1) => {
@@ -314,18 +337,32 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     if (nextIndex < 0 || nextIndex >= activeQuestion.parts.length) return;
     setPageTurnDirection(direction);
     playPageFlipSound();
+    setTouchDeltaX(0);
     setActivePartIndex(nextIndex);
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLElement>) => {
+    if (touchStartX === null) return;
+    const currentX = event.touches[0]?.clientX;
+    if (typeof currentX !== 'number') return;
+    const nextDelta = currentX - touchStartX;
+    const canMoveForward = nextDelta < 0 && activePartIndex < (activeQuestion?.parts.length || 0) - 1;
+    const canMoveBack = nextDelta > 0 && activePartIndex > 0;
+    setTouchDeltaX(canMoveForward || canMoveBack ? Math.max(-120, Math.min(120, nextDelta)) : 0);
   };
 
   const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
     if (touchStartX === null) return;
     const endX = event.changedTouches[0]?.clientX;
     setTouchStartX(null);
+    setTouchDeltaX(0);
     if (typeof endX !== 'number') return;
     const distance = touchStartX - endX;
     if (Math.abs(distance) < 45) return;
     turnPartPage(distance > 0 ? 1 : -1);
   };
+
+  const submittedCount = Object.values(answers).filter((answer) => answer.trim()).length + Object.keys(images).length;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
@@ -378,9 +415,17 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           ) : activeQuestion && activePart && (
             <article
               key={`${activeQuestionIndex}-${activePartIndex}`}
-              onTouchStart={(event) => setTouchStartX(event.touches[0]?.clientX ?? null)}
+              onTouchStart={(event) => {
+                setTouchStartX(event.touches[0]?.clientX ?? null);
+                setTouchDeltaX(0);
+              }}
+              onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
+              style={{
+                '--page-drag-x': `${touchDeltaX * 0.18}px`,
+                '--page-drag-rotate': `${touchDeltaX * -0.16}deg`,
+              } as React.CSSProperties}
+              className={`exam-page-turn ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
             >
               <div className="mb-2 border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
@@ -422,6 +467,18 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                 </div>
                 {images[answerKey] && (
                   <img src={images[answerKey]} alt="معاينة إجابة الطالب" className="mt-3 max-h-48 w-full rounded-xl border border-slate-200 object-contain" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsSubmitted(true)}
+                  className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
+                >
+                  رفع الإجابات
+                </button>
+                {isSubmitted && (
+                  <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                    تم تجهيز {submittedCount} إجابة للرفع.
+                  </p>
                 )}
               </div>
             </article>
