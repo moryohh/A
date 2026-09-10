@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Award, BookOpenCheck, Camera, ChevronLeft, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
+import { supabase } from '../lib/supabase';
 
 interface ChapterExamIconsProps {
   subjectId: string;
@@ -233,6 +234,10 @@ function playPageFlipSound() {
   } catch {}
 }
 
+function examSubmissionKey(examId: string) {
+  return `chapter-exam-submission:${examId}`;
+}
+
 const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; onClose: () => void }> = ({ exam, subjectName, onClose }) => {
   const questions = examQuestions(exam.payload);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -240,7 +245,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -273,19 +278,22 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setPageTurnDirection(1);
     setTouchStartX(null);
     setTouchDeltaX(0);
-    setIsSubmitted(false);
+    setSubmitState('idle');
     setAnswers({});
     setImages({});
   }, [exam.id]);
 
   const handleImageSelected = (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const previous = images[answerKey];
-    if (previous) URL.revokeObjectURL(previous);
-    setImages((current) => ({
-      ...current,
-      [answerKey]: URL.createObjectURL(file),
-    }));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      setImages((current) => ({
+        ...current,
+        [answerKey]: reader.result as string,
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const openQuestion = (index: number) => {
@@ -323,6 +331,57 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     const distance = touchStartX - endX;
     if (Math.abs(distance) < 45) return;
     turnPartPage(distance > 0 ? 1 : -1);
+  };
+
+  const flipForward = () => {
+    if (!activeQuestion) return;
+    const hasNextPart = activePartIndex < activeQuestion.parts.length - 1;
+    if (hasNextPart) {
+      turnPartPage(1);
+      return;
+    }
+    if (activeQuestionIndex < questions.length - 1) {
+      setPageTurnDirection(1);
+      playPageFlipSound();
+      setActiveQuestionIndex((current) => current + 1);
+      setActivePartIndex(0);
+    }
+  };
+
+  const saveSubmission = async () => {
+    const submittedAt = new Date().toISOString();
+    const entries = questions.flatMap((question, questionIndex) => question.parts.map((part, partIndex) => {
+      const key = questionIndex * 100 + partIndex;
+      return {
+        question: question.title,
+        part: part.title,
+        prompt: part.text,
+        answer: answers[key] || '',
+        image: images[key] || '',
+      };
+    }));
+    const submission = {
+      id: `submission_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      exam_id: exam.id,
+      exam_title: exam.title,
+      subject_id: exam.subject_id,
+      subject_name: subjectName,
+      chapter_number: exam.chapter_number,
+      submitted_at: submittedAt,
+      entries,
+    };
+
+    setSubmitState('saving');
+    localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(submission));
+    localStorage.setItem('chapter-exam-submission:last', JSON.stringify(submission));
+    await supabase.from('curriculum_exam_submissions').insert({
+      exam_id: exam.id,
+      subject_id: exam.subject_id,
+      chapter_number: exam.chapter_number,
+      payload: submission,
+      submitted_at: submittedAt,
+    });
+    setSubmitState('saved');
   };
 
   const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
@@ -378,12 +437,6 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           ) : activeQuestion && activePart && (
             <article
               key={`${activeQuestionIndex}-${activePartIndex}`}
-              onTouchStart={(event) => {
-                setTouchStartX(event.touches[0]?.clientX ?? null);
-                setTouchDeltaX(0);
-              }}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
               style={{
                 '--page-drag-x': `${touchDeltaX * 0.18}px`,
                 '--page-drag-rotate': `${touchDeltaX * -0.16}deg`,
@@ -393,13 +446,32 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
               <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
                 {activeQuestion.parts.length > 1 && (
-                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={flipForward}
+                    className="shrink-0 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
+                  >
                     اقلب الصفحة
-                  </span>
+                  </button>
                 )}
               </div>
-              <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
-              <div className="mt-5 border-t border-slate-100 pt-4">
+              <div
+                onTouchStart={(event) => {
+                  setTouchStartX(event.touches[0]?.clientX ?? null);
+                  setTouchDeltaX(0);
+                }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                className="exam-page-sheet rounded-xl"
+              >
+                <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
+              </div>
+              <div
+                className="mt-5 border-t border-slate-100 pt-4"
+                onTouchStart={(event) => event.stopPropagation()}
+                onTouchMove={(event) => event.stopPropagation()}
+                onTouchEnd={(event) => event.stopPropagation()}
+              >
                 <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
                   الجواب
                 </label>
@@ -409,9 +481,10 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                   onChange={(event) => setAnswers((current) => ({ ...current, [answerKey]: event.target.value }))}
                   className="mt-2 min-h-32 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-7 outline-none focus:border-sky-400 focus:bg-white"
                   placeholder="اكتب جوابك بدون أن تظهر الإجابة النموذجية للطالب..."
+                  onTouchStart={(event) => event.stopPropagation()}
                 />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white" onTouchStart={(event) => event.stopPropagation()}>
                     <Camera className="h-4 w-4" />
                     رفع صورة للإجابة
                     <input
@@ -438,14 +511,15 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                 )}
                 <button
                   type="button"
-                  onClick={() => setIsSubmitted(true)}
+                  onClick={saveSubmission}
+                  disabled={submitState === 'saving'}
                   className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
                 >
-                  رفع الإجابات
+                  {submitState === 'saving' ? 'جاري رفع الإجابات...' : 'رفع الإجابات'}
                 </button>
-                {isSubmitted && (
+                {submitState === 'saved' && (
                   <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
-                    تم تجهيز {submittedCount} إجابة للرفع.
+                    تم حفظ {submittedCount} إجابة.
                   </p>
                 )}
               </div>
