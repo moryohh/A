@@ -25,6 +25,11 @@ function titleFromKey(key: string) {
   return clean || 'سؤال';
 }
 
+function questionTitleFromKey(key: string, index: number) {
+  const match = key.match(/(?:question|س)[_-]?(\d+)/i);
+  return match ? `س${match[1]}` : titleFromKey(key) || `س${index + 1}`;
+}
+
 function parseJsonString(value: string): unknown {
   const text = value.trim();
   if (!text.startsWith('{') && !text.startsWith('[')) return value;
@@ -114,7 +119,13 @@ function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry
   const nestedItems = readPartCollection(obj.items);
   if (nestedItems.length > 0) return nestedItems;
   const entry = readQuestion(value, fallbackTitle);
-  return entry ? [entry] : [];
+  if (entry) return [entry];
+  const keyedBranches = Object.entries(obj)
+    .filter(([key, branchValue]) => !IGNORED_KEY_PATTERN.test(key) && !isAnswerKey(key) && branchValue && typeof branchValue === 'object')
+    .map(([key, branchValue]) => readBranch(branchValue, key))
+    .filter(Boolean) as QuestionEntry[];
+  if (keyedBranches.length > 0) return keyedBranches;
+  return [];
 }
 
 function questionNumber(title: string) {
@@ -177,9 +188,9 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
   if (source && typeof source === 'object') {
     const entries = Object.entries(source as Record<string, unknown>);
     const direct = entries
-      .map(([key, value]) => {
+      .map(([key, value], index) => {
         const parts = readQuestionParts(value, key);
-        return parts.length > 0 ? { title: titleFromKey(key), parts } : null;
+        return parts.length > 0 ? { title: questionTitleFromKey(key, index), parts } : null;
       })
       .filter(Boolean) as ExamQuestion[];
     if (direct.length > 0) return direct;
