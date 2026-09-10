@@ -59,9 +59,12 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   const question = obj.question || obj.text || obj.prompt || obj.content || obj.body;
-  const items = Array.isArray(obj.items)
-    ? obj.items.map(formatQuestionItem).filter(Boolean)
-    : [];
+  const itemValues = Array.isArray(obj.items)
+    ? obj.items
+    : obj.items && typeof obj.items === 'object'
+      ? Object.values(obj.items as Record<string, unknown>)
+      : [];
+  const items = itemValues.map(formatQuestionItem).filter(Boolean);
   const answer = obj.answer || obj.model_answer;
   if (typeof question !== 'string' || !question.trim()) return null;
   const text = [question.trim(), ...items].join('\n\n');
