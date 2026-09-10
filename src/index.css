@@ -101,12 +101,13 @@ a,
 .exam-page-turn {
   position: relative;
   overflow: hidden;
-  animation-duration: 420ms;
+  animation-duration: 680ms;
   animation-fill-mode: both;
-  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-timing-function: cubic-bezier(0.2, 0.72, 0.18, 1);
   backface-visibility: hidden;
   transform-origin: center right;
   will-change: transform, opacity, filter;
+  touch-action: pan-y;
 }
 
 .exam-page-turn::after {
@@ -116,7 +117,19 @@ a,
   pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.08), transparent);
   transform: translateX(90%);
-  animation: exam-page-sheen 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: exam-page-sheen 680ms cubic-bezier(0.2, 0.72, 0.18, 1) both;
+}
+
+.exam-page-dragging {
+  animation: none;
+  transform: perspective(900px) rotateY(var(--page-drag-rotate, 0deg)) translateX(var(--page-drag-x, 0px));
+  transition: none;
+}
+
+.exam-page-dragging::after {
+  animation: none;
+  opacity: 0.65;
+  transform: translateX(var(--page-drag-x, 0px));
 }
 
 .exam-page-turn-next {
