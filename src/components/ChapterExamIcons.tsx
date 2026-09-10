@@ -256,6 +256,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   const questions = examQuestions(exam.payload);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [activePartIndex, setActivePartIndex] = useState(0);
+  const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -278,6 +279,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   useEffect(() => {
     setActiveQuestionIndex(0);
     setActivePartIndex(0);
+    setPageTurnDirection(1);
     setAnswers({});
     setImages({});
   }, [exam.id]);
@@ -301,6 +303,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     if (!activeQuestion) return;
     const nextIndex = activePartIndex + direction;
     if (nextIndex < 0 || nextIndex >= activeQuestion.parts.length) return;
+    setPageTurnDirection(direction);
     playPageFlipSound();
     setActivePartIndex(nextIndex);
   };
@@ -316,8 +319,6 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
             </div>
             <div className="min-w-0 flex-1 text-center">
               <p className="text-[10px] text-emerald-600">{examLabel}</p>
-              <h2 className="mt-1 truncate text-sm font-black text-slate-950">{exam.title}</h2>
-              <p className="mt-1 text-[10px] text-slate-500">عدد الأسئلة: {questions.length}</p>
             </div>
             <button type="button" onClick={onClose} className="shrink-0 rounded-full border border-slate-200 bg-slate-100 p-2 text-slate-700 shadow-sm" aria-label="خروج من الامتحان">
               <X className="h-4 w-4" />
@@ -357,14 +358,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           {questions.length === 0 ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
           ) : activeQuestion && activePart && (
-            <article key={`${activeQuestionIndex}-${activePartIndex}`} className="rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm transition duration-300 animate-in slide-in-from-left-3">
-              <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <article
+              key={`${activeQuestionIndex}-${activePartIndex}`}
+              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm`}
+            >
+              <div className="mb-3 border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">
-                  فرع {activePartIndex + 1} من {activeQuestion.parts.length}
-                </span>
               </div>
-              <p className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-8 text-slate-900">{activePart.text}</p>
+              <p className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-900">{activePart.text}</p>
               {activeQuestion.parts.length > 1 && (
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <button type="button" onClick={() => turnPartPage(-1)} disabled={activePartIndex === 0} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">
@@ -377,7 +378,10 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                         key={`${part.title}-${index}`}
                         type="button"
                         onClick={() => {
-                          if (index !== activePartIndex) playPageFlipSound();
+                          if (index !== activePartIndex) {
+                            setPageTurnDirection(index > activePartIndex ? 1 : -1);
+                            playPageFlipSound();
+                          }
                           setActivePartIndex(index);
                         }}
                         className={`h-2.5 rounded-full transition-all ${index === activePartIndex ? 'w-6 bg-slate-950' : 'w-2.5 bg-slate-300'}`}
