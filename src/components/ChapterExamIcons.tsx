@@ -325,7 +325,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     turnPartPage(distance > 0 ? 1 : -1);
   };
 
-  const submittedCount = Object.values(answers).filter((answer) => answer.trim()).length + Object.keys(images).length;
+  const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
