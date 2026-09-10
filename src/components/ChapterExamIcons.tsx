@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BookOpenCheck, Camera, ChevronLeft, ChevronRight, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
+import { Award, BookOpenCheck, Camera, ChevronLeft, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 
 interface ChapterExamIconsProps {
@@ -275,6 +275,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
       ? exam.payload.dawr
       : '';
   const answerKey = activeQuestionIndex * 100 + activePartIndex;
+  const partStyles = [
+    { card: 'border-sky-300 bg-sky-50/35', question: 'bg-sky-50 text-sky-950' },
+    { card: 'border-emerald-300 bg-emerald-50/35', question: 'bg-emerald-50 text-emerald-950' },
+    { card: 'border-amber-300 bg-amber-50/35', question: 'bg-amber-50 text-amber-950' },
+    { card: 'border-violet-300 bg-violet-50/35', question: 'bg-violet-50 text-violet-950' },
+    { card: 'border-rose-300 bg-rose-50/35', question: 'bg-rose-50 text-rose-950' },
+  ];
+  const activePartStyle = partStyles[activePartIndex % partStyles.length];
 
   useEffect(() => {
     setActiveQuestionIndex(0);
@@ -333,11 +341,12 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
-            <span>المادة: {subjectName}</span>
-            {examDate && <span>التاريخ: {examDate}</span>}
-            {examRound && <span>الدور: {examRound}</span>}
-          </div>
+          {(examDate || examRound) && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
+              {examDate && <span>التاريخ: {examDate}</span>}
+              {examRound && <span>الدور: {examRound}</span>}
+            </div>
+          )}
         </header>
 
         {questions.length > 0 && (
@@ -371,44 +380,15 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
               key={`${activeQuestionIndex}-${activePartIndex}`}
               onTouchStart={(event) => setTouchStartX(event.touches[0]?.clientX ?? null)}
               onTouchEnd={handleTouchEnd}
-              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm`}
+              className={`exam-page-turn ${pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
             >
               <div className="mb-2 border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
               </div>
-              <p className="whitespace-pre-line rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-900">{activePart.text}</p>
-              {activeQuestion.parts.length > 1 && (
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button type="button" onClick={() => turnPartPage(-1)} disabled={activePartIndex === 0} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">
-                    <ChevronRight className="h-4 w-4" />
-                    السابق
-                  </button>
-                  <div className="flex gap-1">
-                    {activeQuestion.parts.map((part, index) => (
-                      <button
-                        key={`${part.title}-${index}`}
-                        type="button"
-                        onClick={() => {
-                          if (index !== activePartIndex) {
-                            setPageTurnDirection(index > activePartIndex ? 1 : -1);
-                            playPageFlipSound();
-                          }
-                          setActivePartIndex(index);
-                        }}
-                        className={`h-2.5 rounded-full transition-all ${index === activePartIndex ? 'w-6 bg-slate-950' : 'w-2.5 bg-slate-300'}`}
-                        aria-label={`الفرع ${part.title}`}
-                      />
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => turnPartPage(1)} disabled={activePartIndex === activeQuestion.parts.length - 1} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">
-                    التالي
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+              <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
               <div className="mt-5 border-t border-slate-100 pt-4">
                 <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
-                  اكتب إجابتك هنا
+                  الجواب
                 </label>
                 <textarea
                   id={`exam-answer-${exam.id}-${answerKey}`}
