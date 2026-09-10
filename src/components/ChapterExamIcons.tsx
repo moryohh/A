@@ -34,6 +34,19 @@ function parseJsonString(value: string): unknown {
   }
 }
 
+function cleanText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatQuestionItem(item: unknown, index: number) {
+  if (typeof item === 'string') return `${index + 1}. ${item.trim()}`;
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
+  const obj = item as Record<string, unknown>;
+  const label = cleanText(obj.label) || cleanText(obj.number) || cleanText(obj.id) || `${index + 1}`;
+  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  return question ? `${label}. ${question}` : '';
+}
+
 function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   if (isAnswerKey(title) || IGNORED_KEY_PATTERN.test(title)) return null;
   if (typeof value === 'string') {
@@ -46,9 +59,14 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   const question = obj.question || obj.text || obj.prompt || obj.content || obj.body;
+  const items = Array.isArray(obj.items)
+    ? obj.items.map(formatQuestionItem).filter(Boolean)
+    : [];
   const answer = obj.answer || obj.model_answer;
   if (typeof question !== 'string' || !question.trim()) return null;
-  return { title: titleFromKey(title), text: question.trim(), answer: typeof answer === 'string' ? answer : undefined };
+  const text = [question.trim(), ...items].join('\n\n');
+  const entryTitle = cleanText(obj.question_number) || cleanText(obj.label) || titleFromKey(title);
+  return { title: entryTitle, text, answer: typeof answer === 'string' ? answer : undefined };
 }
 
 export function questionEntries(payload: Record<string, unknown>): QuestionEntry[] {
@@ -175,14 +193,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
           {entries.length === 0 ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
           ) : activeQuestion && (
-            <article className="min-h-full rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
+            <article className="rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-black text-slate-950">{activeQuestion.title || `س${activeQuestionIndex + 1}`}</h3>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">
                   س{activeQuestionIndex + 1} من {entries.length}
                 </span>
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-8 text-slate-900">{activeQuestion.text}</p>
+              <p className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-8 text-slate-900">{activeQuestion.text}</p>
               <div className="mt-5 border-t border-slate-100 pt-4">
                 <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${activeQuestionIndex}`}>
                   اكتب إجابتك هنا
