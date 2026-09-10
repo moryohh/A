@@ -161,22 +161,33 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const loadBank = async () => {
     setIsLoading(true);
+    setLoadError('');
     try {
       const bank = await fetchChapterExamBank(subjectId, chapterNumber);
       setMonthly(bank.monthly);
       setMinistry(bank.ministry);
       return bank;
+    } catch (error) {
+      setLoadError('تعذر تحميل الامتحانات حالياً. حاول مرة أخرى.');
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const openExamPicker = async () => {
-    if (!monthly.length && !ministry.length) await loadBank();
     setIsPickerOpen(true);
+    if (!monthly.length && !ministry.length && !isLoading) {
+      try {
+        await loadBank();
+      } catch {
+        // The picker remains open and shows the friendly error message.
+      }
+    }
   };
 
   const readableExams = (exams: CurriculumExamRecord[]) => exams.filter((exam) => questionEntries(exam.payload).length > 0);
@@ -208,7 +219,11 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
         </button>
       )}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
-        {exams.length === 0 ? (
+        {isLoading ? (
+          <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">جاري تحميل الامتحانات...</p>
+        ) : loadError ? (
+          <p className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4 text-center text-xs font-bold leading-6 text-red-100">{loadError}</p>
+        ) : exams.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">{emptyMessage}</p>
         ) : exams.map((exam) => {
           const questionCount = questionEntries(exam.payload).length;
