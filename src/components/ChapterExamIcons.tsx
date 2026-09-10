@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Award, BookOpenCheck, ChevronLeft, Loader2, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 
@@ -44,29 +44,90 @@ export function questionEntries(payload: Record<string, unknown>): QuestionEntry
   return fallback;
 }
 
-const ExamPreview: React.FC<{ exam: CurriculumExamRecord; onClose: () => void }> = ({ exam, onClose }) => {
+const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; onClose: () => void }> = ({ exam, subjectName, onClose }) => {
   const entries = questionEntries(exam.payload);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const activeQuestion = entries[activeQuestionIndex];
+  const examLabel = exam.exam_type === 'monthly' ? 'امتحان شهري' : 'امتحان وزاري';
+  const examDate = typeof exam.payload.exam_date === 'string'
+    ? exam.payload.exam_date
+    : typeof exam.payload.date === 'string'
+      ? exam.payload.date
+      : typeof exam.payload.year === 'string'
+        ? exam.payload.year
+        : '';
+  const examRound = typeof exam.payload.round === 'string'
+    ? exam.payload.round
+    : typeof exam.payload.dawr === 'string'
+      ? exam.payload.dawr
+      : '';
+
+  useEffect(() => {
+    setActiveQuestionIndex(0);
+  }, [exam.id]);
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center" dir="rtl">
-      <div className="max-h-[88vh] w-full max-w-xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-white/10 p-4">
-          <div>
-            <p className="text-[10px] font-bold text-sky-300">{exam.exam_type === 'monthly' ? 'امتحان شهري' : 'امتحان وزاري'}</p>
-            <h2 className="mt-1 text-base font-black">{exam.title}</h2>
-            <p className="mt-1 text-[11px] font-bold text-amber-300">عدد الأسئلة: {entries.length}</p>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" dir="rtl">
+      <div className="max-h-[88vh] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-stone-50 text-slate-950 shadow-2xl">
+        <header className="border-b border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-700">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 text-right">
+              <p>جمهورية العراق - وزارة التربية</p>
+              <p className="mt-1 text-slate-500">{subjectName}</p>
+            </div>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="text-[10px] text-emerald-600">{examLabel}</p>
+              <h2 className="mt-1 truncate text-sm font-black text-slate-950">{exam.title}</h2>
+              <p className="mt-1 text-[10px] text-slate-500">عدد الأسئلة: {entries.length}</p>
+            </div>
+            <button type="button" onClick={onClose} className="shrink-0 rounded-full border border-slate-200 bg-slate-100 p-2 text-slate-700 shadow-sm" aria-label="خروج من الامتحان">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full bg-white/10 p-2" aria-label="إغلاق الامتحان"><X className="h-5 w-5" /></button>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
+            <span>المادة: {subjectName}</span>
+            {examDate && <span>التاريخ: {examDate}</span>}
+            {examRound && <span>الدور: {examRound}</span>}
+          </div>
         </header>
-        <div className="max-h-[72vh] space-y-3 overflow-y-auto p-4">
+
+        {entries.length > 0 && (
+          <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-stone-100 px-3 py-2" aria-label="التنقل بين أسئلة الامتحان">
+            {entries.map((_, index) => {
+              const isActive = index === activeQuestionIndex;
+              return (
+                <button
+                  key={`exam-question-tab-${index}`}
+                  type="button"
+                  onClick={() => setActiveQuestionIndex(index)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black transition ${
+                    isActive
+                      ? 'border-slate-950 bg-slate-950 text-white'
+                      : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
+                  }`}
+                  aria-current={isActive ? 'step' : undefined}
+                >
+                  س{index + 1}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+
+        <div className="max-h-[62vh] overflow-y-auto p-4">
           {entries.length === 0 ? (
-            <p className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
-          ) : entries.map((entry, index) => (
-            <article key={`${index}-${entry.text.slice(0, 20)}`} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-right">
-              <h3 className="text-sm font-black text-sky-200">{entry.title || `س${index + 1}`}</h3>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/90">{entry.text}</p>
-              {entry.answer && <details className="mt-3 rounded-xl bg-black/20 p-3"><summary className="cursor-pointer text-xs font-black text-emerald-300">إظهار الجواب النموذجي</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-white/75">{entry.answer}</p></details>}
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">تم حفظ الملف، لكن صيغة الأسئلة تحتاج مراجعة قبل العرض التفاعلي.</p>
+          ) : activeQuestion && (
+            <article className="min-h-[300px] rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-950">{activeQuestion.title || `س${activeQuestionIndex + 1}`}</h3>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">
+                  س{activeQuestionIndex + 1} من {entries.length}
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap text-sm leading-8 text-slate-900">{activeQuestion.text}</p>
             </article>
-          ))}
+          )}
         </div>
       </div>
     </div>
@@ -125,7 +186,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
           </div>
         </div>
       )}
-      {selected && <ExamPreview exam={selected} onClose={() => setSelected(null)} />}
+      {selected && <ExamPreview exam={selected} subjectName={subjectName} onClose={() => setSelected(null)} />}
     </>
   );
 };
