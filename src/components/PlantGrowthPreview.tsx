@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
 
@@ -58,6 +58,7 @@ const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }
 };
 
 const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boolean }> = ({ cyclePoints, burst, compact = false }) => {
+  const uniqueId = useId().replace(/:/g, '');
   const stageIndex = getStageIndex(cyclePoints);
   const stage = growthStages[stageIndex];
   const isSeedReborn = stageIndex >= 14;
@@ -70,20 +71,20 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
   const showFourLeaves = stageIndex >= 4 && !showTree && !isSeedReborn;
   const showFlower = stageIndex >= 5 && !showTree && !isSeedReborn;
   const showSideLeaves = stageIndex >= 6 && !showTree && !isSeedReborn;
-  const flowerCount = stageIndex >= 8 && !showFire ? 10 : showFlower ? 1 : 0;
-  const fruitCount = stageIndex >= 10 && !showFire ? 12 : stageIndex >= 9 && !showFire ? 5 : 0;
+  const flowerCount = stageIndex >= 8 && !showFire ? 9 : showFlower ? 1 : 0;
+  const fruitCount = stageIndex >= 10 && !showFire ? 10 : stageIndex >= 9 && !showFire ? 4 : 0;
   const treeScale = stageIndex >= 12 ? 1.22 : stageIndex >= 11 ? 1.12 : stageIndex >= 10 ? 1.02 : stageIndex >= 8 ? 0.95 : 0.82;
 
   const leaves = useMemo(() => {
     return [
-      [68, 55, 30, '#2dd46f'],
-      [116, 54, 34, '#16b85f'],
-      [92, 35, 38, '#70e48b'],
-      [49, 82, 24, '#0f9f54'],
-      [135, 84, 27, '#28c76f'],
-      [91, 83, 39, '#16a35b'],
-      [72, 103, 25, '#1fbe67'],
-      [113, 105, 25, '#22c55e'],
+      [94, 37, 31, 24],
+      [63, 52, 29, 23],
+      [126, 52, 30, 23],
+      [47, 79, 27, 22],
+      [143, 80, 27, 22],
+      [73, 82, 32, 25],
+      [116, 82, 32, 25],
+      [94, 94, 35, 27],
     ];
   }, []);
 
@@ -93,7 +94,8 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
     >
       <style>{`
         @keyframes stagePop { 0% { transform: translateY(18px) scale(.72); opacity:.4; } 58% { transform: translateY(-6px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
-        @keyframes livingTree { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
+        @keyframes livingTree { 0%, 100% { transform: rotate(-1.15deg) translateY(0); } 50% { transform: rotate(1.15deg) translateY(-1px); } }
+        @keyframes crownGlow { 0%, 100% { filter: drop-shadow(0 5px 4px rgba(5,150,105,.16)); } 50% { filter: drop-shadow(0 6px 10px rgba(250,204,21,.45)); } }
         @keyframes magicDot { 0% { transform: translate(90px, 96px) scale(.35); opacity:0; } 22% { opacity:1; } 100% { transform: translate(-58px, -106px) scale(1.35); opacity:0; } }
         @keyframes emberOrbit { 0% { transform: rotate(0deg) translateX(64px) rotate(0deg); opacity:.45; } 50% { opacity:1; } 100% { transform: rotate(360deg) translateX(64px) rotate(-360deg); opacity:.45; } }
         @keyframes flamePulse { 0%, 100% { transform: scale(.94); opacity:.72; filter: blur(.2px); } 50% { transform: scale(1.08); opacity:1; filter: blur(0); } }
@@ -138,32 +140,40 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
         aria-label={stage.label}
       >
         <defs>
-          <linearGradient id="previewSeed" x1="0" x2="1" y1="0" y2="1">
+          <linearGradient id={`${uniqueId}-seed`} x1="0" x2="1" y1="0" y2="1">
             <stop offset="0%" stopColor="#f0b35e" />
             <stop offset="52%" stopColor="#a7652a" />
             <stop offset="100%" stopColor="#6b3f18" />
           </linearGradient>
-          <linearGradient id="previewTrunk" x1="0" x2="1" y1="0" y2="1">
+          <linearGradient id={`${uniqueId}-trunk`} x1="0" x2="1" y1="0" y2="1">
             <stop offset="0%" stopColor="#b8793a" />
             <stop offset="52%" stopColor="#7c4a1d" />
             <stop offset="100%" stopColor="#4a2a12" />
           </linearGradient>
-          <radialGradient id="previewLeaf" cx="42%" cy="34%" r="64%">
+          <radialGradient id={`${uniqueId}-leaf`} cx="42%" cy="28%" r="72%">
             <stop offset="0%" stopColor="#bbf7d0" />
             <stop offset="45%" stopColor="#35d66f" />
             <stop offset="100%" stopColor="#0f7f45" />
           </radialGradient>
-          <linearGradient id="previewStem" x1="0" x2="1" y1="0" y2="1">
+          <linearGradient id={`${uniqueId}-stem`} x1="0" x2="1" y1="0" y2="1">
             <stop offset="0%" stopColor="#9af082" />
             <stop offset="100%" stopColor="#15803d" />
           </linearGradient>
+          <radialGradient id={`${uniqueId}-fire`} cx="50%" cy="70%" r="65%">
+            <stop offset="0%" stopColor="#fff7a8" />
+            <stop offset="42%" stopColor="#fbbf24" />
+            <stop offset="76%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#7c2d12" />
+          </radialGradient>
         </defs>
         <ellipse cx="95" cy="160" rx="62" ry="13" fill="#064e3b" opacity=".18" />
 
         {(!showStem || isSeedReborn) && (
           <g style={{ animation: isSeedReborn ? 'rebornSeed 950ms ease-out both' : undefined }}>
-            <ellipse cx="95" cy="139" rx="20" ry="27" fill="url(#previewSeed)" />
+            {isSeedReborn && <><circle cx="95" cy="136" r="38" fill="#fef3c7" opacity=".38" /><circle cx="95" cy="136" r="30" fill="none" stroke="#fbbf24" strokeWidth="2" opacity=".62" strokeDasharray="4 5" /></>}
+            <ellipse cx="95" cy="139" rx="20" ry="27" fill={`url(#${uniqueId}-seed)`} />
             <ellipse cx="88" cy="126" rx="7" ry="10" fill="#facc15" opacity=".35" />
+            {isSeedReborn && <path d="M96 121 C101 111 111 107 116 110 C113 119 106 125 96 127 Z" fill="#4ade80" />}
           </g>
         )}
 
@@ -176,67 +186,67 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
         )}
 
         {showStem && (
-          <path d="M95 148 C90 117 91 89 98 63" fill="none" stroke="url(#previewStem)" strokeWidth="11" strokeLinecap="round" />
+          <path d="M95 148 C90 117 91 89 98 63" fill="none" stroke={`url(#${uniqueId}-stem)`} strokeWidth="11" strokeLinecap="round" />
         )}
 
         {!showTree && showTwoLeaves && (
           <g>
-            <ellipse cx="76" cy="82" rx="22" ry="11" fill="url(#previewLeaf)" transform="rotate(-28 76 82)" />
-            <ellipse cx="115" cy="82" rx="22" ry="11" fill="url(#previewLeaf)" transform="rotate(28 115 82)" />
+            <ellipse cx="76" cy="82" rx="22" ry="11" fill={`url(#${uniqueId}-leaf)`} transform="rotate(-28 76 82)" />
+            <ellipse cx="115" cy="82" rx="22" ry="11" fill={`url(#${uniqueId}-leaf)`} transform="rotate(28 115 82)" />
             {showFourLeaves && (
               <>
-                <ellipse cx="73" cy="108" rx="19" ry="10" fill="url(#previewLeaf)" transform="rotate(-18 73 108)" />
-                <ellipse cx="118" cy="108" rx="19" ry="10" fill="url(#previewLeaf)" transform="rotate(18 118 108)" />
+                <ellipse cx="73" cy="108" rx="19" ry="10" fill={`url(#${uniqueId}-leaf)`} transform="rotate(-18 73 108)" />
+                <ellipse cx="118" cy="108" rx="19" ry="10" fill={`url(#${uniqueId}-leaf)`} transform="rotate(18 118 108)" />
               </>
             )}
             {showSideLeaves && (
               <>
-                <ellipse cx="58" cy="96" rx="18" ry="9" fill="url(#previewLeaf)" transform="rotate(-45 58 96)" />
-                <ellipse cx="133" cy="96" rx="18" ry="9" fill="url(#previewLeaf)" transform="rotate(45 133 96)" />
+                <ellipse cx="58" cy="96" rx="18" ry="9" fill={`url(#${uniqueId}-leaf)`} transform="rotate(-45 58 96)" />
+                <ellipse cx="133" cy="96" rx="18" ry="9" fill={`url(#${uniqueId}-leaf)`} transform="rotate(45 133 96)" />
               </>
             )}
           </g>
         )}
 
         {showTree && (
-          <g transform={`translate(95 156) scale(${treeScale}) translate(-95 -156)`}>
-            <path d="M82 160 C84 126 86 91 94 55 C103 91 110 126 113 160 Z" fill="url(#previewTrunk)" />
-            <path d="M94 77 C69 66 55 52 45 34" fill="none" stroke="url(#previewTrunk)" strokeWidth="9" strokeLinecap="round" />
-            <path d="M101 75 C128 64 142 48 150 29" fill="none" stroke="url(#previewTrunk)" strokeWidth="9" strokeLinecap="round" />
-            <path d="M94 103 C70 100 55 92 42 80" fill="none" stroke="url(#previewTrunk)" strokeWidth="7" strokeLinecap="round" />
-            <path d="M101 102 C126 100 142 91 156 79" fill="none" stroke="url(#previewTrunk)" strokeWidth="7" strokeLinecap="round" />
-            {leaves.map(([cx, cy, r, fill], index) => (
-              <circle key={index} cx={cx as number} cy={cy as number} r={r as number} fill={index % 2 ? fill as string : 'url(#previewLeaf)'} opacity={showFire ? '.45' : '.96'} />
+          <g transform={`translate(95 156) scale(${treeScale}) translate(-95 -156)`} style={{ animation: stageIndex >= 8 ? 'crownGlow 3.5s ease-in-out infinite' : undefined }}>
+            <path d="M80 160 C83 127 86 88 95 51 C105 91 111 127 115 160 Z" fill={`url(#${uniqueId}-trunk)`} />
+            <path d="M93 83 C72 68 58 49 51 31 M100 80 C121 65 135 47 141 27 M90 110 C70 105 53 94 41 78 M103 108 C125 104 141 94 154 76" fill="none" stroke={`url(#${uniqueId}-trunk)`} strokeWidth="8" strokeLinecap="round" />
+            {leaves.map(([cx, cy, rx, ry], index) => (
+              <g key={index} transform={`translate(${cx} ${cy})`}>
+                <ellipse rx={rx} ry={ry} fill={`url(#${uniqueId}-leaf)`} opacity={showFire ? '.58' : '.98'} />
+                <ellipse cx="-5" cy="-6" rx={rx * .4} ry={ry * .32} fill="#dcfce7" opacity=".25" />
+              </g>
             ))}
-            <path d="M88 153 C93 125 94 92 95 63" fill="none" stroke="#ffffff55" strokeWidth="3" strokeLinecap="round" />
+            <path d="M88 153 C93 125 94 92 95 63" fill="none" stroke="#fff8" strokeWidth="3" strokeLinecap="round" />
           </g>
         )}
 
         {Array.from({ length: flowerCount }).map((_, index) => {
-          const spots = [[95, 68], [69, 57], [120, 58], [54, 86], [138, 86], [96, 39], [78, 104], [114, 104], [47, 68], [145, 67]];
+          const spots = [[95, 54], [65, 61], [124, 61], [51, 85], [140, 85], [95, 88], [73, 96], [118, 97], [80, 35]];
           const [cx, cy] = spots[index];
           return (
             <g key={index} transform={`translate(${cx} ${cy}) scale(${index === 0 ? 1 : .7})`}>
-              <circle r="4" fill="#facc15" />
-              <circle cx="0" cy="-8" r="5.5" fill="#f472b6" />
-              <circle cx="8" cy="0" r="5.5" fill="#fb7185" />
-              <circle cx="0" cy="8" r="5.5" fill="#f472b6" />
-              <circle cx="-8" cy="0" r="5.5" fill="#fb7185" />
+              <circle r="4.3" fill="#facc15" stroke="#fff8" strokeWidth="1" />
+              <circle cx="0" cy="-7" r="5.2" fill="#f472b6" />
+              <circle cx="6.5" cy="0" r="5.2" fill="#fb7185" />
+              <circle cx="0" cy="7" r="5.2" fill="#f472b6" />
+              <circle cx="-6.5" cy="0" r="5.2" fill="#fb7185" />
             </g>
           );
         })}
 
         {Array.from({ length: fruitCount }).map((_, index) => {
-          const fruits = [[72, 75], [119, 76], [96, 58], [139, 94], [54, 96], [95, 111], [80, 43], [124, 45], [45, 73], [151, 70], [69, 111], [124, 112]];
+          const fruits = [[72, 76], [118, 76], [96, 67], [136, 94], [54, 95], [95, 110], [77, 45], [122, 46], [47, 75], [145, 72]];
           const [cx, cy] = fruits[index];
-          return <circle key={index} cx={cx} cy={cy} r={stageIndex >= 11 ? 6 : 4.8} fill={index % 2 ? '#ef4444' : '#f97316'} stroke="#fff9" strokeWidth="1.4" />;
+          return <g key={index}><circle cx={cx} cy={cy} r={stageIndex >= 11 ? 6.3 : 5} fill={index % 2 ? '#ef4444' : '#fb923c'} stroke="#fff9" strokeWidth="1.4" /><path d={`M${cx} ${cy - 5} q3 -5 6 -4`} fill="none" stroke="#166534" strokeWidth="1.7" strokeLinecap="round" /></g>;
         })}
 
         {showFire && !isSeedReborn && (
           <g style={{ animation: 'flamePulse 900ms ease-in-out infinite' }}>
-            <circle cx="95" cy="82" r="54" fill="#f97316" opacity=".28" />
-            <path d="M95 22 C126 61 136 91 117 119 C103 140 74 137 66 111 C58 84 78 72 95 22 Z" fill="#fb923c" opacity=".78" />
-            <path d="M96 49 C116 77 119 98 105 115 C94 128 76 119 80 98 C83 82 91 70 96 49 Z" fill="#fde047" opacity=".9" />
+            <path d="M95 23 C126 59 143 93 121 123 C110 138 80 138 67 119 C49 92 70 63 95 23 Z" fill={`url(#${uniqueId}-fire)`} opacity=".98" />
+            <path d="M96 49 C116 75 119 97 105 115 C93 129 76 118 80 98 C83 82 91 67 96 49 Z" fill="#fff3a3" opacity=".92" />
+            <path d="M94 125 C88 110 89 86 95 65 C102 91 104 111 100 126 Z" fill="#7c2d12" opacity=".62" />
           </g>
         )}
       </svg>
@@ -262,7 +272,7 @@ export const PlantGrowthPreview: React.FC = () => {
   const [points, setPoints] = useState(0);
   const [burst, setBurst] = useState(false);
   const rank = Math.min(Math.floor(points / 100), shieldRanks.length - 1);
-  const cyclePoints = points % 100;
+  const cyclePoints = points > 0 && points % 100 === 0 ? 100 : points % 100;
   const stageIndex = getStageIndex(cyclePoints);
   const stage = growthStages[stageIndex];
   const nextStage = growthStages.find((item) => item.points > cyclePoints);
@@ -273,7 +283,7 @@ export const PlantGrowthPreview: React.FC = () => {
   const collectPoints = () => {
     gameAudio.playClick();
     setBurst(true);
-    setPoints((current) => Math.min(499, current + 10));
+    setPoints((current) => Math.min(500, current + 10));
     window.setTimeout(() => setBurst(false), 1250);
   };
 
