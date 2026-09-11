@@ -420,7 +420,7 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
       const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
       const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), entry.image ? 45000 : 25000);
+      const timeout = window.setTimeout(() => controller.abort(), entry.image ? 90000 : 25000);
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -691,7 +691,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   };
 
   const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
-  const processingMessages = ['جاري إرسال الإجابات', 'جاري استقبال الرد', 'جاري تصحيح الإجابات', 'جاري حفظ النتيجة'];
+  const processingMessages = ['جاري إرسال الإجابات', 'جاري استقبال الرد', 'جاري تصحيح الصور والنصوص', 'جاري حفظ النتيجة'];
 
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
@@ -858,11 +858,18 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                 <>
                   <Loader2 className="mx-auto h-9 w-9 animate-spin text-emerald-600" />
                   <h3 className="mt-4 text-lg font-black text-slate-950">{processingMessages[processingPhase]}</h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">ابقَ قليلا، ستظهر صفحة النتيجة بعد اكتمال الإرسال.</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">تصحيح الصور قد يستغرق وقتا أطول. ابقَ في هذه الصفحة حتى تظهر النتيجة هنا.</p>
+                  <button
+                    type="button"
+                    onClick={() => setProcessingPhase(2)}
+                    className="mt-5 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm"
+                  >
+                    انتظار النتيجة وقت أطول
+                  </button>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
                   >
                     <DoorOpen className="h-4 w-4" />
                     خروج من الانتظار
