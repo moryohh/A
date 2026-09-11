@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Award,
   Flame,
-  BookOpen,
   ShieldCheck,
   ArrowRight,
   Zap,
@@ -60,6 +58,11 @@ const getTreeStage = (points: number) => {
   ), treeMilestones[0]);
 };
 
+const getShieldTone = (level: number) => {
+  const tones = ['#9a6a3a', '#b87333', '#94a3b8', '#d4a017', '#38bdf8'];
+  return tones[Math.min(Math.max(level, 0), tones.length - 1)];
+};
+
 const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
   const stageIndex = treeMilestones.findIndex((stage) => stage.points === getTreeStage(points).points);
   const stage = treeMilestones[Math.max(0, stageIndex)];
@@ -81,6 +84,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number 
         @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
         @keyframes treeSwaySoft { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
         @keyframes pointFly { 0% { transform: translate(42px, 42px) scale(.55); opacity:0; } 25% { opacity:1; } 100% { transform: translate(-18px, -42px) scale(1); opacity:0; } }
+        @keyframes rewardToTree { 0% { transform: translate(0, 0) scale(.75); opacity:0; } 18% { opacity:1; } 100% { transform: translate(-105px, 38px) scale(1.15); opacity:0; } }
         @keyframes leafPulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); } 50% { filter: drop-shadow(0 0 10px rgba(34,197,94,.55)); } }
       `}</style>
       <div className="absolute left-3 top-3 h-9 w-9 rounded-full bg-amber-200/80 blur-[1px]" />
@@ -220,7 +224,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const avatarStorageKey = user?.id ? `nahnu_maak_avatar_${user.id}` : null;
   const storedAvatar = avatarStorageKey ? localStorage.getItem(avatarStorageKey) : null;
   const userAvatar = storedAvatar || user?.avatarUrl || DEFAULT_CARTOON_AVATARS[0].url;
-  const studyHours = user?.studyHours ?? 0;
   const streakDays = user?.streakDays ?? 0;
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
@@ -231,6 +234,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     ? Math.round(((totalPoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
     : 100;
   const [isCollectingPoints, setIsCollectingPoints] = useState(false);
+  const [lastCollectedPoints, setLastCollectedPoints] = useState<number | null>(null);
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
     { id: 'solar_light', label: 'شمسي', colors: ['#FFFFFF', '#0284C7'] },
     { id: 'golden_navy', label: 'ذهبي', colors: ['#FFFDF5', '#D97706'] },
@@ -315,7 +319,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const handleCollectPoints = () => {
     gameAudio.playClick();
     setIsCollectingPoints(true);
+    setLastCollectedPoints(10);
     window.setTimeout(() => setIsCollectingPoints(false), 1250);
+    window.setTimeout(() => setLastCollectedPoints(null), 1250);
   };
 
   return (
@@ -483,44 +489,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           )}
 
-          {/* Stats Bar */}
-          <div
-            className={`grid grid-cols-3 gap-2 mt-4 p-3 rounded-2xl border text-center text-xs transition-colors ${
-              theme.isLight ? 'bg-slate-50 border-slate-200' : `${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`
-            }`}
-          >
-            <div>
-              <span className={`text-[10px] block ${theme.classes.textMuted}`}>ساعات المشاهدة</span>
-              <span className={`font-bold flex items-center justify-center gap-1 mt-0.5 ${theme.classes.textMain}`}>
-                <BookOpen className="w-3.5 h-3.5" style={{ color: theme.colors.primary }} />
-                {studyHours} س
-              </span>
-            </div>
-            <div className={`border-x ${theme.isLight ? 'border-slate-200' : 'border-white/10'}`}>
-              <span className={`text-[10px] block ${theme.classes.textMuted}`}>أيام التفاعل</span>
-              <span className="font-bold text-amber-400 flex items-center justify-center gap-1 mt-0.5">
-                <Flame className="w-3.5 h-3.5 fill-amber-400" />
-                {streakDays} يوم
-              </span>
-            </div>
-            <div>
-              <span className={`text-[10px] block ${theme.classes.textMuted}`}>مجموع النقاط</span>
-              <span className={`font-bold flex items-center justify-center gap-1 mt-0.5 ${theme.classes.textMain}`}>
-                <Award className="w-3.5 h-3.5" style={{ color: theme.colors.primary }} />
-                {totalPoints.toLocaleString()}
-              </span>
-            </div>
-          </div>
           <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
             <div className="flex items-center justify-between text-[10px] font-black">
-              <span className={theme.classes.textMain}>التقدم نحو المستوى {userLevel + 1}</span>
-              <span style={{ color: theme.colors.primary }}>{levelSnapshot.progressPercent}%</span>
+              <span className={theme.classes.textMain}>مستوى {userLevel + 1}</span>
+              <ShieldCheck className="h-5 w-5" style={{ color: getShieldTone(userLevel), fill: `${getShieldTone(userLevel)}35` }} aria-label="درع مستوى الطالب" />
             </div>
             <div className="mt-2 h-2 rounded-full bg-black/10 overflow-hidden border border-white/10">
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }} />
-            </div>
-            <div className={`mt-1 text-[10px] ${theme.classes.textMuted}`}>
-              {levelSnapshot.pointsIntoLevel} من {levelSnapshot.pointsForNextLevel} نقطة للمستوى التالي
             </div>
           </div>
 
@@ -533,7 +508,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             }}
             aria-label="التقييم الدوري"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
@@ -545,9 +520,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     }}
                     aria-label="جمع النقاط"
                   >
-                    جمع النقاط
+                    جمع النقاط {lastCollectedPoints ? `+${lastCollectedPoints}` : ''}
                   </button>
+                  <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
+                    <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                    {streakDays} يوم تفاعل
+                  </div>
                 </div>
+              {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
               <GrowthTree points={totalPoints} animate={isCollectingPoints} progress={treeProgress} />
             </div>
           </section>
