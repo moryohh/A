@@ -71,9 +71,9 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
   const showFourLeaves = stageIndex >= 4 && !showTree && !isSeedReborn;
   const showFlower = stageIndex >= 5 && !showTree && !isSeedReborn;
   const showSideLeaves = stageIndex >= 6 && !showTree && !isSeedReborn;
-  const visualStages = [0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 9, 9, 10, 11];
+  const visualStages = [0, 1, 2, 3, 4, 5, 12, 6, 7, 8, 9, 9, 9, 10, 11];
   const assetIndex = visualStages[stageIndex] ?? 0;
-  const useGeneratedAsset = stageIndex >= 7;
+  const useGeneratedAsset = stageIndex >= 6;
   const flowerCount = stageIndex >= 8 && !showFire ? 9 : showFlower ? 1 : 0;
   const fruitCount = stageIndex >= 10 && !showFire ? 10 : stageIndex >= 9 && !showFire ? 4 : 0;
   const treeScale = stageIndex >= 12 ? 1.22 : stageIndex >= 11 ? 1.12 : stageIndex >= 10 ? 1.02 : stageIndex >= 8 ? 0.95 : 0.82;
