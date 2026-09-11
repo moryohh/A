@@ -18,6 +18,7 @@ type SubmissionEntry = {
   prompt: string;
   answer: string;
   image: string;
+  hasImage?: boolean;
   modelAnswer?: string;
 };
 type ChapterSubmission = {
@@ -286,6 +287,17 @@ function dataUrlToFile(dataUrl: string, fileName: string) {
     bytes[index] = binary.charCodeAt(index);
   }
   return new File([bytes], fileName, { type: mimeType });
+}
+
+function stripImagesForStorage(submission: ChapterSubmission): ChapterSubmission {
+  return {
+    ...submission,
+    entries: submission.entries.map((entry) => ({
+      ...entry,
+      image: '',
+      hasImage: Boolean(entry.image || entry.hasImage),
+    })),
+  };
 }
 
 async function readCorrectionResponse(response: Response): Promise<unknown> {
@@ -594,11 +606,13 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     setSubmitState('processing');
     setProcessingPhase(0);
     try {
-      localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(submission));
-      localStorage.setItem('chapter-exam-submission:last', JSON.stringify(submission));
+      const pendingSubmission = stripImagesForStorage(submission);
+      localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(pendingSubmission));
+      localStorage.setItem('chapter-exam-submission:last', JSON.stringify(pendingSubmission));
       const correction = await correctChapterExamSubmission(submission);
+      const storableSubmission = stripImagesForStorage(submission);
       const finalSubmission: ChapterSubmission = {
-        ...submission,
+        ...storableSubmission,
         correction_status: correction.status,
         correction_endpoint: correction.endpoint,
         correction_result: correction.result,
@@ -628,7 +642,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
       notifyChapterExamResult(finalSubmission);
       setSubmitState('completed');
     } catch {
-      setSubmitMessage('تم حفظ الإجابات على الجهاز، لكن تعذر الاتصال بالحفظ الخارجي.');
+      setSubmitMessage('تعذر إكمال الإرسال أو الحفظ. حاول مرة أخرى بصورة أوضح وأصغر.');
       setSubmitState('error');
     }
   };
