@@ -277,6 +277,17 @@ function dataUrlToBase64(dataUrl: string) {
   return base64 || dataUrl;
 }
 
+function dataUrlToFile(dataUrl: string, fileName: string) {
+  const [header, base64] = dataUrl.split(',');
+  const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+  const binary = window.atob(base64 || dataUrl);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new File([bytes], fileName, { type: mimeType });
+}
+
 async function readCorrectionResponse(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) return {};
@@ -346,6 +357,11 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
       answer: answerPayload,
       answers: [answerPayload],
     };
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(payload));
+    if (entry.image) {
+      formData.append('studentImage', dataUrlToFile(entry.image, `${answerPayload.question_id}.jpg`));
+    }
 
     let lastError = '';
     let handled = false;
@@ -357,8 +373,7 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: formData,
           signal: controller.signal,
         });
         const result = await readCorrectionResponse(response);
