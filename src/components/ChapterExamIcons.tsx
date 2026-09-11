@@ -613,12 +613,13 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
         payload: finalSubmission,
         submitted_at: submittedAt,
       });
+      const resultMessage = buildResultMessage(finalSubmission);
       if (error) {
-        setSubmitMessage('تم إرسال الإجابات واستلام الرد، لكن حفظ السحابة غير مفعّل حالياً.');
+        setSubmitMessage(`${resultMessage} تم عرض النتيجة هنا، لكن حفظ السحابة غير مفعّل حالياً.`);
       } else if (correction.status === 'completed') {
-        setSubmitMessage('تم إرسال إجاباتك واستلام نتيجة التصحيح وحفظها.');
+        setSubmitMessage(`${resultMessage} تم حفظ النتيجة في السحابة.`);
       } else if (correction.status === 'partial') {
-        setSubmitMessage('تم إرسال الإجابات، ووصل تصحيح بعض الإجابات فقط.');
+        setSubmitMessage(resultMessage);
       } else if (correction.status === 'skipped') {
         setSubmitMessage('تم حفظ المحاولة، لكن لا توجد إجابات للتصحيح.');
       } else {
