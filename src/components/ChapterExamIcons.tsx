@@ -349,6 +349,45 @@ async function readCorrectionResponse(response: Response): Promise<unknown> {
   }
 }
 
+function textFromCorrectionResult(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const obj = value as Record<string, unknown>;
+  return [
+    obj.feedback,
+    obj.output,
+    obj.text,
+    obj.extractedText,
+    obj.message,
+  ].filter((item): item is string => typeof item === 'string').join(' ');
+}
+
+function inferScoreFromCorrectionText(text: string): number | null {
+  const normalized = text.trim();
+  if (!normalized) return null;
+  if (/غير صحيحة|غير صحيح|لا تحتوي|لم يتم تقديم|لا توجد إجابة|ليست إجابة|خاطئة/i.test(normalized)) return 0;
+  if (/جزئي|جزئياً|جزئيا|ناقص/i.test(normalized)) return 50;
+  if (/صحيحة|صحيح|دقيقة|ممتاز/i.test(normalized)) return 100;
+  return null;
+}
+
+function normalizeCorrectionResult(result: unknown): unknown {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  const obj = result as Record<string, unknown>;
+  const nested = obj.result && typeof obj.result === 'object' && !Array.isArray(obj.result)
+    ? obj.result as Record<string, unknown>
+    : null;
+  const target = nested || obj;
+  const currentScore = findNumericValue(target, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+  if (currentScore !== null) return result;
+  const inferredScore = inferScoreFromCorrectionText(textFromCorrectionResult(target));
+  if (inferredScore === null) return result;
+  if (nested) {
+    return { ...obj, result: { ...nested, score: inferredScore, inferred_score: true } };
+  }
+  return { ...obj, score: inferredScore, inferred_score: true };
+}
+
 async function correctSingleChapterExamEntry(submission: ChapterSubmission, entry: SubmissionEntry, index: number) {
   const answerPayload = {
     question_id: `${entry.question}-${entry.part}-${index + 1}`,
@@ -360,9 +399,9 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
     student_answer: entry.answer,
     answerText: entry.answer,
     textAnswer: entry.answer,
-    imageBase64: entry.image ? dataUrlToBase64(entry.image) : undefined,
-    imageDataUrl: entry.image || undefined,
-    imageAnswer: entry.image || undefined,
+    imageBase64: undefined,
+    imageDataUrl: undefined,
+    imageAnswer: undefined,
     modelAnswer: entry.modelAnswer || '',
     model_answer: entry.modelAnswer || '',
     correctAnswer: entry.modelAnswer || '',
@@ -379,6 +418,7 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
     chapter_number: submission.chapter_number,
     submitted_at: submission.submitted_at,
     language: 'ara',
+    prompt: answerPayload.question,
     question_id: answerPayload.question_id,
     question: answerPayload.question,
     questionTitle: answerPayload.questionTitle,
@@ -398,10 +438,8 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
     answers: [answerPayload],
   };
 
-  let lastError = '';
-  for (let attempt = 0; attempt < CHAPTER_EXAM_CORRECTION_ENDPOINTS.length; attempt += 1) {
-    const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
-    const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
+  const controllers: AbortController[] = [];
+  const attempts = CHAPTER_EXAM_CORRECTION_ENDPOINTS.map(async (endpoint) => {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(payload));
     if (entry.image) {
@@ -409,6 +447,7 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
       formData.append(endpoint.includes('mmm-friend-ocr') ? 'image' : 'studentImage', answerImageFile);
     }
     const controller = new AbortController();
+    controllers.push(controller);
     const timeout = window.setTimeout(() => controller.abort(), entry.image ? 90000 : 25000);
     try {
       const response = await fetch(endpoint, {
@@ -418,17 +457,28 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
       });
       const result = await readCorrectionResponse(response);
       if (!response.ok) {
-        lastError = `${endpoint} رفض الطلب برمز ${response.status}`;
-        continue;
+        throw new Error(`${endpoint} رفض الطلب برمز ${response.status}`);
       }
-      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result };
+      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result) };
     } catch (error) {
-      lastError = error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.';
+      throw new Error(error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.');
     } finally {
       window.clearTimeout(timeout);
     }
+  });
+
+  try {
+    const result = await Promise.any(attempts);
+    controllers.forEach((controller) => controller.abort());
+    return result;
+  } catch (error) {
+    const lastError = error instanceof AggregateError
+      ? error.errors.map((attemptError) => attemptError instanceof Error ? attemptError.message : String(attemptError)).join(' | ')
+      : error instanceof Error ? error.message : 'تعذر الاتصال بمسارات التصحيح.';
+    return { status: 'failed', endpoint: '', question: entry.question, part: entry.part, error: lastError };
+  } finally {
+    controllers.forEach((controller) => controller.abort());
   }
-  return { status: 'failed', endpoint: '', question: entry.question, part: entry.part, error: lastError };
 }
 
 async function correctChapterExamSubmission(submission: ChapterSubmission) {
