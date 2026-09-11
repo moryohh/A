@@ -420,7 +420,7 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
       const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
       const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 25000);
+      const timeout = window.setTimeout(() => controller.abort(), entry.image ? 45000 : 25000);
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
