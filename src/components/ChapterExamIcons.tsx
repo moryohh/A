@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BookOpenCheck, Camera, ChevronLeft, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
+import { Award, BookOpenCheck, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 
@@ -801,6 +801,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
                   <Loader2 className="mx-auto h-9 w-9 animate-spin text-emerald-600" />
                   <h3 className="mt-4 text-lg font-black text-slate-950">{processingMessages[processingPhase]}</h3>
                   <p className="mt-2 text-sm leading-7 text-slate-600">ابقَ قليلا، ستظهر صفحة النتيجة بعد اكتمال الإرسال.</p>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
+                  >
+                    <DoorOpen className="h-4 w-4" />
+                    خروج من الانتظار
+                  </button>
                 </>
               ) : (
                 <>
