@@ -60,7 +60,7 @@ const getTreeStage = (points: number) => {
   ), treeMilestones[0]);
 };
 
-const GrowthTree: React.FC<{ points: number; animate: boolean }> = ({ points, animate }) => {
+const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
   const stageIndex = treeMilestones.findIndex((stage) => stage.points === getTreeStage(points).points);
   const stage = treeMilestones[Math.max(0, stageIndex)];
   const showRoot = stageIndex >= 1;
@@ -74,7 +74,9 @@ const GrowthTree: React.FC<{ points: number; animate: boolean }> = ({ points, an
   const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
 
   return (
-    <div className="relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem] border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
+    <div className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
+      <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white/75 p-2">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
       <style>{`
         @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
         @keyframes treeSwaySoft { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
@@ -182,8 +184,10 @@ const GrowthTree: React.FC<{ points: number; animate: boolean }> = ({ points, an
           return <circle key={`fruit-${index}`} cx={cx} cy={cy} r={stageIndex >= 11 ? 5 : 4} fill={index % 2 ? '#ef4444' : '#f97316'} stroke="#fff7" strokeWidth="1" />;
         })}
       </svg>
-      <span className="absolute bottom-2 rounded-full bg-white/80 px-2.5 py-0.5 text-[9px] font-black" style={{ color: stage.tone }}>
-        {stage.label}
+      </div>
+      </div>
+      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-white bg-white px-2 py-0.5 text-[9px] font-black shadow-sm" style={{ color: stage.tone }}>
+        {progress}%
       </span>
     </div>
   );
@@ -530,8 +534,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             aria-label="التقييم الدوري"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     onClick={handleCollectPoints}
@@ -544,30 +547,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   >
                     جمع النقاط
                   </button>
-                  <div className="text-right">
-                    <p className={`text-[10px] font-black ${theme.classes.textMuted}`}>مرحلة الشجرة</p>
-                    <p className="text-sm font-black" style={{ color: treeStage.tone }}>{treeStage.label}</p>
-                  </div>
                 </div>
-                <div className="rounded-2xl border bg-white/45 p-2.5" style={{ borderColor: `${treeStage.tone}25` }}>
-                  <div className="flex items-center justify-between gap-2 text-[10px] font-black">
-                    <span className={theme.classes.textMain}>مستوى التقدم</span>
-                    <span style={{ color: treeStage.tone }}>
-                      {nextTreeStage ? `${totalPoints} / ${nextTreeStage.points}` : `${totalPoints}+`}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-3 overflow-hidden rounded-full border border-white/60 bg-black/10" aria-label="مستوى تقدم الشجرة">
-                    <div
-                      className="h-full rounded-full transition-[width] duration-700"
-                      style={{ width: `${treeProgress}%`, background: `linear-gradient(90deg, ${treeStage.tone}70, ${treeStage.tone})` }}
-                    />
-                  </div>
-                  <p className={`mt-1.5 text-[9px] font-bold ${theme.classes.textMuted}`}>
-                    {nextTreeStage ? `المرحلة التالية عند ${nextTreeStage.points} نقطة: ${nextTreeStage.label}` : 'وصلت لأعلى مرحلة نمو حالية'}
-                  </p>
-                </div>
-              </div>
-              <GrowthTree points={totalPoints} animate={isCollectingPoints} />
+              <GrowthTree points={totalPoints} animate={isCollectingPoints} progress={treeProgress} />
             </div>
           </section>
         </div>
