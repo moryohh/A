@@ -21,8 +21,6 @@ import {
   Calendar,
   LockKeyhole,
   UserX,
-  Trophy,
-  Gem,
   CircleDot,
   Leaf,
   Sprout,
@@ -35,8 +33,6 @@ import { UserProfile, CommunityPost, CompetitionSnapshot } from '../types';
 import { DEFAULT_CARTOON_AVATARS, CartoonAvatarOption } from '../data/cartoonAvatars';
 import { updateUserProfileData } from '../services/communityService';
 import { getLevelSnapshot } from '../services/pointsService';
-import { RATING_META } from '../services/competitionService';
-import { MapLeaderboardModal } from './MapLeaderboardModal';
 
 interface ProfileViewProps {
   user?: UserProfile | null;
@@ -67,8 +63,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBlockedUsersOpen, setIsBlockedUsersOpen] = useState(false);
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const [showPointsDetails, setShowPointsDetails] = useState(false);
   const [avatarLoadIndex, setAvatarLoadIndex] = useState(0);
 
   const userName = user?.name || 'طالب منصة نحن معك';
@@ -82,18 +76,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
   const userLevel = levelSnapshot.level;
-  const ratingTier = competitionSnapshot?.ratingTier || 'bronze';
-  const ratingMeta = RATING_META[ratingTier];
   const ratingVisible = competitionSnapshot?.ratingVisible ?? userLevel >= 6;
   const accuracyPercent = competitionSnapshot?.accuracyPercent ?? 0;
-  const qualityProgress = ratingVisible ? accuracyPercent : Math.min(100, Math.round((userLevel / 6) * 100));
-  const activityPointsToday = Math.min(5, competitionSnapshot?.activityPointsToday ?? 0);
-  const activityProgress = activityPointsToday * 20;
   const cycleAccuracy = Math.max(0, Math.min(100, accuracyPercent));
   const growthProgress = ratingVisible ? cycleAccuracy : Math.min(100, levelSnapshot.progressPercent);
-  const periodDaysRemaining = competitionSnapshot?.periodEnd
-    ? Math.max(0, Math.ceil((new Date(`${competitionSnapshot.periodEnd}T23:59:59`).getTime() - Date.now()) / 86400000))
-    : null;
   const plantStage = growthProgress >= 85
     ? { label: 'شجرة مزهرة', icon: TreePine, color: '#16a34a', message: 'نمو ممتاز واستمر في التعلم' }
     : growthProgress >= 65
@@ -399,121 +385,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             }}
             aria-label="التقييم الدوري"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className={`flex items-center gap-1.5 text-[11px] font-black ${theme.classes.textMain}`}>
-                  <Gem className="w-3.5 h-3.5" style={{ color: ratingMeta.color }} />
-                  <span>التقييم الدوري</span>
-                </div>
-                <div className={`mt-1 text-[10px] ${theme.classes.textMuted}`}>
-                  دورة متحركة مدتها 15 يومًا • النشاط المسجل فعليًا فقط
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setShowPointsDetails((previous) => !previous)}
-                aria-expanded={showPointsDetails}
-                className="shrink-0 rounded-xl px-2.5 py-2 text-[10px] font-black transition-transform active:scale-95"
+                className="shrink-0 rounded-2xl px-3.5 py-3 text-[11px] font-black transition-transform active:scale-95"
                 style={{ backgroundColor: `${theme.colors.primary}1c`, color: theme.colors.primary }}
+                aria-label="جمع النقاط"
               >
-                <span className="block">جمع النقاط</span>
-                <span className={`mt-0.5 block text-[9px] font-bold ${theme.classes.textMuted}`}>
-                  {showPointsDetails ? 'إخفاء التفاصيل' : 'عرض المصادر'}
-                </span>
+                جمع النقاط
               </button>
-            </div>
-
-            <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-3">
-              <div className="flex min-w-[92px] flex-col items-center justify-center rounded-2xl border p-2.5" style={{ borderColor: `${plantStage.color}55`, backgroundColor: `${plantStage.color}14` }}>
-                <PlantIcon className="h-12 w-12 transition-all duration-500" strokeWidth={1.7} style={{ color: plantStage.color }} />
-                <span className="mt-1 text-[10px] font-black" style={{ color: plantStage.color }}>{plantStage.label}</span>
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center justify-between gap-2 text-[10px] font-black">
-                  <span className={theme.classes.textMain}>{ratingVisible ? ratingMeta.label : 'البرونزي المبدئي'}</span>
-                  <span style={{ color: ratingMeta.color }}>{growthProgress}%</span>
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-black">
+                    <span className={theme.classes.textMain}>مستوى التقدم</span>
+                    <span style={{ color: plantStage.color }}>{growthProgress}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/10" aria-label="مستوى تقدم النبتة">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-700"
+                      style={{ width: `${growthProgress}%`, background: `linear-gradient(90deg, ${plantStage.color}75, ${plantStage.color})` }}
+                    />
+                  </div>
                 </div>
-                <div className="mt-1.5 h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/15" aria-label="تقدم نمو النبتة">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-700"
-                    style={{ width: `${growthProgress}%`, background: `linear-gradient(90deg, ${plantStage.color}75, ${plantStage.color})` }}
-                  />
-                </div>
-                <p className={`mt-1.5 text-[10px] leading-5 ${theme.classes.textMuted}`}>{plantStage.message}</p>
-                <p className={`mt-1 text-[9px] ${theme.classes.textMuted}`}>
-                  {periodDaysRemaining === null ? 'تظهر المدة بعد مزامنة الدورة' : `متبقي ${periodDaysRemaining} يومًا على انتهاء الدورة`}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className={`rounded-xl border p-2 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
-                <span className={`block text-[9px] ${theme.classes.textMuted}`}>نقاط الدورة</span>
-                <strong className={`mt-1 block text-sm ${theme.classes.textMain}`}>{(competitionSnapshot?.periodPoints ?? 0).toLocaleString()}</strong>
-              </div>
-              <div className={`rounded-xl border p-2 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
-                <span className={`block text-[9px] ${theme.classes.textMuted}`}>إجابات مسجلة</span>
-                <strong className={`mt-1 block text-sm ${theme.classes.textMain}`}>{competitionSnapshot?.periodAnswered ?? 0}</strong>
-              </div>
-              <div className={`rounded-xl border p-2 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
-                <span className={`block text-[9px] ${theme.classes.textMuted}`}>نشاط اليوم</span>
-                <strong className="mt-1 block text-sm text-amber-400">{activityPointsToday}/5</strong>
-              </div>
-              <div className={`rounded-xl border p-2 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
-                <span className={`block text-[9px] ${theme.classes.textMuted}`}>الدقائق اليوم</span>
-                <strong className={`mt-1 block text-sm ${theme.classes.textMain}`}>{competitionSnapshot?.activityMinutesToday ?? 0}</strong>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-2xl border p-2.5" style={{ borderColor: `${theme.colors.primary}25`, backgroundColor: `${theme.colors.primary}08` }}>
-              <div className="flex items-center justify-between text-[10px] font-black">
-                <span className={theme.classes.textMain}>{ratingVisible ? 'التقدم نحو المستوى التالي' : 'التقدم لفتح التقييم الدوري'}</span>
-                <span style={{ color: ratingVisible ? ratingMeta.color : theme.colors.primary }}>{qualityProgress}%</span>
-              </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-black/10" aria-label="التقدم نحو المستوى التالي">
-                <div
-                  className="h-full rounded-full transition-[width] duration-700"
-                  style={{ width: `${qualityProgress}%`, background: ratingVisible ? `linear-gradient(90deg, ${ratingMeta.color}90, ${ratingMeta.color})` : `linear-gradient(90deg, ${theme.colors.primary}80, ${theme.colors.secondary})` }}
-                />
-              </div>
-              <div className={`mt-1 text-[9px] ${theme.classes.textMuted}`}>
-                {ratingVisible ? `${cycleAccuracy}% دقة في الدورة الحالية` : 'يظهر التصنيف بعد الوصول إلى المستوى 6'}
-              </div>
-            </div>
-
-            {showPointsDetails && (
-              <div className="mt-3 rounded-2xl border p-3 animate-in fade-in" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
-                <div className="flex items-center justify-between gap-2 text-[10px] font-black">
-                  <span className={theme.classes.textMain}>مصادر النقاط المسجلة</span>
-                  <span style={{ color: theme.colors.primary }}>{(competitionSnapshot?.periodPoints ?? 0).toLocaleString()} نقطة</span>
-                </div>
-                <div className="mt-2 space-y-1.5 text-[10px]">
-                  <div className="flex items-center justify-between gap-2"><span className={theme.classes.textMuted}>نتائج الاختبارات والامتحانات</span><strong className={theme.classes.textMain}>{competitionSnapshot?.periodCorrect ?? 0}</strong></div>
-                  <div className="flex items-center justify-between gap-2"><span className={theme.classes.textMuted}>أنشطة أخرى مسجلة في المنصة</span><strong className={theme.classes.textMain}>{Math.max(0, (competitionSnapshot?.periodPoints ?? 0) - (competitionSnapshot?.periodCorrect ?? 0))}</strong></div>
-                  <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-1.5"><span className={`font-black ${theme.classes.textMain}`}>الإجمالي الحالي</span><strong style={{ color: theme.colors.primary }}>{(competitionSnapshot?.periodPoints ?? 0).toLocaleString()}</strong></div>
-                </div>
-                <p className={`mt-2 text-[9px] leading-4 ${theme.classes.textMuted}`}>لا تتم إضافة أي مصدر جديد هنا؛ تظهر فقط النقاط التي سجلتها الأنشطة الحالية في المنصة.</p>
-              </div>
-            )}
-
-            <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-              <div className="rounded-2xl border p-3" style={{ borderColor: ratingVisible ? `${ratingMeta.color}45` : `${theme.colors.primary}25`, backgroundColor: `${theme.colors.primary}06` }}>
-                <div className={`text-[10px] font-black ${theme.classes.textMuted}`}>مستوى التقييم الحالي</div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-base font-black" style={{ color: ratingVisible ? ratingMeta.color : theme.colors.primary }}>{ratingVisible ? ratingMeta.label : 'برونزي'}</span>
-                  <span className={`text-[10px] ${theme.classes.textMuted}`}>• المستوى {userLevel}</span>
+                <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl border p-2" style={{ borderColor: `${plantStage.color}55`, backgroundColor: `${plantStage.color}14` }}>
+                  <PlantIcon className="h-10 w-10 transition-all duration-500" strokeWidth={1.7} style={{ color: plantStage.color }} />
+                  <span className="mt-1 text-[9px] font-black" style={{ color: plantStage.color }}>{plantStage.label}</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsLeaderboardOpen(true)}
-                className="min-w-[104px] rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-transform active:scale-95"
-                style={{ borderColor: `${theme.colors.primary}55`, backgroundColor: `${theme.colors.primary}12`, color: theme.colors.primary }}
-              >
-                <Trophy className="h-6 w-6 text-amber-400" />
-                <span className="text-[10px] font-black">قائمة الصدارة</span>
-                <span className={`text-[9px] ${theme.classes.textMuted}`}>تنافس مع زملائك</span>
-              </button>
             </div>
           </section>
         </div>
@@ -985,11 +883,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </button>
       )}
 
-      <MapLeaderboardModal
-        isOpen={isLeaderboardOpen}
-        onClose={() => setIsLeaderboardOpen(false)}
-        currentUser={user}
-      />
     </div>
   );
 };
