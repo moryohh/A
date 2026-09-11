@@ -349,6 +349,88 @@ async function readCorrectionResponse(response: Response): Promise<unknown> {
   }
 }
 
+async function correctSingleChapterExamEntry(submission: ChapterSubmission, entry: SubmissionEntry, index: number) {
+  const answerPayload = {
+    question_id: `${entry.question}-${entry.part}-${index + 1}`,
+    question: entry.prompt,
+    questionTitle: entry.question,
+    part: entry.part,
+    questionText: entry.prompt,
+    studentAnswer: entry.answer,
+    student_answer: entry.answer,
+    answerText: entry.answer,
+    textAnswer: entry.answer,
+    imageBase64: entry.image ? dataUrlToBase64(entry.image) : undefined,
+    imageDataUrl: entry.image || undefined,
+    imageAnswer: entry.image || undefined,
+    modelAnswer: entry.modelAnswer || '',
+    model_answer: entry.modelAnswer || '',
+    correctAnswer: entry.modelAnswer || '',
+    referenceAnswer: entry.modelAnswer || '',
+  };
+  const payload = {
+    request_id: `${submission.id}-${index + 1}`,
+    submission_id: submission.id,
+    source: 'chapter_exam',
+    exam_id: submission.exam_id,
+    exam_title: submission.exam_title,
+    subject_id: submission.subject_id,
+    subject_name: submission.subject_name,
+    chapter_number: submission.chapter_number,
+    submitted_at: submission.submitted_at,
+    language: 'ara',
+    question_id: answerPayload.question_id,
+    question: answerPayload.question,
+    questionTitle: answerPayload.questionTitle,
+    questionText: answerPayload.questionText,
+    studentAnswer: answerPayload.studentAnswer,
+    student_answer: answerPayload.student_answer,
+    answerText: answerPayload.answerText,
+    textAnswer: answerPayload.textAnswer,
+    imageBase64: answerPayload.imageBase64,
+    imageDataUrl: answerPayload.imageDataUrl,
+    imageAnswer: answerPayload.imageAnswer,
+    modelAnswer: answerPayload.modelAnswer,
+    model_answer: answerPayload.model_answer,
+    correctAnswer: answerPayload.correctAnswer,
+    referenceAnswer: answerPayload.referenceAnswer,
+    answer: answerPayload,
+    answers: [answerPayload],
+  };
+
+  let lastError = '';
+  for (let attempt = 0; attempt < CHAPTER_EXAM_CORRECTION_ENDPOINTS.length; attempt += 1) {
+    const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
+    const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(payload));
+    if (entry.image) {
+      const answerImageFile = dataUrlToFile(entry.image, `${answerPayload.question_id}.jpg`);
+      formData.append(endpoint.includes('mmm-friend-ocr') ? 'image' : 'studentImage', answerImageFile);
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), entry.image ? 90000 : 25000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+      const result = await readCorrectionResponse(response);
+      if (!response.ok) {
+        lastError = `${endpoint} رفض الطلب برمز ${response.status}`;
+        continue;
+      }
+      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.';
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+  return { status: 'failed', endpoint: '', question: entry.question, part: entry.part, error: lastError };
+}
+
 async function correctChapterExamSubmission(submission: ChapterSubmission) {
   const answeredEntries = submission.entries.filter((entry) => entry.answer.trim() || entry.image);
   if (answeredEntries.length === 0) {
@@ -359,90 +441,9 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
     };
   }
 
-  const results = [];
-  for (const [index, entry] of answeredEntries.entries()) {
-    const answerPayload = {
-      question_id: `${entry.question}-${entry.part}-${index + 1}`,
-      question: entry.prompt,
-      questionTitle: entry.question,
-      part: entry.part,
-      questionText: entry.prompt,
-      studentAnswer: entry.answer,
-      student_answer: entry.answer,
-      answerText: entry.answer,
-      textAnswer: entry.answer,
-      imageBase64: entry.image ? dataUrlToBase64(entry.image) : undefined,
-      imageDataUrl: entry.image || undefined,
-      imageAnswer: entry.image || undefined,
-      modelAnswer: entry.modelAnswer || '',
-      model_answer: entry.modelAnswer || '',
-      correctAnswer: entry.modelAnswer || '',
-      referenceAnswer: entry.modelAnswer || '',
-    };
-    const payload = {
-      request_id: `${submission.id}-${index + 1}`,
-      submission_id: submission.id,
-      source: 'chapter_exam',
-      exam_id: submission.exam_id,
-      exam_title: submission.exam_title,
-      subject_id: submission.subject_id,
-      subject_name: submission.subject_name,
-      chapter_number: submission.chapter_number,
-      submitted_at: submission.submitted_at,
-      language: 'ara',
-      question_id: answerPayload.question_id,
-      question: answerPayload.question,
-      questionTitle: answerPayload.questionTitle,
-      questionText: answerPayload.questionText,
-      studentAnswer: answerPayload.studentAnswer,
-      student_answer: answerPayload.student_answer,
-      answerText: answerPayload.answerText,
-      textAnswer: answerPayload.textAnswer,
-      imageBase64: answerPayload.imageBase64,
-      imageDataUrl: answerPayload.imageDataUrl,
-      imageAnswer: answerPayload.imageAnswer,
-      modelAnswer: answerPayload.modelAnswer,
-      model_answer: answerPayload.model_answer,
-      correctAnswer: answerPayload.correctAnswer,
-      referenceAnswer: answerPayload.referenceAnswer,
-      answer: answerPayload,
-      answers: [answerPayload],
-    };
-    let lastError = '';
-    let handled = false;
-    for (let attempt = 0; attempt < CHAPTER_EXAM_CORRECTION_ENDPOINTS.length; attempt += 1) {
-      const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
-      const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
-      const formData = new FormData();
-      formData.append('payload', JSON.stringify(payload));
-      if (entry.image) {
-        const answerImageFile = dataUrlToFile(entry.image, `${answerPayload.question_id}.jpg`);
-        formData.append(endpoint.includes('mmm-friend-ocr') ? 'image' : 'studentImage', answerImageFile);
-      }
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), entry.image ? 90000 : 25000);
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal,
-        });
-        const result = await readCorrectionResponse(response);
-        if (!response.ok) {
-          lastError = `${endpoint} رفض الطلب برمز ${response.status}`;
-          continue;
-        }
-        results.push({ status: 'completed', endpoint, question: entry.question, part: entry.part, result });
-        handled = true;
-        break;
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.';
-      } finally {
-        window.clearTimeout(timeout);
-      }
-    }
-    if (!handled) results.push({ status: 'failed', endpoint: '', question: entry.question, part: entry.part, error: lastError });
-  }
+  const results = await Promise.all(
+    answeredEntries.map((entry, index) => correctSingleChapterExamEntry(submission, entry, index)),
+  );
 
   const completedCount = results.filter((result) => result.status === 'completed').length;
   if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result: { results } };
