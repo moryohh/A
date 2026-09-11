@@ -57,7 +57,7 @@ const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }
   );
 };
 
-const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cyclePoints, burst }) => {
+const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boolean }> = ({ cyclePoints, burst, compact = false }) => {
   const stageIndex = getStageIndex(cyclePoints);
   const stage = growthStages[stageIndex];
   const isSeedReborn = stageIndex >= 14;
@@ -88,7 +88,9 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
   }, []);
 
   return (
-    <div className="relative mx-auto h-[19rem] w-full overflow-hidden rounded-[2rem] border border-white/55 bg-[#def9ff] shadow-[inset_0_-18px_48px_rgba(21,128,61,.16)]">
+    <div
+      className={`relative mx-auto w-full overflow-hidden border border-white/55 bg-[#def9ff] shadow-[inset_0_-18px_48px_rgba(21,128,61,.16)] ${compact ? 'h-32 rounded-2xl' : 'h-[19rem] rounded-[2rem]'}`}
+    >
       <style>{`
         @keyframes stagePop { 0% { transform: translateY(18px) scale(.72); opacity:.4; } 58% { transform: translateY(-6px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
         @keyframes livingTree { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
@@ -100,9 +102,9 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
       `}</style>
 
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_20%,rgba(255,255,255,.95),transparent_26%),radial-gradient(circle_at_74%_36%,rgba(255,255,255,.65),transparent_20%)]" />
-      <div className="absolute right-7 top-7 h-16 w-16 rounded-full bg-amber-200 shadow-[0_0_46px_rgba(251,191,36,.55)]" />
-      <div className="absolute bottom-0 h-20 w-[120%] -translate-x-8 rounded-t-[50%] bg-gradient-to-b from-lime-200 via-emerald-300 to-emerald-500" />
-      <div className="absolute bottom-12 left-1/2 h-9 w-52 -translate-x-1/2 rounded-full bg-emerald-950/20 blur-md" />
+      <div className={`${compact ? 'right-4 top-4 h-9 w-9' : 'right-7 top-7 h-16 w-16'} absolute rounded-full bg-amber-200 shadow-[0_0_46px_rgba(251,191,36,.55)]`} />
+      <div className={`${compact ? 'h-10' : 'h-20'} absolute bottom-0 w-[120%] -translate-x-8 rounded-t-[50%] bg-gradient-to-b from-lime-200 via-emerald-300 to-emerald-500`} />
+      <div className={`${compact ? 'bottom-6 h-5 w-24' : 'bottom-12 h-9 w-52'} absolute left-1/2 -translate-x-1/2 rounded-full bg-emerald-950/20 blur-md`} />
 
       {burst && Array.from({ length: 18 }).map((_, index) => (
         <span
@@ -123,7 +125,7 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
 
       <svg
         viewBox="0 0 190 190"
-        className="absolute bottom-10 left-1/2 z-10 h-60 w-60 -translate-x-1/2"
+        className={`${compact ? 'bottom-4 h-28 w-28' : 'bottom-10 h-60 w-60'} absolute left-1/2 z-10 -translate-x-1/2`}
         style={{
           transformOrigin: '95px 158px',
           animation: burst
@@ -135,11 +137,32 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
         role="img"
         aria-label={stage.label}
       >
+        <defs>
+          <linearGradient id="previewSeed" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#f0b35e" />
+            <stop offset="52%" stopColor="#a7652a" />
+            <stop offset="100%" stopColor="#6b3f18" />
+          </linearGradient>
+          <linearGradient id="previewTrunk" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#b8793a" />
+            <stop offset="52%" stopColor="#7c4a1d" />
+            <stop offset="100%" stopColor="#4a2a12" />
+          </linearGradient>
+          <radialGradient id="previewLeaf" cx="42%" cy="34%" r="64%">
+            <stop offset="0%" stopColor="#bbf7d0" />
+            <stop offset="45%" stopColor="#35d66f" />
+            <stop offset="100%" stopColor="#0f7f45" />
+          </radialGradient>
+          <linearGradient id="previewStem" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#9af082" />
+            <stop offset="100%" stopColor="#15803d" />
+          </linearGradient>
+        </defs>
         <ellipse cx="95" cy="160" rx="62" ry="13" fill="#064e3b" opacity=".18" />
 
         {(!showStem || isSeedReborn) && (
           <g style={{ animation: isSeedReborn ? 'rebornSeed 950ms ease-out both' : undefined }}>
-            <ellipse cx="95" cy="139" rx="20" ry="27" fill={isSeedReborn ? '#c8862c' : '#a7652a'} />
+            <ellipse cx="95" cy="139" rx="20" ry="27" fill="url(#previewSeed)" />
             <ellipse cx="88" cy="126" rx="7" ry="10" fill="#facc15" opacity=".35" />
           </g>
         )}
@@ -153,23 +176,23 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
         )}
 
         {showStem && (
-          <path d="M95 148 C90 117 91 89 98 63" fill="none" stroke="#2fa653" strokeWidth="11" strokeLinecap="round" />
+          <path d="M95 148 C90 117 91 89 98 63" fill="none" stroke="url(#previewStem)" strokeWidth="11" strokeLinecap="round" />
         )}
 
         {!showTree && showTwoLeaves && (
           <g>
-            <ellipse cx="76" cy="82" rx="22" ry="11" fill="#22c55e" transform="rotate(-28 76 82)" />
-            <ellipse cx="115" cy="82" rx="22" ry="11" fill="#16a34a" transform="rotate(28 115 82)" />
+            <ellipse cx="76" cy="82" rx="22" ry="11" fill="url(#previewLeaf)" transform="rotate(-28 76 82)" />
+            <ellipse cx="115" cy="82" rx="22" ry="11" fill="url(#previewLeaf)" transform="rotate(28 115 82)" />
             {showFourLeaves && (
               <>
-                <ellipse cx="73" cy="108" rx="19" ry="10" fill="#65a30d" transform="rotate(-18 73 108)" />
-                <ellipse cx="118" cy="108" rx="19" ry="10" fill="#4d7c0f" transform="rotate(18 118 108)" />
+                <ellipse cx="73" cy="108" rx="19" ry="10" fill="url(#previewLeaf)" transform="rotate(-18 73 108)" />
+                <ellipse cx="118" cy="108" rx="19" ry="10" fill="url(#previewLeaf)" transform="rotate(18 118 108)" />
               </>
             )}
             {showSideLeaves && (
               <>
-                <ellipse cx="58" cy="96" rx="18" ry="9" fill="#10b981" transform="rotate(-45 58 96)" />
-                <ellipse cx="133" cy="96" rx="18" ry="9" fill="#10b981" transform="rotate(45 133 96)" />
+                <ellipse cx="58" cy="96" rx="18" ry="9" fill="url(#previewLeaf)" transform="rotate(-45 58 96)" />
+                <ellipse cx="133" cy="96" rx="18" ry="9" fill="url(#previewLeaf)" transform="rotate(45 133 96)" />
               </>
             )}
           </g>
@@ -177,14 +200,15 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
 
         {showTree && (
           <g transform={`translate(95 156) scale(${treeScale}) translate(-95 -156)`}>
-            <path d="M82 160 C84 126 86 91 94 55 C103 91 110 126 113 160 Z" fill="#8b5a2b" />
-            <path d="M94 77 C69 66 55 52 45 34" fill="none" stroke="#8b5a2b" strokeWidth="9" strokeLinecap="round" />
-            <path d="M101 75 C128 64 142 48 150 29" fill="none" stroke="#8b5a2b" strokeWidth="9" strokeLinecap="round" />
-            <path d="M94 103 C70 100 55 92 42 80" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
-            <path d="M101 102 C126 100 142 91 156 79" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
+            <path d="M82 160 C84 126 86 91 94 55 C103 91 110 126 113 160 Z" fill="url(#previewTrunk)" />
+            <path d="M94 77 C69 66 55 52 45 34" fill="none" stroke="url(#previewTrunk)" strokeWidth="9" strokeLinecap="round" />
+            <path d="M101 75 C128 64 142 48 150 29" fill="none" stroke="url(#previewTrunk)" strokeWidth="9" strokeLinecap="round" />
+            <path d="M94 103 C70 100 55 92 42 80" fill="none" stroke="url(#previewTrunk)" strokeWidth="7" strokeLinecap="round" />
+            <path d="M101 102 C126 100 142 91 156 79" fill="none" stroke="url(#previewTrunk)" strokeWidth="7" strokeLinecap="round" />
             {leaves.map(([cx, cy, r, fill], index) => (
-              <circle key={index} cx={cx as number} cy={cy as number} r={r as number} fill={fill as string} opacity={showFire ? '.45' : '.96'} />
+              <circle key={index} cx={cx as number} cy={cy as number} r={r as number} fill={index % 2 ? fill as string : 'url(#previewLeaf)'} opacity={showFire ? '.45' : '.96'} />
             ))}
+            <path d="M88 153 C93 125 94 92 95 63" fill="none" stroke="#ffffff55" strokeWidth="3" strokeLinecap="round" />
           </g>
         )}
 
@@ -217,7 +241,7 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
         )}
       </svg>
 
-      {showFire && !isSeedReborn && Array.from({ length: 9 }).map((_, index) => (
+      {showFire && !isSeedReborn && !compact && Array.from({ length: 9 }).map((_, index) => (
         <span
           key={index}
           className="absolute left-1/2 top-[41%] z-20 h-3 w-3 rounded-full bg-orange-300"
@@ -225,10 +249,10 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cycleP
         />
       ))}
 
-      <div className="absolute bottom-4 left-4 right-4 z-30 rounded-2xl border border-white/60 bg-white/80 px-3 py-2 text-center shadow-sm">
+      {!compact && <div className="absolute bottom-4 left-4 right-4 z-30 rounded-2xl border border-white/60 bg-white/80 px-3 py-2 text-center shadow-sm">
         <p className="text-[10px] font-black text-slate-500">مرحلة النمو</p>
         <p className="text-sm font-black" style={{ color: stage.color }}>{stage.label}</p>
-      </div>
+      </div>}
     </div>
   );
 };
@@ -332,8 +356,39 @@ export const PlantGrowthPreview: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-5 gap-1.5">
-              {[0, 10, 20, 40, 70, 80, 90, 100, 200, 300].map((value) => (
+            <div className="mt-4 rounded-3xl border border-emerald-100 bg-white/70 p-2.5 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <p className="text-xs font-black text-slate-800">مختبر كل حالات النبتة</p>
+                <p className="text-[10px] font-bold text-slate-500">اضغط أي بطاقة للمعاينة</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {growthStages.map((item) => (
+                  <button
+                    key={item.points}
+                    type="button"
+                    onClick={() => {
+                      gameAudio.playClick();
+                      setPoints(rank * 100 + item.points);
+                      setBurst(false);
+                    }}
+                    className={`overflow-hidden rounded-2xl border bg-white p-1.5 text-right shadow-sm transition-transform active:scale-95 ${cyclePoints === item.points ? 'ring-2 ring-offset-1' : ''}`}
+                    style={{
+                      borderColor: `${item.color}45`,
+                      ['--tw-ring-color' as string]: item.color,
+                    }}
+                  >
+                    <FantasyTree cyclePoints={item.points} burst={false} compact />
+                    <div className="mt-1 flex items-center justify-between gap-1 px-1">
+                      <span className="text-[10px] font-black text-slate-900">{item.points}</span>
+                      <span className="truncate text-[9px] font-bold" style={{ color: item.color }}>{item.label}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {[0, 100, 200, 300, 400].map((value) => (
                 <button
                   key={value}
                   type="button"
