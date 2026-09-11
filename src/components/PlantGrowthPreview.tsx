@@ -1,144 +1,198 @@
-import React, { useState } from 'react';
-import { FlaskConical, X, Sparkles } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
 
-const plantStages = [
-  { points: 0, label: 'بذرة', color: '#a16207' },
-  { points: 2, label: 'بذرة بجذر صغير', color: '#b7791f' },
-  { points: 5, label: 'ساق صغيرة', color: '#84cc16' },
-  { points: 10, label: 'نبتة بورقتين', color: '#22c55e' },
-  { points: 15, label: 'نبتة بأربع أوراق', color: '#16a34a' },
-  { points: 20, label: 'زهرة', color: '#db2777' },
-  { points: 25, label: 'أوراق جانبية', color: '#059669' },
-  { points: 30, label: 'شجيرة', color: '#15803d' },
-  { points: 40, label: 'شجرة مزهرة', color: '#0f766e' },
-  { points: 50, label: 'ثمار قليلة', color: '#ea580c' },
-  { points: 60, label: 'شجرة مثمرة', color: '#16a34a' },
-  { points: 70, label: 'شجرة عملاقة', color: '#166534' },
+const growthStages = [
+  { points: 0, label: 'بذرة', color: '#9a5b22' },
+  { points: 2, label: 'جذر صغير', color: '#b8792d' },
+  { points: 5, label: 'ساق صغيرة', color: '#8fcf3f' },
+  { points: 10, label: 'نبتة بورقتين', color: '#34c96a' },
+  { points: 15, label: 'نبتة بأربع أوراق', color: '#20a85a' },
+  { points: 20, label: 'زهرة', color: '#e04893' },
+  { points: 25, label: 'أوراق جانبية', color: '#11a675' },
+  { points: 30, label: 'شجيرة', color: '#16884a' },
+  { points: 40, label: 'شجرة مزهرة', color: '#0f8c77' },
+  { points: 50, label: 'ثمار قليلة', color: '#f27a24' },
+  { points: 60, label: 'شجرة مثمرة', color: '#1aa05f' },
+  { points: 70, label: 'شجرة عملاقة', color: '#146c3d' },
+  { points: 80, label: 'شجرة تتحرك', color: '#0f8f5f' },
+  { points: 90, label: 'كرة نار', color: '#f15a24' },
+  { points: 100, label: 'ولادة بذرة جديدة', color: '#c8862c' },
 ];
 
-const getStageIndex = (points: number) => {
-  return plantStages.reduce((current, stage, index) => (points >= stage.points ? index : current), 0);
+const shieldRanks = [
+  { label: 'درع خشبي', fill: '#8b5a2b', shine: '#c08457' },
+  { label: 'درع نحاسي', fill: '#b45309', shine: '#f59e0b' },
+  { label: 'درع فضي', fill: '#94a3b8', shine: '#e2e8f0' },
+  { label: 'درع ذهبي', fill: '#ca8a04', shine: '#fde047' },
+  { label: 'درع ماسي', fill: '#0891b2', shine: '#a5f3fc' },
+];
+
+const getStageIndex = (cyclePoints: number) => {
+  return growthStages.reduce((current, stage, index) => (cyclePoints >= stage.points ? index : current), 0);
 };
 
-const PreviewTree: React.FC<{ points: number; isAnimating: boolean }> = ({ points, isAnimating }) => {
-  const stageIndex = getStageIndex(points);
-  const stage = plantStages[stageIndex];
-  const hasRoot = stageIndex >= 1;
-  const hasStem = stageIndex >= 2;
-  const hasTwoLeaves = stageIndex >= 3;
-  const hasFourLeaves = stageIndex >= 4;
-  const hasFlower = stageIndex >= 5;
-  const hasSideLeaves = stageIndex >= 6;
-  const hasTree = stageIndex >= 7;
-  const hasManyFlowers = stageIndex >= 8;
-  const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
-  const treeScale = stageIndex >= 11 ? 1.24 : stageIndex >= 10 ? 1.12 : stageIndex >= 8 ? 1 : 0.82;
+const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }) => {
+  const shield = shieldRanks[Math.min(rank, shieldRanks.length - 1)];
 
   return (
-    <div
-      className="relative mx-auto flex h-64 w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-[1.75rem] border shadow-inner"
-      style={{
-        borderColor: `${stage.color}45`,
-        background: `linear-gradient(180deg, #c8f3ff 0%, #effdf4 62%, ${stage.color}2a 100%)`,
-      }}
-    >
-      <style>{`
-        @keyframes previewGrowPop { 0% { transform: translateY(16px) scale(.76); opacity:.6; } 62% { transform: translateY(-6px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
-        @keyframes previewSway { 0%, 100% { rotate: -1.3deg; } 50% { rotate: 1.3deg; } }
-        @keyframes previewParticle { 0% { transform: translate(84px, 76px) scale(.45); opacity:0; } 24% { opacity:1; } 100% { transform: translate(-46px, -82px) scale(1.15); opacity:0; } }
-        @keyframes previewGlow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); } 50% { filter: drop-shadow(0 0 16px rgba(34,197,94,.72)); } }
-      `}</style>
-      <div className="absolute right-7 top-6 h-14 w-14 rounded-full bg-amber-200/80 shadow-[0_0_38px_rgba(251,191,36,.5)]" />
-      <div className="absolute left-8 top-12 h-5 w-20 rounded-full bg-white/70 blur-[1px]" />
-      <div className="absolute bottom-0 h-16 w-[120%] rounded-t-[50%] bg-gradient-to-b from-lime-200 to-emerald-400" />
-      <div className="absolute bottom-10 h-8 w-40 rounded-full bg-emerald-950/20 blur-md" />
+    <div className="relative flex items-center gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 py-2 shadow-sm">
+      <svg
+        viewBox="0 0 80 92"
+        className="h-12 w-11"
+        style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined }}
+        role="img"
+        aria-label={shield.label}
+      >
+        <path d="M40 5 L68 15 V39 C68 59 56 75 40 86 C24 75 12 59 12 39 V15 Z" fill={shield.fill} />
+        <path d="M40 12 L60 20 V39 C60 53 52 66 40 75 C28 66 20 53 20 39 V20 Z" fill={shield.shine} opacity=".42" />
+        <path d="M30 24 H50 L44 39 H58 L35 69 L40 47 H24 Z" fill="#fff7" />
+        <path d="M40 5 L68 15 V39 C68 59 56 75 40 86 C24 75 12 59 12 39 V15 Z" fill="none" stroke="#fff9" strokeWidth="3" />
+      </svg>
+      <div>
+        <p className="text-[10px] font-black text-slate-500">رتبة الطالب</p>
+        <p className="text-sm font-black text-slate-950">{shield.label}</p>
+      </div>
+    </div>
+  );
+};
 
-      {isAnimating && Array.from({ length: 10 }).map((_, index) => (
+const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean }> = ({ cyclePoints, burst }) => {
+  const stageIndex = getStageIndex(cyclePoints);
+  const stage = growthStages[stageIndex];
+  const isSeedReborn = stageIndex >= 14;
+  const showFire = stageIndex >= 13;
+  const showAncientMotion = stageIndex >= 12;
+  const showTree = stageIndex >= 7 && !isSeedReborn;
+  const showStem = stageIndex >= 2 && !showTree && !isSeedReborn;
+  const showRoot = stageIndex >= 1 || isSeedReborn;
+  const showTwoLeaves = stageIndex >= 3 && !showTree && !isSeedReborn;
+  const showFourLeaves = stageIndex >= 4 && !showTree && !isSeedReborn;
+  const showFlower = stageIndex >= 5 && !showTree && !isSeedReborn;
+  const showSideLeaves = stageIndex >= 6 && !showTree && !isSeedReborn;
+  const flowerCount = stageIndex >= 8 && !showFire ? 10 : showFlower ? 1 : 0;
+  const fruitCount = stageIndex >= 10 && !showFire ? 12 : stageIndex >= 9 && !showFire ? 5 : 0;
+  const treeScale = stageIndex >= 12 ? 1.22 : stageIndex >= 11 ? 1.12 : stageIndex >= 10 ? 1.02 : stageIndex >= 8 ? 0.95 : 0.82;
+
+  const leaves = useMemo(() => {
+    return [
+      [68, 55, 30, '#2dd46f'],
+      [116, 54, 34, '#16b85f'],
+      [92, 35, 38, '#70e48b'],
+      [49, 82, 24, '#0f9f54'],
+      [135, 84, 27, '#28c76f'],
+      [91, 83, 39, '#16a35b'],
+      [72, 103, 25, '#1fbe67'],
+      [113, 105, 25, '#22c55e'],
+    ];
+  }, []);
+
+  return (
+    <div className="relative mx-auto h-[19rem] w-full overflow-hidden rounded-[2rem] border border-white/55 bg-[#def9ff] shadow-[inset_0_-18px_48px_rgba(21,128,61,.16)]">
+      <style>{`
+        @keyframes stagePop { 0% { transform: translateY(18px) scale(.72); opacity:.4; } 58% { transform: translateY(-6px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
+        @keyframes livingTree { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
+        @keyframes magicDot { 0% { transform: translate(90px, 96px) scale(.35); opacity:0; } 22% { opacity:1; } 100% { transform: translate(-58px, -106px) scale(1.35); opacity:0; } }
+        @keyframes emberOrbit { 0% { transform: rotate(0deg) translateX(64px) rotate(0deg); opacity:.45; } 50% { opacity:1; } 100% { transform: rotate(360deg) translateX(64px) rotate(-360deg); opacity:.45; } }
+        @keyframes flamePulse { 0%, 100% { transform: scale(.94); opacity:.72; filter: blur(.2px); } 50% { transform: scale(1.08); opacity:1; filter: blur(0); } }
+        @keyframes rebornSeed { 0% { transform: scale(.55) translateY(-24px); opacity:0; } 70% { transform: scale(1.12) translateY(3px); opacity:1; } 100% { transform: scale(1) translateY(0); opacity:1; } }
+        @keyframes rankPulse { 0% { transform: scale(.82) rotate(-8deg); filter: drop-shadow(0 0 0 rgba(250,204,21,0)); } 70% { transform: scale(1.13) rotate(4deg); filter: drop-shadow(0 0 16px rgba(250,204,21,.75)); } 100% { transform: scale(1) rotate(0); } }
+      `}</style>
+
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_20%,rgba(255,255,255,.95),transparent_26%),radial-gradient(circle_at_74%_36%,rgba(255,255,255,.65),transparent_20%)]" />
+      <div className="absolute right-7 top-7 h-16 w-16 rounded-full bg-amber-200 shadow-[0_0_46px_rgba(251,191,36,.55)]" />
+      <div className="absolute bottom-0 h-20 w-[120%] -translate-x-8 rounded-t-[50%] bg-gradient-to-b from-lime-200 via-emerald-300 to-emerald-500" />
+      <div className="absolute bottom-12 left-1/2 h-9 w-52 -translate-x-1/2 rounded-full bg-emerald-950/20 blur-md" />
+
+      {burst && Array.from({ length: 18 }).map((_, index) => (
         <span
           key={index}
-          className="absolute z-20 h-2.5 w-2.5 rounded-full bg-amber-300 shadow"
+          className="absolute z-30 h-2.5 w-2.5 rounded-full shadow-sm"
           style={{
-            right: `${32 + (index % 4) * 9}%`,
-            bottom: `${22 + index * 2}%`,
-            animation: `previewParticle ${820 + index * 70}ms ease-out ${index * 45}ms both`,
+            right: `${24 + (index % 6) * 8}%`,
+            bottom: `${18 + (index % 5) * 7}%`,
+            backgroundColor: index % 3 === 0 ? '#fde047' : index % 3 === 1 ? '#34d399' : '#f472b6',
+            animation: `magicDot ${880 + index * 28}ms ease-out ${index * 34}ms both`,
           }}
         />
       ))}
 
+      {showFire && !isSeedReborn && (
+        <div className="absolute left-1/2 top-[44%] z-20 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-500/30 blur-xl" />
+      )}
+
       <svg
-        viewBox="0 0 180 180"
-        className="relative z-10 h-52 w-52"
+        viewBox="0 0 190 190"
+        className="absolute bottom-10 left-1/2 z-10 h-60 w-60 -translate-x-1/2"
         style={{
-          transformOrigin: '90px 146px',
-          animation: isAnimating
-            ? 'previewGrowPop 950ms cubic-bezier(.18,1.25,.28,1) both, previewSway 2.8s ease-in-out 900ms infinite'
-            : 'previewSway 4.5s ease-in-out infinite',
+          transformOrigin: '95px 158px',
+          animation: burst
+            ? 'stagePop 950ms cubic-bezier(.18,1.25,.28,1) both, livingTree 2.6s ease-in-out 950ms infinite'
+            : showAncientMotion
+            ? 'livingTree 2.8s ease-in-out infinite'
+            : 'livingTree 4.8s ease-in-out infinite',
         }}
         role="img"
         aria-label={stage.label}
       >
-        <ellipse cx="90" cy="146" rx="55" ry="12" fill="#064e3b" opacity=".18" />
+        <ellipse cx="95" cy="160" rx="62" ry="13" fill="#064e3b" opacity=".18" />
 
-        {!hasStem && (
+        {(!showStem || isSeedReborn) && (
+          <g style={{ animation: isSeedReborn ? 'rebornSeed 950ms ease-out both' : undefined }}>
+            <ellipse cx="95" cy="139" rx="20" ry="27" fill={isSeedReborn ? '#c8862c' : '#a7652a'} />
+            <ellipse cx="88" cy="126" rx="7" ry="10" fill="#facc15" opacity=".35" />
+          </g>
+        )}
+
+        {showRoot && (
+          <g fill="none" stroke="#7c4a1d" strokeWidth="5" strokeLinecap="round" opacity={isSeedReborn ? '.5' : '1'}>
+            <path d="M95 143 C76 154 57 158 39 162" />
+            <path d="M95 144 C112 154 132 158 152 162" />
+            <path d="M95 145 C92 154 91 160 89 167" />
+          </g>
+        )}
+
+        {showStem && (
+          <path d="M95 148 C90 117 91 89 98 63" fill="none" stroke="#2fa653" strokeWidth="11" strokeLinecap="round" />
+        )}
+
+        {!showTree && showTwoLeaves && (
           <g>
-            <ellipse cx="90" cy="130" rx="18" ry="24" fill="#b8752b" />
-            <ellipse cx="84" cy="119" rx="6" ry="9" fill="#facc15" opacity=".38" />
-          </g>
-        )}
-
-        {hasRoot && (
-          <g fill="none" stroke="#7c4a1d" strokeWidth="5" strokeLinecap="round">
-            <path d="M90 133 C74 143 58 147 42 151" />
-            <path d="M90 134 C105 144 122 148 140 151" />
-            <path d="M90 134 C88 145 87 151 86 158" />
-          </g>
-        )}
-
-        {hasStem && !hasTree && (
-          <path d="M90 136 C86 108 87 84 93 62" fill="none" stroke="#2f9e44" strokeWidth="10" strokeLinecap="round" />
-        )}
-
-        {!hasTree && hasTwoLeaves && (
-          <g style={{ animation: isAnimating ? 'previewGlow 1s ease-in-out both' : undefined }}>
-            <ellipse cx="72" cy="78" rx="20" ry="10" fill="#22c55e" transform="rotate(-28 72 78)" />
-            <ellipse cx="108" cy="78" rx="20" ry="10" fill="#16a34a" transform="rotate(28 108 78)" />
-            {hasFourLeaves && (
+            <ellipse cx="76" cy="82" rx="22" ry="11" fill="#22c55e" transform="rotate(-28 76 82)" />
+            <ellipse cx="115" cy="82" rx="22" ry="11" fill="#16a34a" transform="rotate(28 115 82)" />
+            {showFourLeaves && (
               <>
-                <ellipse cx="69" cy="103" rx="18" ry="9" fill="#65a30d" transform="rotate(-17 69 103)" />
-                <ellipse cx="111" cy="103" rx="18" ry="9" fill="#4d7c0f" transform="rotate(17 111 103)" />
+                <ellipse cx="73" cy="108" rx="19" ry="10" fill="#65a30d" transform="rotate(-18 73 108)" />
+                <ellipse cx="118" cy="108" rx="19" ry="10" fill="#4d7c0f" transform="rotate(18 118 108)" />
               </>
             )}
-            {hasSideLeaves && (
+            {showSideLeaves && (
               <>
-                <ellipse cx="54" cy="93" rx="17" ry="8" fill="#10b981" transform="rotate(-45 54 93)" />
-                <ellipse cx="126" cy="93" rx="17" ry="8" fill="#10b981" transform="rotate(45 126 93)" />
+                <ellipse cx="58" cy="96" rx="18" ry="9" fill="#10b981" transform="rotate(-45 58 96)" />
+                <ellipse cx="133" cy="96" rx="18" ry="9" fill="#10b981" transform="rotate(45 133 96)" />
               </>
             )}
           </g>
         )}
 
-        {hasTree && (
-          <g transform={`translate(90 145) scale(${treeScale}) translate(-90 -145)`}>
-            <path d="M78 148 C80 119 82 88 89 57 C96 88 102 119 105 148 Z" fill="#8b5a2b" />
-            <path d="M88 77 C66 69 55 56 47 40" fill="none" stroke="#8b5a2b" strokeWidth="8" strokeLinecap="round" />
-            <path d="M96 74 C121 65 132 51 140 34" fill="none" stroke="#8b5a2b" strokeWidth="8" strokeLinecap="round" />
-            <path d="M89 98 C69 96 55 89 44 79" fill="none" stroke="#8b5a2b" strokeWidth="6" strokeLinecap="round" />
-            <path d="M96 98 C118 96 132 88 145 78" fill="none" stroke="#8b5a2b" strokeWidth="6" strokeLinecap="round" />
-            <circle cx="64" cy="56" r="28" fill="#22c55e" />
-            <circle cx="113" cy="54" r="31" fill="#16a34a" />
-            <circle cx="90" cy="40" r="34" fill="#4ade80" />
-            <circle cx="49" cy="82" r="23" fill="#15803d" />
-            <circle cx="132" cy="83" r="25" fill="#22c55e" />
-            <circle cx="90" cy="82" r="35" fill="#16a34a" />
+        {showTree && (
+          <g transform={`translate(95 156) scale(${treeScale}) translate(-95 -156)`}>
+            <path d="M82 160 C84 126 86 91 94 55 C103 91 110 126 113 160 Z" fill="#8b5a2b" />
+            <path d="M94 77 C69 66 55 52 45 34" fill="none" stroke="#8b5a2b" strokeWidth="9" strokeLinecap="round" />
+            <path d="M101 75 C128 64 142 48 150 29" fill="none" stroke="#8b5a2b" strokeWidth="9" strokeLinecap="round" />
+            <path d="M94 103 C70 100 55 92 42 80" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
+            <path d="M101 102 C126 100 142 91 156 79" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
+            {leaves.map(([cx, cy, r, fill], index) => (
+              <circle key={index} cx={cx as number} cy={cy as number} r={r as number} fill={fill as string} opacity={showFire ? '.45' : '.96'} />
+            ))}
           </g>
         )}
 
-        {Array.from({ length: hasManyFlowers ? 8 : hasFlower ? 1 : 0 }).map((_, index) => {
-          const spots = [[90, 68], [66, 57], [115, 58], [52, 84], [133, 83], [91, 38], [75, 96], [109, 96]];
+        {Array.from({ length: flowerCount }).map((_, index) => {
+          const spots = [[95, 68], [69, 57], [120, 58], [54, 86], [138, 86], [96, 39], [78, 104], [114, 104], [47, 68], [145, 67]];
           const [cx, cy] = spots[index];
           return (
-            <g key={index} transform={`translate(${cx} ${cy}) scale(${index === 0 ? 1 : .72})`}>
+            <g key={index} transform={`translate(${cx} ${cy}) scale(${index === 0 ? 1 : .7})`}>
               <circle r="4" fill="#facc15" />
               <circle cx="0" cy="-8" r="5.5" fill="#f472b6" />
               <circle cx="8" cy="0" r="5.5" fill="#fb7185" />
@@ -149,11 +203,32 @@ const PreviewTree: React.FC<{ points: number; isAnimating: boolean }> = ({ point
         })}
 
         {Array.from({ length: fruitCount }).map((_, index) => {
-          const fruits = [[69, 73], [110, 73], [90, 55], [128, 92], [53, 92], [90, 101], [78, 39], [117, 44], [43, 70], [139, 66]];
+          const fruits = [[72, 75], [119, 76], [96, 58], [139, 94], [54, 96], [95, 111], [80, 43], [124, 45], [45, 73], [151, 70], [69, 111], [124, 112]];
           const [cx, cy] = fruits[index];
-          return <circle key={index} cx={cx} cy={cy} r={stageIndex >= 11 ? 6 : 4.7} fill={index % 2 ? '#ef4444' : '#f97316'} stroke="#fff9" strokeWidth="1.3" />;
+          return <circle key={index} cx={cx} cy={cy} r={stageIndex >= 11 ? 6 : 4.8} fill={index % 2 ? '#ef4444' : '#f97316'} stroke="#fff9" strokeWidth="1.4" />;
         })}
+
+        {showFire && !isSeedReborn && (
+          <g style={{ animation: 'flamePulse 900ms ease-in-out infinite' }}>
+            <circle cx="95" cy="82" r="54" fill="#f97316" opacity=".28" />
+            <path d="M95 22 C126 61 136 91 117 119 C103 140 74 137 66 111 C58 84 78 72 95 22 Z" fill="#fb923c" opacity=".78" />
+            <path d="M96 49 C116 77 119 98 105 115 C94 128 76 119 80 98 C83 82 91 70 96 49 Z" fill="#fde047" opacity=".9" />
+          </g>
+        )}
       </svg>
+
+      {showFire && !isSeedReborn && Array.from({ length: 9 }).map((_, index) => (
+        <span
+          key={index}
+          className="absolute left-1/2 top-[41%] z-20 h-3 w-3 rounded-full bg-orange-300"
+          style={{ animation: `emberOrbit ${1.7 + index * .13}s linear infinite`, animationDelay: `${index * -140}ms` }}
+        />
+      ))}
+
+      <div className="absolute bottom-4 left-4 right-4 z-30 rounded-2xl border border-white/60 bg-white/80 px-3 py-2 text-center shadow-sm">
+        <p className="text-[10px] font-black text-slate-500">مرحلة النمو</p>
+        <p className="text-sm font-black" style={{ color: stage.color }}>{stage.label}</p>
+      </div>
     </div>
   );
 };
@@ -161,19 +236,21 @@ const PreviewTree: React.FC<{ points: number; isAnimating: boolean }> = ({ point
 export const PlantGrowthPreview: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [points, setPoints] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const stageIndex = getStageIndex(points);
-  const stage = plantStages[stageIndex];
-  const nextStage = plantStages.find((item) => item.points > points);
+  const [burst, setBurst] = useState(false);
+  const rank = Math.min(Math.floor(points / 100), shieldRanks.length - 1);
+  const cyclePoints = points % 100;
+  const stageIndex = getStageIndex(cyclePoints);
+  const stage = growthStages[stageIndex];
+  const nextStage = growthStages.find((item) => item.points > cyclePoints);
   const progress = nextStage
-    ? Math.round(((points - stage.points) / Math.max(1, nextStage.points - stage.points)) * 100)
+    ? Math.round(((cyclePoints - stage.points) / Math.max(1, nextStage.points - stage.points)) * 100)
     : 100;
 
   const collectPoints = () => {
     gameAudio.playClick();
-    setIsAnimating(true);
-    setPoints((current) => Math.min(70, current + 2));
-    window.setTimeout(() => setIsAnimating(false), 1250);
+    setBurst(true);
+    setPoints((current) => Math.min(499, current + 10));
+    window.setTimeout(() => setBurst(false), 1250);
   };
 
   return (
@@ -181,7 +258,7 @@ export const PlantGrowthPreview: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
+        className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
         aria-label="فتح معاينة نمو الشجرة"
         title="معاينة نمو الشجرة"
       >
@@ -189,9 +266,9 @@ export const PlantGrowthPreview: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/70 p-3 font-cairo backdrop-blur-sm sm:items-center" dir="rtl">
-          <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-[1.75rem] border border-emerald-200/60 bg-white p-4 text-right shadow-2xl">
-            <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/75 p-3 font-cairo backdrop-blur-sm sm:items-center" dir="rtl">
+          <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-[1.85rem] border border-white/70 bg-gradient-to-b from-white to-emerald-50 p-4 text-right shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-emerald-100 pb-3">
               <div>
                 <p className="text-[11px] font-black text-emerald-600">معاينة مؤقتة معزولة</p>
                 <h2 className="text-lg font-black text-slate-950">التقييم الدوري وتطور الشجرة</h2>
@@ -199,34 +276,38 @@ export const PlantGrowthPreview: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm transition-colors active:bg-slate-100"
                 aria-label="إغلاق المعاينة"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <PreviewTree points={points} isAnimating={isAnimating} />
+            <div className="mb-3">
+              <ShieldBadge rank={rank} pulse={cyclePoints === 0 && points > 0 && burst} />
+            </div>
 
-            <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-3">
+            <FantasyTree cyclePoints={cyclePoints} burst={burst} />
+
+            <div className="mt-4 rounded-3xl border border-emerald-100 bg-white/80 p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-black text-slate-500">المرحلة الحالية</p>
-                  <p className="text-base font-black" style={{ color: stage.color }}>{stage.label}</p>
+                  <p className="text-[11px] font-black text-slate-500">النقاط داخل الدورة</p>
+                  <p className="text-base font-black" style={{ color: stage.color }}>{cyclePoints} / 100</p>
                 </div>
-                <div className="rounded-2xl bg-white px-3 py-2 text-center shadow-sm">
-                  <p className="text-[10px] font-black text-slate-500">النقاط</p>
-                  <p className="text-lg font-black text-slate-950">{points}</p>
+                <div className="rounded-2xl px-3 py-2 text-center text-white shadow-sm" style={{ backgroundColor: stage.color }}>
+                  <p className="text-[10px] font-black opacity-80">المجموع</p>
+                  <p className="text-lg font-black">{points}</p>
                 </div>
               </div>
               <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
                 <div
                   className="h-full rounded-full transition-[width] duration-700"
-                  style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${stage.color}88, ${stage.color})` }}
+                  style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${stage.color}80, ${stage.color})` }}
                 />
               </div>
               <p className="mt-2 text-[11px] font-bold text-slate-500">
-                {nextStage ? `المرحلة التالية عند ${nextStage.points} نقطة: ${nextStage.label}` : 'وصلت الشجرة إلى مرحلة العملاقة'}
+                {nextStage ? `التالي عند ${nextStage.points} نقطة: ${nextStage.label}` : 'عند 100 نقطة تعود بذرة وتترقى رتبة الدرع'}
               </p>
             </div>
 
@@ -234,7 +315,7 @@ export const PlantGrowthPreview: React.FC = () => {
               <button
                 type="button"
                 onClick={collectPoints}
-                className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition-transform active:scale-95"
+                className="rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition-transform active:scale-95"
               >
                 جمع النقاط
               </button>
@@ -243,7 +324,7 @@ export const PlantGrowthPreview: React.FC = () => {
                 onClick={() => {
                   gameAudio.playClick();
                   setPoints(0);
-                  setIsAnimating(false);
+                  setBurst(false);
                 }}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition-transform active:scale-95"
               >
@@ -251,27 +332,26 @@ export const PlantGrowthPreview: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-1.5">
-              {plantStages.map((item, index) => (
+            <div className="mt-4 grid grid-cols-5 gap-1.5">
+              {[0, 10, 20, 40, 70, 80, 90, 100, 200, 300].map((value) => (
                 <button
-                  key={item.points}
+                  key={value}
                   type="button"
                   onClick={() => {
                     gameAudio.playClick();
-                    setPoints(item.points);
-                    setIsAnimating(false);
+                    setPoints(value);
+                    setBurst(false);
                   }}
-                  className={`rounded-2xl border px-2 py-2 text-[10px] font-black transition-transform active:scale-95 ${index === stageIndex ? 'bg-slate-950 text-white' : 'bg-white text-slate-600'}`}
-                  style={{ borderColor: `${item.color}55` }}
+                  className="rounded-2xl border border-emerald-100 bg-white px-1.5 py-2 text-[10px] font-black text-slate-600 transition-transform active:scale-95"
                 >
-                  {item.points} نقطة
+                  {value}
                 </button>
               ))}
             </div>
 
             <div className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-[11px] font-bold leading-5 text-amber-800">
               <Sparkles className="h-4 w-4 shrink-0" />
-              <span>هذه معاينة مؤقتة فقط، ولا تعدل نقاط الطالب أو التقييم الحقيقي.</span>
+              <span>كل 100 نقطة تبدأ دورة نمو جديدة، ويتطور الدرع من خشبي إلى نحاسي ثم فضي ثم ذهبي ثم ماسي.</span>
             </div>
           </div>
         </div>
