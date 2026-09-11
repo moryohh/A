@@ -110,7 +110,7 @@ function mapCommunityApiComment(row: any): CommunityComment {
     id: String(row?.id || `comment-${Date.now()}`),
     postId: row?.post_id ? String(row.post_id) : undefined,
     userId: account.id,
-    userName: account.name,
+    userName: row?.author_name || 'طالب المنصة',
     userAvatar: account.avatarUrl || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     text: row?.comment_text || row?.content || '',
@@ -140,7 +140,7 @@ function mapCommunityApiPost(row: any, currentUserId?: string, likedSet?: Set<st
   return {
     id: postId,
     userId: account?.id || row?.user_id || undefined,
-    userName: account?.name || row?.author_display_name || 'طالب المنصة',
+    userName: row?.author_display_name || 'طالب المنصة',
     userAvatar: account?.avatarUrl || row?.author_avatar_url || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     content: row?.content || row?.post_text || '',
