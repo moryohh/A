@@ -62,9 +62,9 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, 0), 4);
 
   return (
-    <div className="flex w-[4.75rem] flex-col items-center justify-center gap-0.5" aria-label={`درع مستوى ${safeLevel + 1}`}>
-      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`} alt="" className="h-16 w-16 object-contain drop-shadow-lg" />
-      <span className="text-[10px] font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
+    <div className="flex w-52 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
+      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`} alt="" className="h-48 w-48 object-contain drop-shadow-xl" />
+      <span className="text-sm font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
     </div>
   );
 };
