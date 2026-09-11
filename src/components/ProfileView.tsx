@@ -21,11 +21,6 @@ import {
   Calendar,
   LockKeyhole,
   UserX,
-  CircleDot,
-  Leaf,
-  Sprout,
-  Flower2,
-  TreePine,
 } from 'lucide-react';
 import { useAppTheme, AppThemeId } from '../services/themeService';
 import { gameAudio } from '../utils/gameAudio';
@@ -43,6 +38,156 @@ interface ProfileViewProps {
   onSignOut?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
 }
+
+const treeMilestones = [
+  { points: 0, label: 'بذرة', tone: '#a16207' },
+  { points: 2, label: 'جذر صغير', tone: '#b7791f' },
+  { points: 5, label: 'ساق صغيرة', tone: '#84cc16' },
+  { points: 10, label: 'نبتة بورقتين', tone: '#22c55e' },
+  { points: 15, label: 'نبتة بأربع أوراق', tone: '#16a34a' },
+  { points: 20, label: 'زهرة', tone: '#db2777' },
+  { points: 25, label: 'نبتة بأوراق جانبية', tone: '#059669' },
+  { points: 30, label: 'شجيرة', tone: '#15803d' },
+  { points: 40, label: 'شجرة مزهرة', tone: '#0f766e' },
+  { points: 50, label: 'بداية الثمار', tone: '#ea580c' },
+  { points: 60, label: 'شجرة مثمرة', tone: '#16a34a' },
+  { points: 70, label: 'شجرة عملاقة', tone: '#166534' },
+];
+
+const getTreeStage = (points: number) => {
+  return treeMilestones.reduce((current, milestone) => (
+    points >= milestone.points ? milestone : current
+  ), treeMilestones[0]);
+};
+
+const GrowthTree: React.FC<{ points: number; animate: boolean }> = ({ points, animate }) => {
+  const stageIndex = treeMilestones.findIndex((stage) => stage.points === getTreeStage(points).points);
+  const stage = treeMilestones[Math.max(0, stageIndex)];
+  const showRoot = stageIndex >= 1;
+  const showStem = stageIndex >= 2;
+  const leafCount = stageIndex >= 4 ? 4 : stageIndex >= 3 ? 2 : 0;
+  const showFlower = stageIndex >= 5;
+  const showSideLeaves = stageIndex >= 6;
+  const treeSize = stageIndex >= 11 ? 1.24 : stageIndex >= 10 ? 1.12 : stageIndex >= 8 ? 1 : stageIndex >= 7 ? 0.8 : 0.58;
+  const showWood = stageIndex >= 7;
+  const flowerCount = stageIndex >= 8 ? 7 : showFlower ? 1 : 0;
+  const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
+
+  return (
+    <div className="relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem] border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
+      <style>{`
+        @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
+        @keyframes treeSwaySoft { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
+        @keyframes pointFly { 0% { transform: translate(42px, 42px) scale(.55); opacity:0; } 25% { opacity:1; } 100% { transform: translate(-18px, -42px) scale(1); opacity:0; } }
+        @keyframes leafPulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); } 50% { filter: drop-shadow(0 0 10px rgba(34,197,94,.55)); } }
+      `}</style>
+      <div className="absolute left-3 top-3 h-9 w-9 rounded-full bg-amber-200/80 blur-[1px]" />
+      <div className="absolute bottom-3 h-4 w-24 rounded-full bg-emerald-900/15 blur-sm" />
+      {animate && [0, 1, 2, 3, 4].map((item) => (
+        <span
+          key={item}
+          className="absolute h-2.5 w-2.5 rounded-full bg-amber-300 shadow-sm"
+          style={{
+            left: `${58 + item * 5}%`,
+            top: `${58 - item * 4}%`,
+            animation: `pointFly ${850 + item * 90}ms ease-out ${item * 55}ms both`,
+          }}
+        />
+      ))}
+      <svg
+        viewBox="0 0 140 140"
+        className="relative z-10 h-[116px] w-[116px]"
+        style={{
+          transformOrigin: '70px 112px',
+          animation: animate ? 'treeGrowPop 900ms cubic-bezier(.18,1.25,.28,1) both, treeSwaySoft 2.8s ease-in-out 900ms infinite' : 'treeSwaySoft 4.2s ease-in-out infinite',
+        }}
+        role="img"
+        aria-label={stage.label}
+      >
+        <path d="M20 116 C44 105 96 105 120 116" fill="#7c4a1d" opacity=".2" />
+        <ellipse cx="70" cy="114" rx="39" ry="9" fill="#6b3f18" opacity=".18" />
+
+        {!showStem && (
+          <g style={{ animation: animate ? 'treeGrowPop 700ms ease-out both' : undefined }}>
+            <ellipse cx="70" cy="96" rx="15" ry="20" fill="#b8752b" />
+            <ellipse cx="65" cy="88" rx="5" ry="8" fill="#facc15" opacity=".38" />
+          </g>
+        )}
+
+        {showRoot && (
+          <g fill="none" stroke="#7c4a1d" strokeWidth="4" strokeLinecap="round">
+            <path d="M70 100 C60 106 52 109 42 112" />
+            <path d="M70 101 C78 108 89 110 101 113" />
+            <path d="M70 102 C68 109 67 113 66 118" />
+          </g>
+        )}
+
+        {showStem && !showWood && (
+          <path d="M70 104 C67 84 68 69 72 54" fill="none" stroke="#2f9e44" strokeWidth="8" strokeLinecap="round" />
+        )}
+
+        {showWood && (
+          <g transform={`translate(70 110) scale(${treeSize}) translate(-70 -110)`}>
+            <path d="M61 113 C62 91 64 70 69 48 C74 70 78 92 80 113 Z" fill="#8b5a2b" />
+            <path d="M68 61 C52 54 45 45 39 33" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
+            <path d="M73 58 C91 51 99 42 105 29" fill="none" stroke="#8b5a2b" strokeWidth="7" strokeLinecap="round" />
+            <path d="M70 75 C57 73 48 68 39 60" fill="none" stroke="#8b5a2b" strokeWidth="5" strokeLinecap="round" />
+            <path d="M73 76 C88 75 98 68 108 59" fill="none" stroke="#8b5a2b" strokeWidth="5" strokeLinecap="round" />
+            <circle cx="50" cy="42" r="22" fill="#22c55e" opacity=".95" />
+            <circle cx="87" cy="40" r="25" fill="#16a34a" opacity=".96" />
+            <circle cx="70" cy="30" r="27" fill="#4ade80" opacity=".96" />
+            <circle cx="37" cy="62" r="18" fill="#15803d" opacity=".9" />
+            <circle cx="103" cy="64" r="20" fill="#22c55e" opacity=".92" />
+            <circle cx="70" cy="61" r="28" fill="#16a34a" opacity=".97" />
+          </g>
+        )}
+
+        {!showWood && leafCount > 0 && (
+          <g style={{ animation: animate ? 'leafPulse 950ms ease-in-out both' : undefined }}>
+            <ellipse cx="58" cy="62" rx="15" ry="8" fill="#22c55e" transform="rotate(-28 58 62)" />
+            <ellipse cx="82" cy="62" rx="15" ry="8" fill="#16a34a" transform="rotate(28 82 62)" />
+            {leafCount >= 4 && (
+              <>
+                <ellipse cx="55" cy="80" rx="14" ry="7" fill="#65a30d" transform="rotate(-18 55 80)" />
+                <ellipse cx="85" cy="80" rx="14" ry="7" fill="#4d7c0f" transform="rotate(18 85 80)" />
+              </>
+            )}
+          </g>
+        )}
+
+        {showSideLeaves && !showWood && (
+          <g>
+            <ellipse cx="48" cy="73" rx="13" ry="7" fill="#10b981" transform="rotate(-45 48 73)" />
+            <ellipse cx="92" cy="73" rx="13" ry="7" fill="#10b981" transform="rotate(45 92 73)" />
+          </g>
+        )}
+
+        {Array.from({ length: flowerCount }).map((_, index) => {
+          const spots = [[70, 48], [52, 45], [91, 42], [39, 62], [101, 62], [70, 24], [82, 69]];
+          const [cx, cy] = spots[index] || spots[0];
+          return (
+            <g key={`flower-${index}`} transform={`translate(${cx} ${cy}) scale(${index === 0 ? 1 : .72})`}>
+              <circle r="4" fill="#facc15" />
+              <circle cx="0" cy="-7" r="5" fill="#f472b6" />
+              <circle cx="7" cy="0" r="5" fill="#fb7185" />
+              <circle cx="0" cy="7" r="5" fill="#f472b6" />
+              <circle cx="-7" cy="0" r="5" fill="#fb7185" />
+            </g>
+          );
+        })}
+
+        {Array.from({ length: fruitCount }).map((_, index) => {
+          const fruits = [[54, 54], [84, 55], [70, 39], [98, 69], [43, 68], [72, 73], [60, 25], [91, 31], [34, 56], [108, 49]];
+          const [cx, cy] = fruits[index] || fruits[0];
+          return <circle key={`fruit-${index}`} cx={cx} cy={cy} r={stageIndex >= 11 ? 5 : 4} fill={index % 2 ? '#ef4444' : '#f97316'} stroke="#fff7" strokeWidth="1" />;
+        })}
+      </svg>
+      <span className="absolute bottom-2 rounded-full bg-white/80 px-2.5 py-0.5 text-[9px] font-black" style={{ color: stage.tone }}>
+        {stage.label}
+      </span>
+    </div>
+  );
+};
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   user,
@@ -76,20 +221,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
   const userLevel = levelSnapshot.level;
-  const ratingVisible = competitionSnapshot?.ratingVisible ?? userLevel >= 6;
-  const accuracyPercent = competitionSnapshot?.accuracyPercent ?? 0;
-  const cycleAccuracy = Math.max(0, Math.min(100, accuracyPercent));
-  const growthProgress = ratingVisible ? cycleAccuracy : Math.min(100, levelSnapshot.progressPercent);
-  const plantStage = growthProgress >= 85
-    ? { label: 'شجرة مزهرة', icon: TreePine, color: '#16a34a', message: 'نمو ممتاز واستمر في التعلم' }
-    : growthProgress >= 65
-    ? { label: 'نبتة مزهرة', icon: Flower2, color: '#db2777', message: 'اقتربت من أعلى مراحل النمو' }
-    : growthProgress >= 35
-    ? { label: 'نبتة بأوراق', icon: Leaf, color: '#65a30f', message: 'إجاباتك ونشاطك يضيفان أوراقًا جديدة' }
-    : growthProgress > 0
-    ? { label: 'برعم صغير', icon: Sprout, color: '#ca8a04', message: 'كل إجابة دقيقة تساعد نبتتك على النمو' }
-    : { label: 'بذرة البداية', icon: CircleDot, color: '#a16207', message: 'ابدأ باختبار أو درس مسجل لتنمو النبتة' };
-  const PlantIcon = plantStage.icon;
+  const treeStage = getTreeStage(totalPoints);
+  const nextTreeStage = treeMilestones.find((stage) => stage.points > totalPoints);
+  const treeProgress = nextTreeStage
+    ? Math.round(((totalPoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
+    : 100;
+  const [isCollectingPoints, setIsCollectingPoints] = useState(false);
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
     { id: 'solar_light', label: 'شمسي', colors: ['#FFFFFF', '#0284C7'] },
     { id: 'golden_navy', label: 'ذهبي', colors: ['#FFFDF5', '#D97706'] },
@@ -169,6 +306,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const showTempMsg = (msg: string) => {
     setSaveSuccessMsg(msg);
     setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleCollectPoints = () => {
+    gameAudio.playClick();
+    setIsCollectingPoints(true);
+    window.setTimeout(() => setIsCollectingPoints(false), 1250);
   };
 
   return (
@@ -378,40 +521,53 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <section
-            className="mt-3 rounded-3xl border p-3.5 text-right overflow-hidden"
+            className="mt-3 overflow-hidden rounded-[1.4rem] border p-3.5 text-right shadow-lg"
             style={{
-              borderColor: `${theme.colors.primary}35`,
-              background: `linear-gradient(145deg, ${theme.colors.primary}12, transparent 60%)`,
+              borderColor: `${treeStage.tone}45`,
+              background: `radial-gradient(circle at 18% 20%, ${treeStage.tone}24, transparent 34%), linear-gradient(145deg, ${treeStage.tone}12, ${theme.colors.bgCardSubtle})`,
+              boxShadow: `0 16px 36px ${treeStage.tone}12`,
             }}
             aria-label="التقييم الدوري"
           >
             <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                className="shrink-0 rounded-2xl px-3.5 py-3 text-[11px] font-black transition-transform active:scale-95"
-                style={{ backgroundColor: `${theme.colors.primary}1c`, color: theme.colors.primary }}
-                aria-label="جمع النقاط"
-              >
-                جمع النقاط
-              </button>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-                <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCollectPoints}
+                    className="shrink-0 rounded-2xl px-4 py-3 text-[11px] font-black text-white shadow-lg transition-transform active:scale-95"
+                    style={{
+                      background: `linear-gradient(135deg, ${treeStage.tone}, ${theme.colors.primary})`,
+                      boxShadow: `0 10px 22px ${treeStage.tone}35`,
+                    }}
+                    aria-label="جمع النقاط"
+                  >
+                    جمع النقاط
+                  </button>
+                  <div className="text-right">
+                    <p className={`text-[10px] font-black ${theme.classes.textMuted}`}>مرحلة الشجرة</p>
+                    <p className="text-sm font-black" style={{ color: treeStage.tone }}>{treeStage.label}</p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border bg-white/45 p-2.5" style={{ borderColor: `${treeStage.tone}25` }}>
                   <div className="flex items-center justify-between gap-2 text-[10px] font-black">
                     <span className={theme.classes.textMain}>مستوى التقدم</span>
-                    <span style={{ color: plantStage.color }}>{growthProgress}%</span>
+                    <span style={{ color: treeStage.tone }}>
+                      {nextTreeStage ? `${totalPoints} / ${nextTreeStage.points}` : `${totalPoints}+`}
+                    </span>
                   </div>
-                  <div className="mt-1.5 h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/10" aria-label="مستوى تقدم النبتة">
+                  <div className="mt-2 h-3 overflow-hidden rounded-full border border-white/60 bg-black/10" aria-label="مستوى تقدم الشجرة">
                     <div
                       className="h-full rounded-full transition-[width] duration-700"
-                      style={{ width: `${growthProgress}%`, background: `linear-gradient(90deg, ${plantStage.color}75, ${plantStage.color})` }}
+                      style={{ width: `${treeProgress}%`, background: `linear-gradient(90deg, ${treeStage.tone}70, ${treeStage.tone})` }}
                     />
                   </div>
-                </div>
-                <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl border p-2" style={{ borderColor: `${plantStage.color}55`, backgroundColor: `${plantStage.color}14` }}>
-                  <PlantIcon className="h-10 w-10 transition-all duration-500" strokeWidth={1.7} style={{ color: plantStage.color }} />
-                  <span className="mt-1 text-[9px] font-black" style={{ color: plantStage.color }}>{plantStage.label}</span>
+                  <p className={`mt-1.5 text-[9px] font-bold ${theme.classes.textMuted}`}>
+                    {nextTreeStage ? `المرحلة التالية عند ${nextTreeStage.points} نقطة: ${nextTreeStage.label}` : 'وصلت لأعلى مرحلة نمو حالية'}
+                  </p>
                 </div>
               </div>
+              <GrowthTree points={totalPoints} animate={isCollectingPoints} />
             </div>
           </section>
         </div>
