@@ -408,17 +408,17 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
       answer: answerPayload,
       answers: [answerPayload],
     };
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(payload));
-    if (entry.image) {
-      formData.append('studentImage', dataUrlToFile(entry.image, `${answerPayload.question_id}.jpg`));
-    }
-
     let lastError = '';
     let handled = false;
     for (let attempt = 0; attempt < CHAPTER_EXAM_CORRECTION_ENDPOINTS.length; attempt += 1) {
       const endpointIndex = (index + attempt) % CHAPTER_EXAM_CORRECTION_ENDPOINTS.length;
       const endpoint = CHAPTER_EXAM_CORRECTION_ENDPOINTS[endpointIndex];
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(payload));
+      if (entry.image) {
+        const answerImageFile = dataUrlToFile(entry.image, `${answerPayload.question_id}.jpg`);
+        formData.append(endpoint.includes('mmm-friend-ocr') ? 'image' : 'studentImage', answerImageFile);
+      }
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), entry.image ? 90000 : 25000);
       try {
