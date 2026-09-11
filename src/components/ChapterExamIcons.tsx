@@ -289,6 +289,45 @@ function dataUrlToFile(dataUrl: string, fileName: string) {
   return new File([bytes], fileName, { type: mimeType });
 }
 
+function loadImageFromDataUrl(dataUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('تعذر قراءة الصورة.'));
+    image.src = dataUrl;
+  });
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('تعذر تحويل الصورة.'));
+    };
+    reader.onerror = () => reject(new Error('تعذر قراءة ملف الصورة.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function compressAnswerImage(file: File) {
+  const originalDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(originalDataUrl);
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return originalDataUrl;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', 0.86);
+}
+
 function stripImagesForStorage(submission: ChapterSubmission): ChapterSubmission {
   return {
     ...submission,
@@ -508,17 +547,21 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     return () => window.clearInterval(timer);
   }, [submitState]);
 
-  const handleImageSelected = (file: File) => {
+  const handleImageSelected = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return;
+    try {
+      const compressedImage = await compressAnswerImage(file);
       setImages((current) => ({
         ...current,
-        [answerKey]: reader.result as string,
+        [answerKey]: compressedImage,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      const fallbackImage = await readFileAsDataUrl(file);
+      setImages((current) => ({
+        ...current,
+        [answerKey]: fallbackImage,
+      }));
+    }
   };
 
   const openQuestion = (index: number) => {
