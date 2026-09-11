@@ -12,10 +12,38 @@ interface ChapterExamIconsProps {
 
 type QuestionEntry = { title: string; text: string; answer?: string };
 type ExamQuestion = { title: string; parts: QuestionEntry[] };
+type SubmissionEntry = {
+  question: string;
+  part: string;
+  prompt: string;
+  answer: string;
+  image: string;
+  modelAnswer?: string;
+};
+type ChapterSubmission = {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  subject_id: string;
+  subject_name: string;
+  chapter_number: number;
+  submitted_at: string;
+  entries: SubmissionEntry[];
+  correction_status?: 'completed' | 'failed' | 'skipped';
+  correction_endpoint?: string;
+  correction_result?: unknown;
+  correction_error?: string;
+};
 
 const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
 const QUESTION_KEY_PATTERN = /question|prompt|content|body|^q\d*$|^س\d*$/i;
 const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|date|year|round|dawr|chapter|subject/i;
+const CHAPTER_EXAM_CORRECTION_ENDPOINTS = [
+  'https://hhh-two-black.vercel.app/api/ocr',
+  'https://hhh-main-wheat.vercel.app/api/ocr',
+  'https://superb-centaur-deea8c.netlify.app/api/friend-ocr',
+  'https://starlit-duckanoo-496fde.netlify.app/api/mmm-friend-ocr',
+];
 
 function isAnswerKey(key: string) {
   return ANSWER_KEY_PATTERN.test(key);
@@ -238,6 +266,87 @@ function examSubmissionKey(examId: string) {
   return `chapter-exam-submission:${examId}`;
 }
 
+function dataUrlToBase64(dataUrl: string) {
+  const [, base64] = dataUrl.split(',');
+  return base64 || dataUrl;
+}
+
+async function readCorrectionResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { text };
+  }
+}
+
+async function correctChapterExamSubmission(submission: ChapterSubmission) {
+  const answeredEntries = submission.entries.filter((entry) => entry.answer.trim() || entry.image);
+  if (answeredEntries.length === 0) {
+    return {
+      status: 'skipped' as const,
+      endpoint: '',
+      result: { message: 'لا توجد إجابات مرسلة للتصحيح.' },
+    };
+  }
+
+  const payload = {
+    request_id: submission.id,
+    submission_id: submission.id,
+    source: 'chapter_exam',
+    exam_id: submission.exam_id,
+    exam_title: submission.exam_title,
+    subject_id: submission.subject_id,
+    subject_name: submission.subject_name,
+    chapter_number: submission.chapter_number,
+    submitted_at: submission.submitted_at,
+    language: 'ara',
+    answers: answeredEntries.map((entry, index) => ({
+      question_id: `${entry.question}-${entry.part}-${index + 1}`,
+      question: entry.question,
+      part: entry.part,
+      questionText: entry.prompt,
+      studentAnswer: entry.answer,
+      answerText: entry.answer,
+      imageBase64: entry.image ? dataUrlToBase64(entry.image) : undefined,
+      imageDataUrl: entry.image || undefined,
+      modelAnswer: entry.modelAnswer || '',
+    })),
+  };
+
+  let lastError = '';
+  for (const endpoint of CHAPTER_EXAM_CORRECTION_ENDPOINTS) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      const result = await readCorrectionResponse(response);
+      if (!response.ok) {
+        lastError = `${endpoint} رفض الطلب برمز ${response.status}`;
+        continue;
+      }
+      return { status: 'completed' as const, endpoint, result };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.';
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  return {
+    status: 'failed' as const,
+    endpoint: '',
+    result: null,
+    error: lastError || 'تعذر استلام نتيجة التصحيح من كل مسارات API.',
+  };
+}
+
 const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; onClose: () => void }> = ({ exam, subjectName, onClose }) => {
   const questions = examQuestions(exam.payload);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -376,9 +485,10 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
         prompt: part.text,
         answer: answers[key] || '',
         image: images[key] || '',
+        modelAnswer: part.answer,
       };
     }));
-    const submission = {
+    const submission: ChapterSubmission = {
       id: `submission_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       exam_id: exam.id,
       exam_title: exam.title,
@@ -394,20 +504,34 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
     try {
       localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(submission));
       localStorage.setItem('chapter-exam-submission:last', JSON.stringify(submission));
+      const correction = await correctChapterExamSubmission(submission);
+      const finalSubmission: ChapterSubmission = {
+        ...submission,
+        correction_status: correction.status,
+        correction_endpoint: correction.endpoint,
+        correction_result: correction.result,
+        correction_error: 'error' in correction ? correction.error : undefined,
+      };
+      localStorage.setItem(examSubmissionKey(exam.id), JSON.stringify(finalSubmission));
+      localStorage.setItem('chapter-exam-submission:last', JSON.stringify(finalSubmission));
       const { error } = await supabase.from('curriculum_exam_submissions').insert({
         exam_id: exam.id,
         subject_id: exam.subject_id,
         chapter_number: exam.chapter_number,
-        payload: submission,
+        payload: finalSubmission,
         submitted_at: submittedAt,
       });
       if (error) {
-        setSubmitMessage('تم حفظ الإجابات على الجهاز، لكن Supabase رفض الحفظ. يحتاج جدول curriculum_exam_submissions أو صلاحيات RLS.');
+        setSubmitMessage('تم حفظ الإجابات والنتيجة على الجهاز، لكن Supabase رفض الحفظ. يحتاج جدول curriculum_exam_submissions أو صلاحيات RLS.');
+      } else if (correction.status === 'completed') {
+        setSubmitMessage('تم إرسال إجاباتك واستلام نتيجة التصحيح وحفظها.');
+      } else if (correction.status === 'skipped') {
+        setSubmitMessage('تم حفظ المحاولة، لكن لا توجد إجابات للتصحيح.');
       } else {
-        setSubmitMessage('تم إرسال إجاباتك وحفظها.');
+        setSubmitMessage('تم حفظ الإجابات، لكن تعذر استلام نتيجة التصحيح من مسارات API.');
       }
       setSubmitState('completed');
-      window.setTimeout(onClose, 1800);
+      window.setTimeout(onClose, 2200);
     } catch {
       setSubmitMessage('تم حفظ الإجابات على الجهاز، لكن تعذر الاتصال بالحفظ الخارجي.');
       setSubmitState('error');
@@ -415,7 +539,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   };
 
   const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
-  const processingMessages = ['جاري إرسال الإجابات', 'جاري حفظ الإجابات', 'جاري انتظار نتيجة التصحيح', 'جاري تجهيز صفحة النتيجة'];
+  const processingMessages = ['جاري إرسال الإجابات', 'جاري استقبال الرد', 'جاري تصحيح الإجابات', 'جاري حفظ النتيجة'];
 
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-3" dir="rtl">
