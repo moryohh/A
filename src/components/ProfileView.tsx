@@ -518,7 +518,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
             <div className="flex items-center justify-between text-[10px] font-black">
-              <span className={theme.classes.textMain}>مستوى الطالب</span>
+              <span className="text-sm font-black" style={{ color: theme.colors.primary }}>{levelSnapshot.progressPercent}%</span>
               <LevelShield level={userLevel} />
             </div>
             <div className="mt-2 h-2 rounded-full bg-black/10 overflow-hidden border border-white/10">
