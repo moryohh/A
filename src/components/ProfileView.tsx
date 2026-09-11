@@ -63,6 +63,33 @@ const getShieldTone = (level: number) => {
   return tones[Math.min(Math.max(level, 0), tones.length - 1)];
 };
 
+const LevelShield: React.FC<{ level: number }> = ({ level }) => {
+  const safeLevel = Math.min(Math.max(level, 0), 4);
+  const names = ['خشبي', 'نحاسي', 'فضي', 'ذهبي', 'ماسي'];
+  const fill = getShieldTone(safeLevel);
+  const shine = ['#d6a66a', '#f3b26d', '#f1f5f9', '#fde68a', '#cffafe'][safeLevel];
+  const gradientId = `profile-shield-${safeLevel}`;
+
+  return (
+    <div className="flex w-16 flex-col items-center justify-center gap-0.5" aria-label={`درع ${names[safeLevel]}، مستوى ${safeLevel + 1}`}>
+      <svg viewBox="0 0 72 84" className="h-12 w-11 drop-shadow-md" role="img">
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor={shine} />
+            <stop offset="45%" stopColor={fill} />
+            <stop offset="100%" stopColor={safeLevel === 4 ? '#0e7490' : '#422006'} />
+          </linearGradient>
+        </defs>
+        <path d="M36 3 L64 13 V36 C64 57 52 72 36 81 C20 72 8 57 8 36 V13 Z" fill={`url(#${gradientId})`} stroke="#ffffffcc" strokeWidth="2.5" />
+        <path d="M36 12 L55 19 V36 C55 50 48 61 36 69 C24 61 17 50 17 36 V19 Z" fill="#ffffff24" stroke="#ffffff88" strokeWidth="1.5" />
+        <path d="M36 21 L40 31 L51 32 L42 39 L45 50 L36 44 L27 50 L30 39 L21 32 L32 31 Z" fill="#fff9" />
+        {safeLevel === 4 && <path d="M36 5 V79 M10 35 H62" stroke="#ecfeff" strokeWidth="1.2" opacity=".65" />}
+      </svg>
+      <span className="text-[9px] font-black leading-none" style={{ color: fill }}>مستوى {safeLevel + 1}</span>
+    </div>
+  );
+};
+
 const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
   const stageIndex = treeMilestones.findIndex((stage) => stage.points === getTreeStage(points).points);
   const stage = treeMilestones[Math.max(0, stageIndex)];
@@ -491,8 +518,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
             <div className="flex items-center justify-between text-[10px] font-black">
-              <span className={theme.classes.textMain}>مستوى {userLevel + 1}</span>
-              <ShieldCheck className="h-5 w-5" style={{ color: getShieldTone(userLevel), fill: `${getShieldTone(userLevel)}35` }} aria-label="درع مستوى الطالب" />
+              <span className={theme.classes.textMain}>مستوى الطالب</span>
+              <LevelShield level={userLevel} />
             </div>
             <div className="mt-2 h-2 rounded-full bg-black/10 overflow-hidden border border-white/10">
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }} />
