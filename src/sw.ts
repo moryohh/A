@@ -9,7 +9,7 @@ import {registerRoute} from 'workbox-routing';
 const serviceWorker = self as unknown as ServiceWorkerGlobalScope;
 const appBaseUrl = new URL('./', serviceWorker.registration.scope || serviceWorker.location.href);
 const appAsset = (name: string) => new URL(name, appBaseUrl).toString();
-const appRelease = 'cat-brand-20260908';
+const appRelease = 'profile-rating-simplified-20260911';
 
 precacheAndRoute((self as unknown as {__WB_MANIFEST: Array<{revision: string | null; url: string}>}).__WB_MANIFEST);
 cleanupOutdatedCaches();
