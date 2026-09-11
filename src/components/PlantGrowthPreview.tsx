@@ -71,6 +71,9 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
   const showFourLeaves = stageIndex >= 4 && !showTree && !isSeedReborn;
   const showFlower = stageIndex >= 5 && !showTree && !isSeedReborn;
   const showSideLeaves = stageIndex >= 6 && !showTree && !isSeedReborn;
+  const visualStages = [0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 9, 9, 10, 11];
+  const assetIndex = visualStages[stageIndex] ?? 0;
+  const useGeneratedAsset = stageIndex >= 7;
   const flowerCount = stageIndex >= 8 && !showFire ? 9 : showFlower ? 1 : 0;
   const fruitCount = stageIndex >= 10 && !showFire ? 10 : stageIndex >= 9 && !showFire ? 4 : 0;
   const treeScale = stageIndex >= 12 ? 1.22 : stageIndex >= 11 ? 1.12 : stageIndex >= 10 ? 1.02 : stageIndex >= 8 ? 0.95 : 0.82;
@@ -125,10 +128,20 @@ const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boo
         <div className="absolute left-1/2 top-[44%] z-20 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-500/30 blur-xl" />
       )}
 
+      {useGeneratedAsset && <img
+          src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(assetIndex).padStart(2, '0')}.png`}
+          alt={stage.label}
+          className={`${compact ? 'bottom-2 h-[88%] w-[88%]' : 'bottom-5 h-[88%] w-[88%]'} absolute left-1/2 z-10 -translate-x-1/2 object-contain drop-shadow-[0_12px_10px_rgba(6,78,59,.18)]`}
+          style={{
+            animation: burst ? 'stagePop 950ms cubic-bezier(.18,1.25,.28,1) both' : 'livingTree 4.8s ease-in-out infinite',
+          }}
+        />}
+
       <svg
         viewBox="0 0 190 190"
         className={`${compact ? 'bottom-4 h-28 w-28' : 'bottom-10 h-60 w-60'} absolute left-1/2 z-10 -translate-x-1/2`}
         style={{
+          display: useGeneratedAsset ? 'none' : undefined,
           transformOrigin: '95px 158px',
           animation: burst
             ? 'stagePop 950ms cubic-bezier(.18,1.25,.28,1) both, livingTree 2.6s ease-in-out 950ms infinite'
