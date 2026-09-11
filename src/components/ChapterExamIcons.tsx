@@ -599,7 +599,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
         submitted_at: submittedAt,
       });
       if (error) {
-        setSubmitMessage('تم إرسال الإجابات واستلام الرد، لكن تعذر حفظها في السحابة.');
+        setSubmitMessage('تم إرسال الإجابات واستلام الرد، لكن حفظ السحابة غير مفعّل حالياً.');
       } else if (correction.status === 'completed') {
         setSubmitMessage('تم إرسال إجاباتك واستلام نتيجة التصحيح وحفظها.');
       } else if (correction.status === 'partial') {
