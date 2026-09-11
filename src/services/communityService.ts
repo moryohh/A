@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { getSupabaseAccessToken } from './authService';
 import { CommunityPost, CommunityComment, UserProfile } from '../types';
+import { getDemoCommunityAccount } from '../data/demoCommunityAccounts';
 
 const LOCAL_STORAGE_POSTS_KEY = 'nahn_maak_community_posts_v2';
 const LOCAL_STORAGE_LIKES_KEY = 'nahn_maak_user_liked_posts_v2';
@@ -104,20 +105,22 @@ export function rankCommunityPosts(posts: CommunityPost[]): CommunityPost[] {
 }
 
 function mapCommunityApiComment(row: any): CommunityComment {
+  const account = getDemoCommunityAccount(`comment:${row?.id || row?.created_at || row?.content || ''}`);
   return {
     id: String(row?.id || `comment-${Date.now()}`),
     postId: row?.post_id ? String(row.post_id) : undefined,
-    userId: row?.user_id || undefined,
-    userName: row?.author_name || 'طالب المنصة',
-    userAvatar:
-      row?.author_image_url ||
-      row?.author_avatar ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    userId: account.id,
+    userName: account.name,
+    userAvatar: account.avatarUrl || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     text: row?.comment_text || row?.content || '',
     likes: Number(row?.likes_count || 0),
     isLiked: false,
     createdAt: row?.created_at,
+    userLevel: account.level,
+    userPoints: account.points,
+    userProgress: account.progress,
+    isDemoAccount: true,
   };
 }
 
@@ -131,14 +134,14 @@ function mapCommunityApiPost(row: any, currentUserId?: string, likedSet?: Set<st
     ? row.comments.map(mapCommunityApiComment)
     : [];
   const postId = String(row?.id || `post-${Date.now()}`);
+  const isOwnPost = currentUserId ? row?.user_id === currentUserId : false;
+  const account = isOwnPost ? undefined : getDemoCommunityAccount(`post:${postId}`);
 
   return {
     id: postId,
-    userId: row?.user_id || undefined,
-    userName: row?.author_display_name || 'طالب المنصة',
-    userAvatar:
-      row?.author_avatar_url ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    userId: account?.id || row?.user_id || undefined,
+    userName: account?.name || row?.author_display_name || 'طالب المنصة',
+    userAvatar: account?.avatarUrl || row?.author_avatar_url || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     content: row?.content || row?.post_text || '',
     type: (row?.post_type || 'general') as CommunityPost['type'],
@@ -148,9 +151,13 @@ function mapCommunityApiPost(row: any, currentUserId?: string, likedSet?: Set<st
     commentsCount: Number(row?.comments_count ?? comments.length ?? 0),
     reportsCount: Number(row?.reports_count ?? 0),
     isLiked: Boolean(likedSet?.has(postId)),
-    isOwnPost: currentUserId ? row?.user_id === currentUserId : false,
+    isOwnPost,
     createdAt: row?.created_at,
     comments,
+    userLevel: account?.level,
+    userPoints: account?.points,
+    userProgress: account?.progress,
+    isDemoAccount: Boolean(account),
   };
 }
 

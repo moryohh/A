@@ -159,7 +159,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })}
+                    onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar, level: post.userLevel, points: post.userPoints, progress: post.userProgress, isDemoAccount: post.isDemoAccount })}
                     className="flex min-w-0 items-center gap-2.5 text-right transition active:scale-[0.98]"
                     aria-label={`فتح ملف ${post.userName}`}
                   >
@@ -220,7 +220,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     {/* Dropdown Menu */}
                     {isMenuOpen && (
                       <div className={`absolute top-8 left-0 border rounded-2xl shadow-2xl z-30 py-1.5 text-xs w-44 animate-in fade-in ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
-                        {post.userId && !post.isOwnPost && (
+                        {post.userId && !post.isOwnPost && !post.isDemoAccount && (
                           <button
                             onClick={() => {
                               onMessage({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar });
@@ -369,15 +369,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     </div>
                     {publicComments.map((comment) => (
                       <div key={comment.id} className="flex items-start gap-2 text-right">
-                        <img
-                          src={comment.userAvatar}
-                          alt={comment.userName}
-                          width={24}
-                          height={24}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-6 h-6 rounded-full object-cover shrink-0 border border-white/10"
-                        />
+                        <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="shrink-0" aria-label={`فتح ملف ${comment.userName}`}>
+                          <img src={comment.userAvatar} alt={comment.userName} width={24} height={24} loading="lazy" decoding="async" className="w-6 h-6 rounded-full object-cover border border-white/10" />
+                        </button>
                         <p className={`text-[13px] leading-7 ${theme.classes.textMain}`}>
                           <strong className="font-bold">{comment.userName}:</strong> {comment.text}
                         </p>
@@ -416,10 +410,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
                   {/* Private message button */}
                   <button
-                    onClick={() => post.userId && !post.isOwnPost && onMessage({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })}
-                    disabled={!post.userId || post.isOwnPost}
+                    onClick={() => post.userId && !post.isOwnPost && !post.isDemoAccount && onMessage({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })}
+                    disabled={!post.userId || post.isOwnPost || post.isDemoAccount}
                     className={`py-3 rounded-xl border flex items-center justify-center gap-1 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMuted}`}
-                    title={!post.userId ? 'هذا الحساب غير متاح للمراسلة' : post.isOwnPost ? 'هذا منشورك' : 'مراسلة خاصة'}
+                    title={!post.userId ? 'هذا الحساب غير متاح للمراسلة' : post.isOwnPost ? 'هذا منشورك' : post.isDemoAccount ? 'الحسابات التجريبية غير متاحة للمراسلة' : 'مراسلة خاصة'}
                   >
                     <MessageCircle className="w-4 h-4 text-sky-400" />
                     <span>مراسلة</span>

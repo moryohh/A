@@ -60,7 +60,7 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
 
         {/* Post snippet */}
         <div className="bg-[#0D0D12]/60 p-3 rounded-2xl border border-white/5 my-3 text-xs text-gray-300">
-          <button type="button" onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar })} className="mb-1 block font-bold text-gray-400 transition hover:text-sky-400">
+          <button type="button" onClick={() => onOpenProfile({ id: post.userId, name: post.userName, avatarUrl: post.userAvatar, level: post.userLevel, points: post.userPoints, progress: post.userProgress, isDemoAccount: post.isDemoAccount })} className="mb-1 block font-bold text-gray-400 transition hover:text-sky-400">
             صاحب المنشور: {post.userName}
           </button>
           <p className="line-clamp-2 text-white">{post.content}</p>
@@ -78,7 +78,7 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
                 key={comment.id}
                 className="bg-[#0D0D12]/80 p-3.5 rounded-2xl border border-white/5 flex gap-3 text-right relative"
               >
-                <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="shrink-0 transition active:scale-95" aria-label={`فتح ملف ${comment.userName}`}>
+                <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="shrink-0 transition active:scale-95" aria-label={`فتح ملف ${comment.userName}`}>
                   <img
                     src={comment.userAvatar}
                     alt={comment.userName}
@@ -87,11 +87,11 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({
                 </button>
                 <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="text-xs font-bold text-white transition hover:text-sky-400">
+                      <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="text-xs font-bold text-white transition hover:text-sky-400">
                         {comment.userName}
                       </button>
                       <div className="flex items-center gap-2">
-                        {comment.userId && comment.userId !== currentUserId && (
+                        {comment.userId && comment.userId !== currentUserId && !comment.isDemoAccount && (
                           <button type="button" onClick={() => onMessage({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar })} className="text-sky-400 transition active:scale-95" aria-label={`مراسلة ${comment.userName}`}>
                             <MessageCircle className="h-4 w-4" />
                           </button>

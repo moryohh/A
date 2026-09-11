@@ -59,12 +59,21 @@ export interface CommunityComment {
   isLiked?: boolean;
   createdAt?: string;
   replies?: CommunityComment[];
+  userLevel?: number;
+  userPoints?: number;
+  userProgress?: number;
+  isDemoAccount?: boolean;
 }
 
 export interface CommunityMember {
   id?: string;
   name: string;
   avatarUrl?: string;
+  level?: number;
+  points?: number;
+  progress?: number;
+  isDemoAccount?: boolean;
+  bio?: string;
 }
 
 export interface CommunityPost {
@@ -87,6 +96,10 @@ export interface CommunityPost {
   engagementScore?: number;
   createdAt?: string;
   comments: CommunityComment[];
+  userLevel?: number;
+  userPoints?: number;
+  userProgress?: number;
+  isDemoAccount?: boolean;
 }
 
 export interface EducationalLesson {
@@ -291,4 +304,3 @@ export interface UserProfile {
   streakDays?: number;
   themeId?: string;
 }
-
