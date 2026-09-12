@@ -4,6 +4,7 @@ export type PointSource =
   | 'image_choice'
   | 'daily_exam'
   | 'monthly_exam'
+  | 'ministry_exam'
   | 'semester_exam'
   | 'annual_exam'
   | 'experiment';
@@ -119,7 +120,7 @@ export const calculateProgressReward = ({
 }: RewardInput): number => {
   const safeScore = Math.max(0, Number(score) || 0);
 
-  if (source === 'annual_exam') {
+  if (source === 'annual_exam' || source === 'ministry_exam') {
     const earned = clamp(safeScore, 0, 100) >= 50 ? clamp(safeScore, 0, 100) : 0;
     return toOneDecimal(earned / repeatDivisorForAnnualExam(attempt));
   }
@@ -142,6 +143,9 @@ export const calculateProgressReward = ({
 
 export const getAnnualExamReward = (score: number, attempt = 1): number =>
   calculateProgressReward({ source: 'annual_exam', score, attempt });
+
+export const getMinistryExamReward = (score: number, attempt = 1): number =>
+  calculateProgressReward({ source: 'ministry_exam', score, attempt });
 
 export const getMonthlyExamReward = (score: number, attempt = 1): number =>
   calculateProgressReward({ source: 'monthly_exam', score, attempt });

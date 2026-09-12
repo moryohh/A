@@ -57,6 +57,7 @@ interface SubjectLearningPathViewProps {
   onSelectLesson: (lesson: EducationalLesson, context?: OpenLessonContext) => void;
   onBack: () => void;
   onOpenGames?: () => void;
+  onScoreUpdate?: (points: number) => void;
 }
 
 export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = ({
@@ -68,6 +69,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
   onSelectLesson,
   onBack,
   onOpenGames,
+  onScoreUpdate,
 }) => {
   const { theme } = useAppTheme();
   const [chapters, setChapters] = useState<SubjectChapter[]>([]);
@@ -405,6 +407,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
             isLoadingLessons={isLoadingLessons}
             isLoadingChapters={isLoading}
             onBack={onBack}
+            onScoreUpdate={onScoreUpdate}
           />
         </div>
       ) : (

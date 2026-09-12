@@ -1020,6 +1020,7 @@ function AppContent() {
                 setHomeSubView('main_home');
               }}
               onOpenGames={() => setIsGamesOpen(true)}
+              onScoreUpdate={handleScoreUpdate}
             />
           )}
 

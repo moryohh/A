@@ -40,6 +40,7 @@ interface AdventureWorldMapProps {
   isLoadingLessons?: boolean;
   isLoadingChapters?: boolean;
   onBack?: () => void;
+  onScoreUpdate?: (points: number) => void;
 }
 
 // Exactly 6 images preserved in their strict original sequence
@@ -68,6 +69,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   isLoadingLessons = false,
   isLoadingChapters = false,
   onBack,
+  onScoreUpdate,
 }) => {
   const { theme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -590,6 +592,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               subjectName={subjectName}
               chapterNumber={currentChapter.number}
               className="absolute right-[10%] top-[9%]"
+              onScoreUpdate={onScoreUpdate}
             />
           )}
 
