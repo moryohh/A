@@ -63,33 +63,29 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const shieldLevels = Array.from({ length: safeLevel + 1 }, (_, index) => index);
 
   return (
-    <div className="flex w-56 shrink-0 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
-      <div className="relative h-52 w-56" aria-label="ترتيب الدروع المكتسبة">
-        {shieldLevels.map((shieldLevel) => {
-          const isCurrent = shieldLevel === safeLevel;
-          const scale = isCurrent ? 1.05 : 0.72 + shieldLevel * 0.08;
-          const offset = isCurrent ? 16 : shieldLevel * 6;
-          const opacity = isCurrent ? 1 : 0.78 + shieldLevel * 0.05;
+    <div className="relative h-40 w-48 shrink-0" aria-label={`درع مستوى ${safeLevel + 1}`}>
+      {shieldLevels.map((shieldLevel) => {
+        const isCurrent = shieldLevel === safeLevel;
+        const scale = isCurrent ? 1.05 : 0.72 + shieldLevel * 0.08;
+        const offset = isCurrent ? 18 : shieldLevel * 6;
 
-          return (
-            <img
-              key={shieldLevel}
-              src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldLevel}.png`}
-              alt=""
-              className="absolute top-1 h-48 w-48 object-contain drop-shadow-lg"
-              style={{
-                left: `${offset}px`,
-                zIndex: shieldLevel + 1,
-                opacity,
-                transform: `scale(${scale})`,
-                transformOrigin: 'center center',
-              }}
-              aria-hidden="true"
-            />
-          );
-        })}
-      </div>
-      <span className="text-sm font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
+        return (
+          <img
+            key={shieldLevel}
+            src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldLevel}.png`}
+            alt=""
+            className="absolute top-0 h-40 w-40 object-contain drop-shadow-lg"
+            style={{
+              left: `${offset}px`,
+              zIndex: shieldLevel + 1,
+              opacity: isCurrent ? 1 : 0.78 + shieldLevel * 0.05,
+              transform: `scale(${scale})`,
+              transformOrigin: 'center center',
+            }}
+            aria-hidden="true"
+          />
+        );
+      })}
     </div>
   );
 };
@@ -521,17 +517,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
 
           <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
-            <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-black">
-                  <span className={theme.classes.textMain}>المستوى {userLevel + 1}</span>
-                  <span style={{ color: theme.colors.primary }}>{levelSnapshot.progressPercent}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-black/10">
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }} />
-                </div>
-              </div>
+            <div className="mb-2 text-center text-base font-black" style={{ color: theme.colors.primary }}>
+              المستوى {userLevel + 1}
+            </div>
+            <div className="flex h-40 items-center justify-center gap-5">
               <LevelShield level={userLevel} />
+              <div className="flex h-36 flex-col items-center justify-between">
+                <span className="text-sm font-black" style={{ color: theme.colors.primary }}>
+                  {levelSnapshot.progressPercent}%
+                </span>
+                <div className="relative h-24 w-4 overflow-hidden rounded-full border border-white/20 bg-black/10">
+                  <div
+                    className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
+                    style={{ height: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }}
+                  />
+                </div>
+                <span className="text-[9px] font-black text-slate-600">التقدم</span>
+              </div>
+            </div>
+            <div className="mt-1 text-center text-[10px] font-bold text-slate-500">
+              {levelSnapshot.progressPercent}% من المستوى الحالي
             </div>
           </div>
 
