@@ -60,25 +60,34 @@ const getTreeStage = (points: number) => {
 
 const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, 0), 4);
-  const previousLevel = safeLevel > 0 ? safeLevel - 1 : null;
+  const shieldLevels = Array.from({ length: safeLevel + 1 }, (_, index) => index);
 
   return (
     <div className="flex w-56 shrink-0 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
-      <div className="relative h-52 w-56" aria-label={previousLevel === null ? 'درع المستوى الحالي' : 'الدرع الحالي مع الدرع السابق'}>
-        {previousLevel !== null && (
-          <img
-            src={`${import.meta.env.BASE_URL}assets/shields/shield-${previousLevel}.png`}
-            alt=""
-            className="absolute left-0 top-2 h-48 w-48 object-contain opacity-90 drop-shadow-lg"
-            aria-hidden="true"
-          />
-        )}
-        <img
-          src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`}
-          alt=""
-          className="absolute left-4 top-0 h-48 w-48 object-contain drop-shadow-xl"
-          style={{ transform: 'scale(1.05)', transformOrigin: 'center center' }}
-        />
+      <div className="relative h-52 w-56" aria-label="ترتيب الدروع المكتسبة">
+        {shieldLevels.map((shieldLevel) => {
+          const isCurrent = shieldLevel === safeLevel;
+          const scale = isCurrent ? 1.05 : 0.72 + shieldLevel * 0.08;
+          const offset = isCurrent ? 16 : shieldLevel * 6;
+          const opacity = isCurrent ? 1 : 0.78 + shieldLevel * 0.05;
+
+          return (
+            <img
+              key={shieldLevel}
+              src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldLevel}.png`}
+              alt=""
+              className="absolute top-1 h-48 w-48 object-contain drop-shadow-lg"
+              style={{
+                left: `${offset}px`,
+                zIndex: shieldLevel + 1,
+                opacity,
+                transform: `scale(${scale})`,
+                transformOrigin: 'center center',
+              }}
+              aria-hidden="true"
+            />
+          );
+        })}
       </div>
       <span className="text-sm font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
     </div>
