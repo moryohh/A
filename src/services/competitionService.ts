@@ -77,6 +77,13 @@ const toSafeInt = (value: unknown, fallback = 0): number => {
   return Number.isFinite(numberValue) ? Math.max(0, Math.floor(numberValue)) : fallback;
 };
 
+const toSafePoints = (value: unknown, fallback = 0): number => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue)
+    ? Number.parseFloat(Math.max(0, numberValue).toFixed(1))
+    : fallback;
+};
+
 const toAccuracy = (value: unknown, correct: number, answered: number): number => {
   const parsed = Number(value);
   if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
@@ -94,7 +101,7 @@ const mapSnapshot = (row: any): CompetitionSnapshot | null => {
   if (!row) return null;
   const correct = toSafeInt(row.period_correct);
   const answered = toSafeInt(row.period_answered);
-  const points = toSafeInt(row.points);
+  const points = toSafePoints(row.points);
   const level = getComputedLevel(points);
   const accuracyPercent = toAccuracy(row.accuracy_percent, correct, answered);
   const ratingTier = getRatingTierForMetrics(level, accuracyPercent);
@@ -215,7 +222,7 @@ export async function fetchCompetitionLeaderboard(limit = 20): Promise<Leaderboa
       return [];
     }
     return data.map((row: any) => {
-      const points = toSafeInt(row.points);
+      const points = toSafePoints(row.points);
       const level = getComputedLevel(points);
       const accuracyPercent = toAccuracy(row.accuracy_percent, toSafeInt(row.period_correct), toSafeInt(row.period_answered));
       const tier = getRatingTierForMetrics(level, accuracyPercent);
