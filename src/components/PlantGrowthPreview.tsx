@@ -51,6 +51,18 @@ const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }
   </div>;
 };
 
+const ShieldCardArtwork: React.FC<{ tier: number; label: string }> = ({ tier, label }) => {
+  const visualTier = Math.min(tier, 4);
+  const aura = tier === 3 ? { color: '#facc15', opacity: .2 } : tier === 4 ? { color: '#38bdf8', opacity: .3 } : tier === 5 ? { color: '#f472b6', opacity: .24 } : tier === 6 ? { color: '#4ade80', opacity: .3 } : tier === 7 ? { color: '#ef4444', opacity: .4 } : null;
+  const filter = tier === 5 ? 'hue-rotate(62deg) saturate(1.55) contrast(1.08)' : tier === 6 ? 'hue-rotate(92deg) saturate(2) contrast(1.12)' : tier === 7 ? 'hue-rotate(292deg) saturate(2.1) contrast(1.15)' : undefined;
+  const emblem = tier <= 1 ? '' : tier === 3 ? '⚡' : tier === 4 ? '◆' : tier === 5 ? '◈' : tier === 6 ? '☢' : tier === 7 ? '♨' : '';
+  return <div className="relative mx-auto h-24 w-24">
+    {aura && <span className="pointer-events-none absolute -inset-4 z-0 rounded-full blur-xl animate-pulse" style={{ background: `radial-gradient(circle, ${aura.color}, transparent 65%)`, opacity: aura.opacity }} />}
+    <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualTier}.png`} alt={label} className="relative z-10 h-full w-full object-contain drop-shadow-lg" style={{ filter }} />
+    {(tier <= 1 || emblem) && <span className="pointer-events-none absolute left-1/2 top-[51%] z-20 flex h-[31%] w-[31%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[42%] border border-white/25 text-[17px] font-black leading-none shadow-inner" style={{ background: tier <= 1 ? 'linear-gradient(145deg, rgba(82,45,22,.95), rgba(182,104,43,.92))' : 'linear-gradient(145deg, rgba(15,23,42,.64), rgba(255,255,255,.16))', color: aura?.color || '#fff' }}>{emblem}</span>}
+  </div>;
+};
+
 const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boolean }> = ({ cyclePoints, burst, compact = false }) => {
   const uniqueId = useId().replace(/:/g, '');
   const stageIndex = getStageIndex(cyclePoints);
@@ -341,15 +353,7 @@ export const PlantGrowthPreview: React.FC = () => {
                     onClick={() => { gameAudio.playClick(); setPoints(index * 100); setBurst(false); }}
                     className={`rounded-2xl border bg-white p-2 text-center shadow-sm transition active:scale-95 ${rank === index ? 'ring-2 ring-amber-400' : 'border-amber-100'}`}
                   >
-                    <div className="relative mx-auto h-24 w-24">
-                      <img
-                        src={`${import.meta.env.BASE_URL}assets/shields/shield-${Math.min(index, 4)}.png`}
-                        alt={shield.label}
-                        className="h-full w-full object-contain drop-shadow-lg"
-                        style={index === 5 ? { filter: 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' } : undefined}
-                      />
-                      {index >= 3 && <span className="pointer-events-none absolute inset-1 rounded-[45%] animate-pulse" style={{ background: index === 3 ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : index === 4 ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
-                    </div>
+                    <ShieldCardArtwork tier={index} label={shield.label} />
                     <span className="mt-1 block text-[10px] font-black text-slate-700">{shield.label.replace('درع ', '')}</span>
                   </button>
                 ))}
@@ -451,7 +455,7 @@ export const PlantGrowthPreview: React.FC = () => {
 
             <div className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-[11px] font-bold leading-5 text-amber-800">
               <Sparkles className="h-4 w-4 shrink-0" />
-              <span>كل 100 نقطة تبدأ دورة نمو جديدة، ويتطور الدرع من خشبي إلى نحاسي ثم فضي ثم ذهبي ثم ماسي.</span>
+              <span>كل 100 نقطة تبدأ دورة نمو جديدة، ويتطور الدرع من خشبي إلى نحاسي ثم فضي ثم ذهبي ثم ماسي ثم زمردي ثم يورانيوم ثم بركاني.</span>
             </div>
           </div>
         </div>
