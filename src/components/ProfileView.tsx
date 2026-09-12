@@ -35,6 +35,10 @@ interface ProfileViewProps {
   onOpenComments?: (post: CommunityPost) => void;
   onSignOut?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
+  growthPoints?: number;
+  pendingGrowthPoints?: number;
+  shieldTier?: number;
+  onCollectGrowthPoints?: () => number;
 }
 
 const treeMilestones = [
@@ -50,6 +54,8 @@ const treeMilestones = [
   { points: 50, label: 'بداية الثمار', tone: '#ea580c' },
   { points: 60, label: 'شجرة مثمرة', tone: '#16a34a' },
   { points: 70, label: 'شجرة عملاقة', tone: '#166534' },
+  { points: 80, label: 'شجرة متحركة', tone: '#0f766e' },
+  { points: 90, label: 'شجرة مشتعلة', tone: '#ef4444' },
 ];
 
 const getTreeStage = (points: number) => {
@@ -232,6 +238,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenComments,
   onSignOut,
   competitionSnapshot,
+  growthPoints = 0,
+  pendingGrowthPoints = 0,
+  shieldTier = 0,
+  onCollectGrowthPoints,
 }) => {
   const { theme, currentThemeId, setThemeId } = useAppTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -255,11 +265,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
   const userLevel = levelSnapshot.level;
-  const treeStage = getTreeStage(totalPoints);
-  const nextTreeStage = treeMilestones.find((stage) => stage.points > totalPoints);
+  const treeStage = getTreeStage(growthPoints);
+  const nextTreeStage = treeMilestones.find((stage) => stage.points > growthPoints);
   const treeProgress = nextTreeStage
-    ? Math.round(((totalPoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
-    : 100;
+    ? Math.round(((growthPoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
+    : Math.min(99, Math.round(growthPoints));
   const [isCollectingPoints, setIsCollectingPoints] = useState(false);
   const [lastCollectedPoints, setLastCollectedPoints] = useState<number | null>(null);
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
@@ -344,9 +354,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const handleCollectPoints = () => {
+    const collected = onCollectGrowthPoints?.() ?? 0;
+    if (collected <= 0) return;
     gameAudio.playClick();
     setIsCollectingPoints(true);
-    setLastCollectedPoints(10);
+    setLastCollectedPoints(collected);
     window.setTimeout(() => setIsCollectingPoints(false), 1250);
     window.setTimeout(() => setLastCollectedPoints(null), 1250);
   };
@@ -518,7 +530,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="relative mt-3 h-[14.5rem] overflow-hidden rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
             <div className="absolute right-3 top-3">
-              <LevelShield level={userLevel} />
+              <LevelShield level={shieldTier} />
             </div>
             <div className="absolute left-7 top-6 flex h-44 w-16 flex-col items-center">
               <span className="mb-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
@@ -550,14 +562,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <button
                     type="button"
                     onClick={handleCollectPoints}
-                    className="shrink-0 rounded-2xl px-4 py-3 text-[11px] font-black text-white shadow-lg transition-transform active:scale-95"
+                    disabled={pendingGrowthPoints <= 0}
+                    className="shrink-0 rounded-2xl disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-[11px] font-black text-white shadow-lg transition-transform active:scale-95"
                     style={{
                       background: `linear-gradient(135deg, ${treeStage.tone}, ${theme.colors.primary})`,
                       boxShadow: `0 10px 22px ${treeStage.tone}35`,
                     }}
                     aria-label="جمع النقاط"
                   >
-                    جمع النقاط {lastCollectedPoints ? `+${lastCollectedPoints}` : ''}
+                    جمع النقاط {lastCollectedPoints ? `+${lastCollectedPoints}` : pendingGrowthPoints > 0 ? `+${pendingGrowthPoints}` : ''}
                   </button>
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
                     <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
@@ -565,7 +578,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </div>
                 </div>
               {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
-              <GrowthTree points={totalPoints} animate={isCollectingPoints} progress={treeProgress} />
+              <GrowthTree points={growthPoints} animate={isCollectingPoints} progress={treeProgress} />
             </div>
           </section>
         </div>
