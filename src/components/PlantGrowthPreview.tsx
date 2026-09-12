@@ -335,6 +335,26 @@ export const PlantGrowthPreview: React.FC = () => {
               <ShieldBadge rank={rank} pulse={cyclePoints === 0 && points > 0 && burst} />
             </div>
 
+            <section className="mb-3 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-black text-amber-900">مختبر الدروع</h3>
+                <span className="text-[10px] font-bold text-amber-700">اضغط للمعاينة</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {shieldRanks.map((shield, index) => (
+                  <button
+                    key={shield.label}
+                    type="button"
+                    onClick={() => { gameAudio.playClick(); setPoints(index * 100); setBurst(false); }}
+                    className={`rounded-2xl border bg-white p-2 text-center shadow-sm transition active:scale-95 ${rank === index ? 'ring-2 ring-amber-400' : 'border-amber-100'}`}
+                  >
+                    <ShieldBadge rank={index} pulse={rank === index} />
+                    <span className="mt-1 block text-[9px] font-black text-slate-700">{shield.label.replace('درع ', '')}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <FantasyTree cyclePoints={cyclePoints} burst={burst} />
 
             <div className="mt-4 rounded-3xl border border-emerald-100 bg-white/80 p-3 shadow-sm">
