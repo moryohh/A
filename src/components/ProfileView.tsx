@@ -520,7 +520,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="absolute right-3 top-3">
               <LevelShield level={userLevel} />
             </div>
-            <div className="absolute left-7 top-6 flex h-44 w-12 flex-col items-center">
+            <div className="absolute left-7 top-6 flex h-44 w-16 flex-col items-center">
+              <span className="mb-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
+                المستوى {userLevel + 1}
+              </span>
               <div className="relative h-28 w-6 overflow-hidden rounded-full border border-white/20 bg-black/10 shadow-inner">
                 <div
                   className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
@@ -529,9 +532,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
               <span className="mt-2 text-base font-black leading-none" style={{ color: theme.colors.primary }}>
                 {levelSnapshot.progressPercent}%
-              </span>
-              <span className="mt-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
-                المستوى {userLevel + 1}
               </span>
             </div>
           </div>
