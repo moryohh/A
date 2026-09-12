@@ -338,8 +338,16 @@ export const PlantGrowthPreview: React.FC = () => {
                     onClick={() => { gameAudio.playClick(); setPoints(index * 100); setBurst(false); }}
                     className={`rounded-2xl border bg-white p-2 text-center shadow-sm transition active:scale-95 ${rank === index ? 'ring-2 ring-amber-400' : 'border-amber-100'}`}
                   >
-                    <ShieldBadge rank={index} pulse={rank === index} />
-                    <span className="mt-1 block text-[9px] font-black text-slate-700">{shield.label.replace('درع ', '')}</span>
+                    <div className="relative mx-auto h-24 w-24">
+                      <img
+                        src={`${import.meta.env.BASE_URL}assets/shields/shield-${Math.min(index, 4)}.png`}
+                        alt={shield.label}
+                        className="h-full w-full object-contain drop-shadow-lg"
+                        style={index === 5 ? { filter: 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' } : undefined}
+                      />
+                      {index >= 3 && <span className="pointer-events-none absolute inset-1 rounded-[45%] animate-pulse" style={{ background: index === 3 ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : index === 4 ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
+                    </div>
+                    <span className="mt-1 block text-[10px] font-black text-slate-700">{shield.label.replace('درع ', '')}</span>
                   </button>
                 ))}
               </div>
