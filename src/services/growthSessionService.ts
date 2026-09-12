@@ -1,5 +1,5 @@
 export const GROWTH_CYCLE_POINTS = 100;
-export const MAX_SHIELD_TIER = 4;
+export const MAX_SHIELD_TIER = 5;
 
 export interface GrowthSession {
   points: number;
@@ -33,7 +33,7 @@ export const queueGrowthPoints = (userId: string, points: number): GrowthSession
   return next;
 };
 
-export const collectGrowthPoints = (userId: string, shieldTier = 0) => {
+export const collectGrowthPoints = (userId: string, shieldTier = -1) => {
   const current = getGrowthSession(userId);
   const collected = current.pendingPoints;
   const combined = current.points + collected;
