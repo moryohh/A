@@ -26,7 +26,9 @@ const shieldRanks = [
   { label: 'درع فضي', fill: '#94a3b8', shine: '#e2e8f0' },
   { label: 'درع ذهبي', fill: '#ca8a04', shine: '#fde047' },
   { label: 'درع ماسي', fill: '#0891b2', shine: '#a5f3fc' },
-  { label: 'درع يورانيوم', fill: '#28734a', shine: '#c9ff7c' },
+  { label: 'درع زمردي', fill: '#16a34a', shine: '#f472b6' },
+  { label: 'درع يورانيوم', fill: '#22c55e', shine: '#86efac' },
+  { label: 'درع بركاني', fill: '#b91c1c', shine: '#fb923c' },
 ];
 
 const getStageIndex = (cyclePoints: number) => {
@@ -36,13 +38,14 @@ const getStageIndex = (cyclePoints: number) => {
 const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }) => {
   const safeRank = Math.min(Math.max(rank, 0), shieldRanks.length - 1);
   const visualRank = Math.min(safeRank, 4);
-  const uranium = safeRank === 5;
-  const gold = safeRank === 3;
-  const diamond = safeRank === 4;
+  const aura = safeRank === 3 ? { color: '#facc15', opacity: .2 } : safeRank === 4 ? { color: '#38bdf8', opacity: .3 } : safeRank === 5 ? { color: '#f472b6', opacity: .24 } : safeRank === 6 ? { color: '#4ade80', opacity: .3 } : safeRank === 7 ? { color: '#ef4444', opacity: .4 } : null;
+  const filter = safeRank === 5 ? 'hue-rotate(62deg) saturate(1.55) contrast(1.08)' : safeRank === 6 ? 'hue-rotate(92deg) saturate(2) contrast(1.12)' : safeRank === 7 ? 'hue-rotate(292deg) saturate(2.1) contrast(1.15)' : undefined;
+  const emblem = safeRank <= 1 ? '' : safeRank === 3 ? '⚡' : safeRank === 4 ? '◆' : safeRank === 5 ? '◈' : safeRank === 6 ? '☢' : safeRank === 7 ? '♨' : '';
   return <div className="relative flex items-center gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 py-2 shadow-sm">
     <div className="relative h-14 w-12 shrink-0">
-      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualRank}.png`} alt={shieldRanks[safeRank].label} className="h-full w-full object-contain drop-shadow-md" style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined, filter: uranium ? 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' : undefined }} />
-      {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-0 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
+      {aura && <span className="pointer-events-none absolute -inset-3 z-0 rounded-full blur-lg animate-pulse" style={{ background: `radial-gradient(circle, ${aura.color}, transparent 65%)`, opacity: aura.opacity }} />}
+      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualRank}.png`} alt={shieldRanks[safeRank].label} className="relative z-10 h-full w-full object-contain drop-shadow-md" style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined, filter }} />
+      {(safeRank <= 1 || emblem) && <span className="pointer-events-none absolute left-1/2 top-[51%] z-20 flex h-[31%] w-[31%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[42%] border border-white/25 text-[11px] font-black leading-none shadow-inner" style={{ background: safeRank <= 1 ? 'linear-gradient(145deg, rgba(82,45,22,.95), rgba(182,104,43,.92))' : 'linear-gradient(145deg, rgba(15,23,42,.64), rgba(255,255,255,.16))', color: aura?.color || '#fff' }}>{emblem}</span>}
     </div>
     <div><p className="text-[10px] font-black text-slate-500">رتبة الطالب</p><p className="text-sm font-black text-slate-950">{shieldRanks[safeRank].label}</p></div>
   </div>;
