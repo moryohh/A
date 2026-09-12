@@ -1128,7 +1128,7 @@ function AppContent() {
               onSignOut={handleSignOut}
               growthPoints={growthSession.points}
               pendingGrowthPoints={growthSession.pendingPoints}
-              shieldTier={currentUser?.growthShieldTier ?? 0}
+              shieldTier={currentUser?.growthShieldTier ?? -1}
               onCollectGrowthPoints={handleCollectGrowthPoints}
             />
           )}
