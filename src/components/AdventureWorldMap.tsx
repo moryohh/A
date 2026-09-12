@@ -304,7 +304,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                   <div className="text-[10px] font-bold leading-none mb-0.5" style={{ color: theme.colors.secondary }}>
                     {isLoadingChapters
                       ? 'يرجى الانتظار'
-                      : `تحديد الفصل (${selectedChapterIndex + 1} من ${chapters.length})`}
+                      : 'تغيير الفصل من هنا'}
                   </div>
                   <div className="text-xs sm:text-sm font-black text-white truncate">
                     {isLoadingChapters
@@ -318,18 +318,15 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
 
               <div className="flex items-center gap-1.5 shrink-0">
                 <span
-                  className="text-[10px] px-2 py-0.5 rounded-md font-bold border"
+                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold border"
                   style={{
                     backgroundColor: `${theme.colors.primary}35`,
                     borderColor: `${theme.colors.primary}60`,
                     color: theme.colors.textPrimary,
                   }}
                 >
-                  {isLoadingChapters
-                    ? 'جاري التحميل...'
-                    : currentChapter
-                    ? `${currentChapter.lessons.length || currentChapter.lessonsCount || 0} دروس`
-                    : '0 دروس'}
+                  {isLoadingChapters ? 'جاري التحميل...' : 'تبديل الفصل'}
+                  {!isLoadingChapters && <ChevronDown className="w-3 h-3" />}
                 </span>
                 {!isLoadingChapters && (
                   <ChevronDown
