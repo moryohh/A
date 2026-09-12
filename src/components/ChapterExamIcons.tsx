@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Award, BookOpenCheck, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
 import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
+import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
 
 interface ChapterExamIconsProps {
   subjectId: string;
