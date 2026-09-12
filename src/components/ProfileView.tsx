@@ -523,20 +523,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="flex h-40 items-center justify-center gap-5">
               <LevelShield level={userLevel} />
               <div className="flex h-36 flex-col items-center justify-between">
-                <span className="text-sm font-black" style={{ color: theme.colors.primary }}>
-                  {levelSnapshot.progressPercent}%
-                </span>
-                <div className="relative h-24 w-4 overflow-hidden rounded-full border border-white/20 bg-black/10">
+                <div className="relative h-28 w-5 overflow-hidden rounded-full border border-white/20 bg-black/10">
                   <div
                     className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
                     style={{ height: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }}
                   />
                 </div>
-                <span className="text-[9px] font-black text-slate-600">التقدم</span>
+                <span className="h-4" aria-hidden="true" />
               </div>
             </div>
-            <div className="mt-1 text-center text-[10px] font-bold text-slate-500">
-              {levelSnapshot.progressPercent}% من المستوى الحالي
+            <div className="mt-1 text-center text-base font-black" style={{ color: theme.colors.primary }}>
+              {levelSnapshot.progressPercent}%
             </div>
           </div>
 
