@@ -122,7 +122,7 @@ export async function syncUserProfile(supabaseUser: any): Promise<UserProfile> {
         studyHours: existingProfile.study_hours ?? 0,
         streakDays: existingProfile.streak_days ?? 0,
         themeId: existingProfile.theme_id,
-        growthShieldTier: existingProfile.growth_shield_tier ?? 0,
+        growthShieldTier: existingProfile.growth_shield_tier ?? -1,
       };
     }
 
