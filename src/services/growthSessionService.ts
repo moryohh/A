@@ -1,5 +1,5 @@
 export const GROWTH_CYCLE_POINTS = 100;
-export const MAX_SHIELD_TIER = 5;
+export const MAX_SHIELD_TIER = 7;
 
 export interface GrowthSession {
   points: number;
