@@ -60,10 +60,26 @@ const getTreeStage = (points: number) => {
 
 const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, 0), 4);
+  const previousLevel = safeLevel > 0 ? safeLevel - 1 : null;
 
   return (
-    <div className="flex w-auto shrink-0 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
-      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`} alt="" className="h-48 w-48 object-contain drop-shadow-xl" />
+    <div className="flex w-56 shrink-0 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
+      <div className="relative h-52 w-56" aria-label={previousLevel === null ? 'درع المستوى الحالي' : 'الدرع الحالي مع الدرع السابق'}>
+        {previousLevel !== null && (
+          <img
+            src={`${import.meta.env.BASE_URL}assets/shields/shield-${previousLevel}.png`}
+            alt=""
+            className="absolute left-0 top-2 h-48 w-48 object-contain opacity-90 drop-shadow-lg"
+            aria-hidden="true"
+          />
+        )}
+        <img
+          src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`}
+          alt=""
+          className="absolute left-4 top-0 h-48 w-48 object-contain drop-shadow-xl"
+          style={{ transform: 'scale(1.05)', transformOrigin: 'center center' }}
+        />
+      </div>
       <span className="text-sm font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
     </div>
   );
