@@ -8,6 +8,7 @@ interface ChapterExamIconsProps {
   subjectName: string;
   chapterNumber: number;
   className?: string;
+  onScoreUpdate?: (points: number) => void;
 }
 
 type QuestionEntry = { title: string; text: string; answer?: string };
@@ -541,7 +542,7 @@ function notifyChapterExamResult(submission: ChapterSubmission) {
   window.dispatchEvent(new CustomEvent<ChapterExamNotificationDetail>('chapter-exam-result', { detail }));
 }
 
-const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; onClose: () => void }> = ({ exam, subjectName, onClose }) => {
+const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; examKind: 'monthly' | 'ministry'; onClose: () => void; onScoreUpdate?: (points: number) => void }> = ({ exam, subjectName, examKind, onClose, onScoreUpdate }) => {
   const questions = examQuestions(exam.payload);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [activePartIndex, setActivePartIndex] = useState(0);
@@ -721,6 +722,21 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
         payload: finalSubmission,
         submitted_at: submittedAt,
       });
+      const score = findNumericValue(correction.result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+      if (score !== null && (correction.status === 'completed' || correction.status === 'partial')) {
+        const attemptKey = `nahnu_maak:chapter-exam-attempt:v1:${exam.id}`;
+        let attempt = 1;
+        try {
+          attempt = Math.max(1, Number.parseInt(localStorage.getItem(attemptKey) || '0', 10) + 1);
+          localStorage.setItem(attemptKey, String(attempt));
+        } catch {
+          // The result still receives its first-attempt reward if browser storage is unavailable.
+        }
+        const reward = examKind === 'ministry'
+          ? getMinistryExamReward(score, attempt)
+          : getMonthlyExamReward(score, attempt);
+        if (reward > 0) onScoreUpdate?.(reward);
+      }
       const resultMessage = buildResultMessage(finalSubmission);
       if (error) {
         setSubmitMessage(`${resultMessage} تم عرض النتيجة هنا، لكن حفظ السحابة غير مفعّل حالياً.`);
@@ -948,7 +964,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; o
   );
 };
 
-export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className }) => {
+export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate }) => {
   const [monthly, setMonthly] = useState<CurriculumExamRecord[]>([]);
   const [ministry, setMinistry] = useState<CurriculumExamRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
@@ -1091,7 +1107,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
           </div>
         </div>
       )}
-      {selected && <ExamPreview exam={selected} subjectName={subjectName} onClose={() => setSelected(null)} />}
+      {selected && <ExamPreview exam={selected} subjectName={subjectName} examKind={ministry.some((exam) => exam.id === selected.id) ? 'ministry' : 'monthly'} onScoreUpdate={onScoreUpdate} onClose={() => setSelected(null)} />}
     </>
   );
 };
