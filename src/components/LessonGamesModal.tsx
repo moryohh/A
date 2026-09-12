@@ -93,16 +93,19 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   ].map((part) => encodeURIComponent(String(part).trim().toLowerCase())).join(':');
 
   const awardLessonReward = (gameType: 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam', points: number) => {
-    const safePoints = Math.max(0, Math.floor(Number(points) || 0));
-    const storageKey = `nahnu_maek:first-reward:v1:${lessonRewardIdentity}:${gameType}`;
-    let isFirstCompletion = false;
+    const safePoints = Math.max(0, Number(points) || 0);
+    const storageKey = `nahnu_maak:reward-attempt:v2:${lessonRewardIdentity}:${gameType}`;
+    let attempt = 1;
     try {
-      isFirstCompletion = localStorage.getItem(storageKey) !== '1';
-      if (isFirstCompletion) localStorage.setItem(storageKey, '1');
+      attempt = Math.max(1, Number.parseInt(localStorage.getItem(storageKey) || '0', 10) + 1);
+      localStorage.setItem(storageKey, String(attempt));
     } catch (error) {
-      console.debug('Unable to save first-completion reward state:', error);
+      console.debug('Unable to save reward attempt state:', error);
     }
-    onScoreUpdate?.(isFirstCompletion ? safePoints * 2 : safePoints);
+
+    // The first attempt gets the earned reward; every repeat gets one quarter.
+    const awardedPoints = attempt > 1 ? safePoints / 4 : safePoints;
+    onScoreUpdate?.(Number.parseFloat(awardedPoints.toFixed(1)));
   };
 
   useEffect(() => {
