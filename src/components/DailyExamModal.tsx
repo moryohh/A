@@ -328,7 +328,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
       });
       if (!rewardIssuedRef.current && [nextEvaluations.q1, nextEvaluations.q2].every((result) => result?.success)) {
         rewardIssuedRef.current = true;
-        onScoreUpdate?.(getDailyExamReward((score / totalScore) * 100));
+        onScoreUpdate?.(getDailyExamReward(score));
         if (!assessmentReportedRef.current) {
           assessmentReportedRef.current = true;
           onAssessmentResult?.(score, totalScore);
