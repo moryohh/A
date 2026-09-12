@@ -67,6 +67,7 @@ import {
 } from './services/communityService';
 import { fetchUnreadMessageCount } from './services/messengerService';
 import { getLevelSnapshot } from './services/pointsService';
+import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
   fetchCompetitionSnapshot,
   recordActivityBlock,
@@ -170,6 +171,7 @@ function AppContent() {
   // Authentication state - Strictly driven by Supabase Auth sessions
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [growthSession, setGrowthSession] = useState({ points: 0, pendingPoints: 0 });
 
   // Main app state
   const [activeTab, setActiveTab] = useState<NavTab>('home');
@@ -322,6 +324,8 @@ function AppContent() {
   }, []);
 
   const handleSignOut = async () => {
+    resetGrowthSession(currentUser?.id);
+    setGrowthSession({ points: 0, pendingPoints: 0 });
     await signOutUser();
     setCurrentUser(null);
     setActiveTab('home');
@@ -340,6 +344,10 @@ function AppContent() {
     if (storedAvatar && storedAvatar !== currentUser.avatarUrl) {
       setCurrentUser((previous) => (previous ? { ...previous, avatarUrl: storedAvatar } : previous));
     }
+  }, [currentUser?.id]);
+
+  React.useEffect(() => {
+    setGrowthSession(getGrowthSession(currentUser?.id));
   }, [currentUser?.id]);
 
   // Sync stories whenever the active lesson changes (showing the teachers who teach this exact lesson)
@@ -676,6 +684,7 @@ function AppContent() {
     };
 
     setCurrentUser(optimisticUser);
+    setGrowthSession(queueGrowthPoints(currentUser.id, points));
     setCompetitionSnapshot((previous) => previous ? { ...previous, points: nextTotalPoints, level: levelSnapshot.level } : previous);
     showToast(`أضيفت ${points} ${points === 1 ? 'نقطة' : 'نقاط'} إلى مستواك`);
 
@@ -699,6 +708,20 @@ function AppContent() {
         level: savedUser.level ?? levelSnapshot.level,
       }));
     }
+  };
+
+  const handleCollectGrowthPoints = () => {
+    if (!currentUser) return 0;
+    const result = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? 0);
+    if (result.collected <= 0) return 0;
+    setGrowthSession({ points: result.points, pendingPoints: 0 });
+    if (result.completedCycles > 0) {
+      const updatedUser = { ...currentUser, growthShieldTier: result.nextShieldTier };
+      setCurrentUser(updatedUser);
+      void updateUserProfileData(currentUser.id, { growthShieldTier: result.nextShieldTier });
+      showToast('اكتملت دورة النبتة! حصلت على درع جديد.');
+    }
+    return result.collected;
   };
 
   // Handlers - Direct Teacher Switching without Story Modals
@@ -1102,6 +1125,10 @@ function AppContent() {
               competitionSnapshot={competitionSnapshot}
               onOpenComments={(post) => setActiveCommunityPostForComments(post)}
               onSignOut={handleSignOut}
+              growthPoints={growthSession.points}
+              pendingGrowthPoints={growthSession.pendingPoints}
+              shieldTier={currentUser?.growthShieldTier ?? 0}
+              onCollectGrowthPoints={handleCollectGrowthPoints}
             />
           )}
         </main>
