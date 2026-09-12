@@ -42,7 +42,7 @@ const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }
   return <div className="relative flex items-center gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 py-2 shadow-sm">
     <div className="relative h-14 w-12 shrink-0">
       <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualRank}.png`} alt={shieldRanks[safeRank].label} className="h-full w-full object-contain drop-shadow-md" style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined, filter: uranium ? 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' : undefined }} />
-      {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-0 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />
+      {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-0 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
     </div>
     <div><p className="text-[10px] font-black text-slate-500">رتبة الطالب</p><p className="text-sm font-black text-slate-950">{shieldRanks[safeRank].label}</p></div>
   </div>;
