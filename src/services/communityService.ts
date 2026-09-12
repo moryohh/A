@@ -332,6 +332,7 @@ export async function updateUserProfileData(
     if (updates.studyHours !== undefined) payload.study_hours = updates.studyHours;
     if (updates.streakDays !== undefined) payload.streak_days = updates.streakDays;
     if (updates.themeId !== undefined) payload.theme_id = updates.themeId;
+    if (updates.growthShieldTier !== undefined) payload.growth_shield_tier = updates.growthShieldTier;
 
     const { data, error } = await client
       .from('profiles')
