@@ -1,5 +1,5 @@
 import React, { useId, useMemo, useState } from 'react';
-import { FlaskConical, Sparkles, X } from 'lucide-react';
+import { Factory, FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
 
 const growthStages = [
@@ -302,7 +302,14 @@ export const PlantGrowthPreview: React.FC = () => {
   const collectPoints = () => {
     gameAudio.playClick();
     setBurst(true);
-    setPoints((current) => Math.min(500, current + 10));
+    setPoints((current) => Math.min(700, current + 10));
+    window.setTimeout(() => setBurst(false), 1250);
+  };
+
+  const simulateFactoryPoints = () => {
+    gameAudio.playClick();
+    setBurst(true);
+    setPoints((current) => Math.min(700, current + 80));
     window.setTimeout(() => setBurst(false), 1250);
   };
 
@@ -384,13 +391,22 @@ export const PlantGrowthPreview: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={simulateFactoryPoints}
+                className="inline-flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-fuchsia-600 to-violet-500 px-2 py-3 text-xs font-black text-white shadow-lg shadow-fuchsia-900/20 transition-transform active:scale-95"
+                title="إضافة 80 نقطة تجريبية للمختبر"
+              >
+                <Factory className="h-4 w-4" />
+                المصنع +80
+              </button>
               <button
                 type="button"
                 onClick={collectPoints}
-                className="rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition-transform active:scale-95"
+                className="rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-500 px-2 py-3 text-xs font-black text-white shadow-lg shadow-emerald-900/20 transition-transform active:scale-95"
               >
-                جمع النقاط
+                جمع +10
               </button>
               <button
                 type="button"
