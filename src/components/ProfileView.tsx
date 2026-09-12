@@ -63,24 +63,24 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const shieldLevels = Array.from({ length: safeLevel + 1 }, (_, index) => index);
 
   return (
-    <div className="relative h-40 w-48 shrink-0" aria-label={`درع مستوى ${safeLevel + 1}`}>
+    <div className="relative h-48 w-52 shrink-0" aria-label={`دروع المستوى ${safeLevel + 1}`}>
       {shieldLevels.map((shieldLevel) => {
         const isCurrent = shieldLevel === safeLevel;
-        const scale = isCurrent ? 1.05 : 0.72 + shieldLevel * 0.08;
-        const offset = isCurrent ? 18 : shieldLevel * 6;
+        const distanceFromCurrent = safeLevel - shieldLevel;
+        const scale = isCurrent ? 1.12 : Math.max(0.68, 0.95 - distanceFromCurrent * 0.1);
 
         return (
           <img
             key={shieldLevel}
             src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldLevel}.png`}
             alt=""
-            className="absolute top-0 h-40 w-40 object-contain drop-shadow-lg"
+            className="absolute top-0 h-44 w-44 object-contain drop-shadow-xl"
             style={{
-              left: `${offset}px`,
+              right: isCurrent ? '1px' : `${22 + distanceFromCurrent * 16}px`,
               zIndex: shieldLevel + 1,
-              opacity: isCurrent ? 1 : 0.78 + shieldLevel * 0.05,
-              transform: `scale(${scale})`,
-              transformOrigin: 'center center',
+              opacity: isCurrent ? 1 : Math.max(0.62, 0.9 - distanceFromCurrent * 0.08),
+              transform: `scale(${scale}) rotate(${isCurrent ? 0 : -distanceFromCurrent * 7}deg)`,
+              transformOrigin: 'center bottom',
             }}
             aria-hidden="true"
           />
@@ -516,24 +516,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           )}
 
-          <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
-            <div className="mb-2 text-center text-base font-black" style={{ color: theme.colors.primary }}>
-              المستوى {userLevel + 1}
-            </div>
-            <div className="flex h-40 items-center justify-center gap-5">
+          <div className="relative mt-3 h-[14.5rem] overflow-hidden rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
+            <div className="absolute right-3 top-3">
               <LevelShield level={userLevel} />
-              <div className="flex h-36 flex-col items-center justify-between">
-                <div className="relative h-28 w-5 overflow-hidden rounded-full border border-white/20 bg-black/10">
-                  <div
-                    className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
-                    style={{ height: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }}
-                  />
-                </div>
-                <span className="h-4" aria-hidden="true" />
-              </div>
             </div>
-            <div className="mt-1 text-center text-base font-black" style={{ color: theme.colors.primary }}>
-              {levelSnapshot.progressPercent}%
+            <div className="absolute left-7 top-6 flex h-44 w-12 flex-col items-center">
+              <div className="relative h-28 w-6 overflow-hidden rounded-full border border-white/20 bg-black/10 shadow-inner">
+                <div
+                  className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
+                  style={{ height: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }}
+                />
+              </div>
+              <span className="mt-2 text-base font-black leading-none" style={{ color: theme.colors.primary }}>
+                {levelSnapshot.progressPercent}%
+              </span>
+              <span className="mt-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
+                المستوى {userLevel + 1}
+              </span>
             </div>
           </div>
 
