@@ -9,7 +9,7 @@ import {registerRoute} from 'workbox-routing';
 const serviceWorker = self as unknown as ServiceWorkerGlobalScope;
 const appBaseUrl = new URL('./', serviceWorker.registration.scope || serviceWorker.location.href);
 const appAsset = (name: string) => new URL(name, appBaseUrl).toString();
-const appRelease = 'comment-notifications-live-20260912';
+const appRelease = 'layered-shields-aligned-20260912';
 
 precacheAndRoute((self as unknown as {__WB_MANIFEST: Array<{revision: string | null; url: string}>}).__WB_MANIFEST);
 cleanupOutdatedCaches();
