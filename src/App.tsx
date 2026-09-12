@@ -2,7 +2,6 @@ import React, { Component, useState } from 'react';
 import {
   INITIAL_STORIES,
   FEATURED_LESSON,
-  NOTIFICATIONS_DATA,
 } from './data/mockData';
 import { getGamesForLesson } from './data/mockGames';
 import {
@@ -130,7 +129,7 @@ class GamesLoadBoundary extends Component<GamesLoadBoundaryProps, { hasError: bo
 }
 
 const LEARNING_POSITIONS_STORAGE_KEY = 'nahnu_maek_learning_positions_v2';
-const NOTIFICATIONS_STORAGE_KEY = 'nahnu_maek_notifications_v1';
+const NOTIFICATIONS_STORAGE_KEY = 'nahnu_maek_notifications_v2';
 
 function loadStoredNotifications(): AppNotification[] {
   try {
@@ -142,7 +141,7 @@ function loadStoredNotifications(): AppNotification[] {
   } catch (error) {
     console.debug('Failed to load notifications:', error);
   }
-  return NOTIFICATIONS_DATA;
+  return [];
 }
 
 function loadStoredPositions(): Record<string, LearningPosition> {
@@ -238,6 +237,23 @@ function AppContent() {
       .then(setUnreadMessageCount)
       .catch(() => setUnreadMessageCount(0));
   }, [currentUser?.id]);
+
+  // A message notification is created only from the real unread count returned by the messaging service.
+  React.useEffect(() => {
+    if (!currentUser?.id || unreadMessageCount <= 0) return;
+    const messageNotification: AppNotification = {
+      id: `unread-messages-${currentUser.id}`,
+      title: 'لديك رسائل جديدة',
+      message: `لديك ${unreadMessageCount} رسالة غير مقروءة. افتح الرسائل لقراءتها.`,
+      time: 'الآن',
+      isRead: false,
+      type: 'community',
+    };
+    setNotifications((previous) => [
+      messageNotification,
+      ...previous.filter((item) => item.id !== messageNotification.id),
+    ].slice(0, 50));
+  }, [currentUser?.id, unreadMessageCount]);
 
   const openMessenger = (member: CommunityMember | null = null) => {
     setMessengerContact(member);
@@ -945,7 +961,10 @@ function AppContent() {
               setHomeSubView('main_home');
             }
           }}
-          onOpenNotifications={() => setIsNotificationsOpen(true)}
+          onOpenNotifications={() => {
+            setNotifications((previous) => previous.map((item) => ({ ...item, isRead: true })));
+            setIsNotificationsOpen(true);
+          }}
           onOpenProfile={() => setActiveTab('profile')}
           onOpenGames={() => setIsGamesOpen(true)}
           onOpenMessenger={() => openMessenger()}
