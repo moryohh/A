@@ -62,7 +62,7 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, 0), 4);
 
   return (
-    <div className="flex w-52 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
+    <div className="flex w-auto shrink-0 flex-col items-center justify-center gap-1" aria-label={`درع مستوى ${safeLevel + 1}`}>
       <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${safeLevel}.png`} alt="" className="h-48 w-48 object-contain drop-shadow-xl" />
       <span className="text-sm font-black leading-none text-slate-700">مستوى {safeLevel + 1}</span>
     </div>
@@ -496,14 +496,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
 
           <div className="mt-3 rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
-            <div className="flex items-center justify-end text-[10px] font-black">
-              <LevelShield level={userLevel} />
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-sm font-black" style={{ color: theme.colors.primary }}>{levelSnapshot.progressPercent}%</span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full border border-white/10 bg-black/10">
-                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }} />
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-black">
+                  <span className={theme.classes.textMain}>المستوى {userLevel + 1}</span>
+                  <span style={{ color: theme.colors.primary }}>{levelSnapshot.progressPercent}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-black/10">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }} />
+                </div>
               </div>
+              <LevelShield level={userLevel} />
             </div>
           </div>
 
