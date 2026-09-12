@@ -64,27 +64,24 @@ const getTreeStage = (points: number) => {
   ), treeMilestones[0]);
 };
 
-const shieldRanks = [
-  { name: 'خشبي', base: '#74431f', edge: '#d6a463', shine: '#f4d6a4' },
-  { name: 'نحاسي', base: '#9a3e1d', edge: '#e38a58', shine: '#ffd0a7' },
-  { name: 'فضي', base: '#687485', edge: '#e4edf6', shine: '#ffffff' },
-  { name: 'ذهبي', base: '#b7790b', edge: '#ffe37b', shine: '#fff8c8' },
-  { name: 'ماسي', base: '#1678a5', edge: '#9ff5ff', shine: '#e9feff' },
-  { name: 'يورانيوم', base: '#28734a', edge: '#e7c75f', shine: '#c9ff7c' },
-];
+const shieldNames = ['درع خشبي', 'درع نحاسي', 'درع فضي', 'درع ذهبي', 'درع ماسي', 'درع يورانيوم'];
 
-const ShieldArtwork: React.FC<{ tier: number; small?: boolean }> = ({ tier, small = false }) => {
-  const rank = shieldRanks[Math.max(0, Math.min(tier, shieldRanks.length - 1))];
-  const size = small ? 'h-24 w-24' : 'h-44 w-44';
-  const gold = tier === 3, diamond = tier === 4, uranium = tier === 5;
-  return <div className={`relative ${size}`}><svg viewBox="0 0 140 160" className="h-full w-full drop-shadow-xl" role="img" aria-label={`درع ${rank.name}`}><defs><linearGradient id={`shield-${tier}`} x1="0" y1="0" x2="1" y2="1"><stop stopColor={rank.shine}/><stop offset=".35" stopColor={rank.base}/><stop offset="1" stopColor="#1f2937"/></linearGradient><linearGradient id={`edge-${tier}`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff"/><stop offset=".35" stopColor={rank.edge}/><stop offset="1" stopColor={rank.base}/></linearGradient></defs><path d="M70 7 L125 26 V78 C125 112 102 138 70 153 C38 138 15 112 15 78 V26 Z" fill={`url(#shield-${tier})`} stroke={`url(#edge-${tier})`} strokeWidth="8"/><path d="M70 20 L111 35 V77 C111 101 95 121 70 135 C45 121 29 101 29 77 V35 Z" fill="none" stroke="#fff" strokeOpacity=".32" strokeWidth="3"/>{tier === 2 && <path d="M70 44 L78 62 L98 65 L83 79 L87 99 L70 89 L53 99 L57 79 L42 65 L62 62 Z" fill="#f8fafc" opacity=".78"/>}{tier === 3 && <><path d="M46 89 V61 L56 74 L70 53 L84 74 L94 61 V89 Z" fill="#fff1a6" stroke="#855b08" strokeWidth="4"/><circle cx="70" cy="77" r="6" fill="#f59e0b"/></>}{tier === 4 && <><path d="M70 48 L95 74 L70 108 L45 74 Z" fill="#d8ffff" stroke="#56d9f4" strokeWidth="5"/><path d="M45 74 H95 M70 48 V108 M57 61 L83 87 M83 61 L57 87" stroke="#fff" strokeWidth="3" opacity=".85"/></>}{tier === 5 && <><circle cx="70" cy="78" r="16" fill="#e7c75f"/><circle cx="70" cy="78" r="7" fill="#2d7d46"/><ellipse cx="70" cy="78" rx="31" ry="12" fill="none" stroke="#c9ff7c" strokeWidth="4"/><ellipse cx="70" cy="78" rx="12" ry="31" fill="none" stroke="#c9ff7c" strokeWidth="4"/></>}</svg>{(gold||diamond||uranium)&&<span className="pointer-events-none absolute inset-1 rounded-[45%] animate-pulse" style={{background:gold?'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)':diamond?'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)':'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)'}}/>}</div>;
+const ShieldArtwork: React.FC<{ tier: number; compact?: boolean }> = ({ tier, compact = false }) => {
+  const visualTier = Math.min(Math.max(tier, 0), 4);
+  const uranium = tier === 5;
+  const gold = tier === 3;
+  const diamond = tier === 4;
+  return <div className={`relative ${compact ? 'h-16 w-16' : 'h-44 w-44'}`}>
+    <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualTier}.png`} alt={shieldNames[tier] || shieldNames[0]} className="h-full w-full object-contain drop-shadow-xl" style={uranium ? { filter: 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' } : undefined} />
+    {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-1 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
+  </div>;
 };
 
 const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, -1), 5);
   if (safeLevel < 0) return <div className="flex h-48 w-52 flex-col items-center justify-center text-center" aria-label="لا يوجد درع بعد"><div className="h-28 w-24 rounded-[42%] border-4 border-dashed border-slate-300 bg-slate-100/70 opacity-65"/><p className="mt-2 text-xs font-black text-slate-500">لا يوجد درع بعد</p><p className="text-[10px] font-bold text-slate-400">اجمع 20 نقطة لتحصل على الخشبي</p></div>;
   const shields=Array.from({length:safeLevel+1},(_,index)=>index);
-  return <div className="relative h-48 w-52 shrink-0" aria-label={`دروع المستوى ${safeLevel+1}`}>{shields.map((item)=>{const current=item===safeLevel,distance=safeLevel-item;return <div key={item} className="absolute top-0" style={{right:current?'1px':`${22+distance*16}px`,zIndex:item+1,opacity:current?1:Math.max(.62,.9-distance*.08),transform:`scale(${current?1.12:Math.max(.68,.95-distance*.1)}) rotate(${current?0:-distance*7}deg)`,transformOrigin:'center bottom'}}><ShieldArtwork tier={item}/></div>})}</div>;
+  return <div className="relative h-48 w-52 shrink-0" aria-label={shieldNames[safeLevel]}>{shields.map((item)=>{const current=item===safeLevel,distance=safeLevel-item;return <div key={item} className="absolute top-0" style={{right:current?'1px':`${22+distance*16}px`,zIndex:item+1,opacity:current?1:Math.max(.62,.9-distance*.08),transform:`scale(${current?1.12:Math.max(.68,.95-distance*.1)}) rotate(${current?0:-distance*7}deg)`,transformOrigin:'center bottom'}}><ShieldArtwork tier={item}/></div>})}</div>;
 };
 
 const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
