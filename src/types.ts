@@ -303,4 +303,5 @@ export interface UserProfile {
   studyHours?: number;
   streakDays?: number;
   themeId?: string;
+  growthShieldTier?: number;
 }
