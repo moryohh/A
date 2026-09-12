@@ -26,6 +26,7 @@ const shieldRanks = [
   { label: 'درع فضي', fill: '#94a3b8', shine: '#e2e8f0' },
   { label: 'درع ذهبي', fill: '#ca8a04', shine: '#fde047' },
   { label: 'درع ماسي', fill: '#0891b2', shine: '#a5f3fc' },
+  { label: 'درع يورانيوم', fill: '#28734a', shine: '#c9ff7c' },
 ];
 
 const getStageIndex = (cyclePoints: number) => {
@@ -410,8 +411,8 @@ export const PlantGrowthPreview: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
-              {[0, 100, 200, 300, 400].map((value) => (
+            <div className="mt-3 grid grid-cols-6 gap-1.5">
+              {[0, 100, 200, 300, 400, 500].map((value) => (
                 <button
                   key={value}
                   type="button"
