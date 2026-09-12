@@ -64,21 +64,39 @@ const getTreeStage = (points: number) => {
   ), treeMilestones[0]);
 };
 
-const shieldNames = ['درع خشبي', 'درع نحاسي', 'درع فضي', 'درع ذهبي', 'درع ماسي', 'درع يورانيوم'];
+const shieldNames = ['درع خشبي', 'درع نحاسي', 'درع فضي', 'درع ذهبي', 'درع ماسي', 'درع زمردي', 'درع يورانيوم', 'درع بركاني'];
 
 const ShieldArtwork: React.FC<{ tier: number; compact?: boolean }> = ({ tier, compact = false }) => {
-  const visualTier = Math.min(Math.max(tier, 0), 4);
-  const uranium = tier === 5;
-  const gold = tier === 3;
-  const diamond = tier === 4;
+  const safeTier = Math.min(Math.max(tier, 0), shieldNames.length - 1);
+  const visualTier = Math.min(safeTier, 4);
+  const aura = safeTier === 3
+    ? { color: '#facc15', opacity: 0.2 }
+    : safeTier === 4
+      ? { color: '#38bdf8', opacity: 0.3 }
+      : safeTier === 5
+        ? { color: '#f472b6', opacity: 0.24 }
+        : safeTier === 6
+          ? { color: '#4ade80', opacity: 0.3 }
+          : safeTier === 7
+            ? { color: '#ef4444', opacity: 0.4 }
+            : null;
+  const filter = safeTier === 5
+    ? 'hue-rotate(62deg) saturate(1.55) contrast(1.08)'
+    : safeTier === 6
+      ? 'hue-rotate(92deg) saturate(2) contrast(1.12)'
+      : safeTier === 7
+        ? 'hue-rotate(292deg) saturate(2.1) contrast(1.15)'
+        : undefined;
+  const emblem = safeTier <= 1 ? '' : safeTier === 3 ? '⚡' : safeTier === 4 ? '◆' : safeTier === 5 ? '◈' : safeTier === 6 ? '☢' : safeTier === 7 ? '♨' : '';
   return <div className={`relative ${compact ? 'h-16 w-16' : 'h-44 w-44'}`}>
-    <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualTier}.png`} alt={shieldNames[tier] || shieldNames[0]} className="h-full w-full object-contain drop-shadow-xl" style={uranium ? { filter: 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' } : undefined} />
-    {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-1 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />}
+    {aura && <span className="pointer-events-none absolute -inset-4 z-0 rounded-full blur-xl animate-pulse" style={{ background: `radial-gradient(circle, ${aura.color}, transparent 65%)`, opacity: aura.opacity }} />}
+    <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualTier}.png`} alt={shieldNames[safeTier]} className="relative z-10 h-full w-full object-contain drop-shadow-xl" style={{ filter }} />
+    {(safeTier <= 1 || emblem) && <span className="pointer-events-none absolute left-1/2 top-[51%] z-20 flex h-[31%] w-[31%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[42%] border border-white/25 text-[36%] font-black leading-none shadow-inner" style={{ background: safeTier <= 1 ? 'linear-gradient(145deg, rgba(82,45,22,.95), rgba(182,104,43,.92))' : 'linear-gradient(145deg, rgba(15,23,42,.64), rgba(255,255,255,.16))', color: aura?.color || '#fff' }}>{emblem}</span>}
   </div>;
 };
 
 const LevelShield: React.FC<{ level: number }> = ({ level }) => {
-  const safeLevel = Math.min(Math.max(level, -1), 5);
+  const safeLevel = Math.min(Math.max(level, -1), 7);
   if (safeLevel < 0) return <div className="flex h-48 w-52 flex-col items-center justify-center text-center" aria-label="لا يوجد درع بعد"><div className="h-28 w-24 rounded-[42%] border-4 border-dashed border-slate-300 bg-slate-100/70 opacity-65"/><p className="mt-2 text-xs font-black text-slate-500">لا يوجد درع بعد</p><p className="text-[10px] font-bold text-slate-400">اجمع 20 نقطة لتحصل على الخشبي</p></div>;
   const shields=Array.from({length:safeLevel+1},(_,index)=>index);
   return <div className="relative h-48 w-52 shrink-0" aria-label={shieldNames[safeLevel]}>{shields.map((item)=>{const current=item===safeLevel,distance=safeLevel-item;return <div key={item} className="absolute top-0" style={{right:current?'1px':`${22+distance*16}px`,zIndex:item+1,opacity:current?1:Math.max(.62,.9-distance*.08),transform:`scale(${current?1.12:Math.max(.68,.95-distance*.1)}) rotate(${current?0:-distance*7}deg)`,transformOrigin:'center bottom'}}><ShieldArtwork tier={item}/></div>})}</div>;
