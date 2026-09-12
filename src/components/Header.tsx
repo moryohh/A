@@ -99,15 +99,17 @@ export const Header: React.FC<HeaderProps> = ({
           title="الإشعارات"
         >
           <Bell className="w-4.5 h-4.5" />
-          <span
-            className="absolute -top-1 -right-1 min-w-4 h-4 px-1 text-white text-[9px] font-black rounded-full flex items-center justify-center border shadow-sm"
-            style={{
-              backgroundColor: theme.colors.primary,
-              borderColor: theme.colors.bgMain,
-            }}
-          >
-            {unreadCount > 0 ? unreadCount : 4}
-          </span>
+          {unreadCount > 0 && (
+            <span
+              className="absolute -top-1 -right-1 min-w-4 h-4 px-1 text-white text-[9px] font-black rounded-full flex items-center justify-center border shadow-sm"
+              style={{
+                backgroundColor: theme.colors.primary,
+                borderColor: theme.colors.bgMain,
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
       </div>
