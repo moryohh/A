@@ -216,7 +216,30 @@ function AppContent() {
       try {
         const loadedPosts = await fetchCommunityPosts(currentUser?.id);
         if (isMounted) {
-          setCommunityPosts(loadedPosts || []);
+          const posts = loadedPosts || [];
+          setCommunityPosts(posts);
+
+          // Comment notifications are generated only for real comments on this student's own posts.
+          const commentNotifications: AppNotification[] = posts.flatMap((post) => (
+            post.isOwnPost
+              ? post.comments
+                .filter((comment) => comment.userId !== currentUser?.id && comment.text.trim().length > 0)
+                .map((comment) => ({
+                  id: `community-comment-${comment.id}`,
+                  title: 'تعليق جديد على منشورك',
+                  message: `${comment.userName} علّق: ${comment.text.slice(0, 100)}`,
+                  time: comment.timeAgo,
+                  isRead: false,
+                  type: 'community' as const,
+                }))
+              : []
+          ));
+          if (commentNotifications.length > 0) {
+            setNotifications((previous) => [
+              ...commentNotifications,
+              ...previous.filter((item) => !commentNotifications.some((notification) => notification.id === item.id)),
+            ].slice(0, 50));
+          }
         }
       } catch (err) {
         console.debug('Error loading community data:', err);
