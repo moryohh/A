@@ -39,12 +39,14 @@ export const collectGrowthPoints = (userId: string, shieldTier = -1) => {
   const combined = current.points + collected;
   const completedCycles = Math.floor(combined / GROWTH_CYCLE_POINTS);
   const next = { points: Number((combined % GROWTH_CYCLE_POINTS).toFixed(1)), pendingPoints: 0 };
+  const firstShieldUnlocked = shieldTier < 0 && combined >= 20;
+  const baseShieldTier = firstShieldUnlocked ? 0 : shieldTier;
   save(userId, next);
   return {
     ...next,
     collected,
     completedCycles,
-    nextShieldTier: Math.min(MAX_SHIELD_TIER, Math.max(0, shieldTier) + completedCycles),
+    nextShieldTier: Math.min(MAX_SHIELD_TIER, Math.max(-1, baseShieldTier) + completedCycles),
   };
 };
 
