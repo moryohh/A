@@ -34,28 +34,18 @@ const getStageIndex = (cyclePoints: number) => {
 };
 
 const ShieldBadge: React.FC<{ rank: number; pulse: boolean }> = ({ rank, pulse }) => {
-  const shield = shieldRanks[Math.min(rank, shieldRanks.length - 1)];
-
-  return (
-    <div className="relative flex items-center gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 py-2 shadow-sm">
-      <svg
-        viewBox="0 0 80 92"
-        className="h-12 w-11"
-        style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined }}
-        role="img"
-        aria-label={shield.label}
-      >
-        <path d="M40 5 L68 15 V39 C68 59 56 75 40 86 C24 75 12 59 12 39 V15 Z" fill={shield.fill} />
-        <path d="M40 12 L60 20 V39 C60 53 52 66 40 75 C28 66 20 53 20 39 V20 Z" fill={shield.shine} opacity=".42" />
-        <path d="M30 24 H50 L44 39 H58 L35 69 L40 47 H24 Z" fill="#fff7" />
-        <path d="M40 5 L68 15 V39 C68 59 56 75 40 86 C24 75 12 59 12 39 V15 Z" fill="none" stroke="#fff9" strokeWidth="3" />
-      </svg>
-      <div>
-        <p className="text-[10px] font-black text-slate-500">رتبة الطالب</p>
-        <p className="text-sm font-black text-slate-950">{shield.label}</p>
-      </div>
+  const safeRank = Math.min(Math.max(rank, 0), shieldRanks.length - 1);
+  const visualRank = Math.min(safeRank, 4);
+  const uranium = safeRank === 5;
+  const gold = safeRank === 3;
+  const diamond = safeRank === 4;
+  return <div className="relative flex items-center gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 py-2 shadow-sm">
+    <div className="relative h-14 w-12 shrink-0">
+      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualRank}.png`} alt={shieldRanks[safeRank].label} className="h-full w-full object-contain drop-shadow-md" style={{ animation: pulse ? 'rankPulse 900ms ease-out both' : undefined, filter: uranium ? 'hue-rotate(105deg) saturate(1.4) contrast(1.08)' : undefined }} />
+      {(gold || diamond || uranium) && <span className="pointer-events-none absolute inset-0 rounded-[45%] animate-pulse" style={{ background: gold ? 'radial-gradient(circle, rgba(255,223,91,.2), transparent 64%)' : diamond ? 'radial-gradient(circle, rgba(88,224,255,.3), transparent 64%)' : 'radial-gradient(circle, rgba(201,255,124,.3), rgba(231,199,95,.16) 36%, transparent 66%)' }} />
     </div>
-  );
+    <div><p className="text-[10px] font-black text-slate-500">رتبة الطالب</p><p className="text-sm font-black text-slate-950">{shieldRanks[safeRank].label}</p></div>
+  </div>;
 };
 
 const FantasyTree: React.FC<{ cyclePoints: number; burst: boolean; compact?: boolean }> = ({ cyclePoints, burst, compact = false }) => {
