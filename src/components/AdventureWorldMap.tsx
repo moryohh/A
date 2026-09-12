@@ -72,7 +72,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   const { theme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const activeNodeRef = useRef<HTMLDivElement>(null);
-  const returnToLessonTimerRef = useRef<number | null>(null);
 
   // Selected Chapter State & Dropdown
   const [internalChapterIndex, setInternalChapterIndex] = useState<number>(0);
@@ -138,24 +137,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
     );
     container.scrollTo({ top: targetTop, behavior });
   };
-
-  // Keep the page from being dragged past the map on mobile. After a short pause,
-  // return the map smoothly to the student's current lesson.
-  const scheduleReturnToCurrentLesson = () => {
-    if (returnToLessonTimerRef.current !== null) {
-      window.clearTimeout(returnToLessonTimerRef.current);
-    }
-    returnToLessonTimerRef.current = window.setTimeout(() => {
-      scrollActiveNodeWithinMap('smooth');
-      returnToLessonTimerRef.current = null;
-    }, 500);
-  };
-
-  useEffect(() => () => {
-    if (returnToLessonTimerRef.current !== null) {
-      window.clearTimeout(returnToLessonTimerRef.current);
-    }
-  }, []);
 
   // Active 3 images based on the selected section (chapter)
   // Chapter 1, 3, 5... (even index 0, 2, 4): First 3 images (Set A: 0, 1, 2)
@@ -446,17 +427,11 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
       {/* ========================================================= */}
       <div
         ref={containerRef}
-        onTouchEnd={scheduleReturnToCurrentLesson}
-        onTouchCancel={scheduleReturnToCurrentLesson}
-        onPointerUp={scheduleReturnToCurrentLesson}
         className="relative w-full overflow-y-auto overflow-x-hidden rounded-3xl border-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] custom-scrollbar bg-[#020617] transition-all duration-300"
         style={{
           height: '78vh',
           borderColor: `${theme.colors.primary}60`,
           boxShadow: `0 0 25px ${theme.colors.glow}`,
-          overscrollBehaviorY: 'contain',
-          touchAction: 'pan-y',
-          WebkitOverflowScrolling: 'touch',
         }}
       >
         <div
