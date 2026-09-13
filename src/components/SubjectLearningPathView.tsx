@@ -430,7 +430,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
                 <div className="rounded-2xl bg-[#091124]/95 border border-sky-500/30 overflow-hidden shadow-xl">
                   {/* Chapter Header */}
                   <div
-                    onClick={() => toggleChapter(chapter.id)}
+                    onClick={() => { gameAudio.playPrimaryNavigation(); toggleChapter(chapter.id); }}
                     className="p-3.5 sm:p-4 bg-gradient-to-r from-[#0e1b3d] to-[#0a142c] flex items-center justify-between gap-3 cursor-pointer border-b border-white/5 select-none hover:bg-[#12224d] transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
