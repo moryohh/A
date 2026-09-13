@@ -758,7 +758,20 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
     }
   };
 
-  const submittedCount = Object.values(answers).filter((answer): answer is string => typeof answer === 'string' && answer.trim().length > 0).length + Object.keys(images).length;
+  const answerStatus = questions.flatMap((question, questionIndex) => question.parts.map((part, partIndex) => {
+    const key = questionIndex * 100 + partIndex;
+    const hasText = Boolean(answers[key]?.trim());
+    const hasImage = Boolean(images[key]);
+    return {
+      key,
+      questionName: question.title || `السؤال ${questionIndex + 1}`,
+      partName: part.title || `الفرع ${partIndex + 1}`,
+      prompt: part.text,
+      isAnswered: hasText || hasImage,
+    };
+  }));
+  const submittedCount = answerStatus.filter((item) => item.isAnswered).length;
+  const missingAnswers = answerStatus.filter((item) => !item.isAnswered);
   const processingMessages = ['جاري إرسال الإجابات', 'جاري استقبال الرد', 'جاري تصحيح الصور والنصوص', 'جاري حفظ النتيجة'];
 
   return (
@@ -908,6 +921,22 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
               <p className="mt-2 text-sm leading-7 text-slate-600">
                 سيتم إرسال {submittedCount} إجابة. يمكنك الرجوع الآن وتعديل الإجابة قبل الإرسال النهائي.
               </p>
+              {missingAnswers.length > 0 ? (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-black text-amber-900">تنبيه: لم تجب عن {missingAnswers.length} من الأسئلة أو الفروع</p>
+                  <p className="mt-1 text-[11px] leading-5 text-amber-800">يمكنك الإرسال رغم النقص، أو الرجوع لكتابة نص أو رفع صورة.</p>
+                  <ul className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pl-1">
+                    {missingAnswers.map((item) => (
+                      <li key={item.key} className="rounded-xl border border-amber-200/80 bg-white px-3 py-2">
+                        <span className="block text-xs font-black text-slate-900">{item.questionName} — {item.partName}</span>
+                        <span className="mt-0.5 block truncate text-[10px] text-slate-500">{item.prompt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">أجبت عن جميع الأسئلة والفروع.</div>
+              )}
               <div className="mt-5 flex gap-2">
                 <button type="button" onClick={() => setSubmitState('idle')} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
                   تعديل الإجابات
