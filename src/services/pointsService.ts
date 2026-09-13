@@ -36,6 +36,7 @@ export const BASE_POINTS = 20;
 export const GROWTH_FACTOR = 1.09;
 export const LEVEL_ONE_TARGET = BASE_POINTS;
 export const LEVEL_GROWTH_RATE = 0.09;
+export const FACTORY_REWARD_POINTS = 80;
 
 const toOneDecimal = (value: number): number =>
   Number.parseFloat((Number.isFinite(value) ? value : 0).toFixed(1));

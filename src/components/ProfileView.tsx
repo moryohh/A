@@ -19,13 +19,14 @@ import {
   Calendar,
   LockKeyhole,
   UserX,
+  Factory,
 } from 'lucide-react';
 import { useAppTheme, AppThemeId } from '../services/themeService';
 import { gameAudio } from '../utils/gameAudio';
 import { UserProfile, CommunityPost, CompetitionSnapshot } from '../types';
 import { DEFAULT_CARTOON_AVATARS, CartoonAvatarOption } from '../data/cartoonAvatars';
 import { updateUserProfileData } from '../services/communityService';
-import { getLevelSnapshot } from '../services/pointsService';
+import { FACTORY_REWARD_POINTS, getLevelSnapshot } from '../services/pointsService';
 
 interface ProfileViewProps {
   user?: UserProfile | null;
@@ -565,19 +566,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           >
             <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={handleCollectPoints}
-                    disabled={pendingGrowthPoints <= 0}
-                    className="shrink-0 rounded-2xl disabled:cursor-not-allowed disabled:opacity-50 px-4 py-3 text-[11px] font-black text-white shadow-lg transition-transform active:scale-95"
-                    style={{
-                      background: `linear-gradient(135deg, ${treeStage.tone}, ${theme.colors.primary})`,
-                      boxShadow: `0 10px 22px ${treeStage.tone}35`,
-                    }}
-                    aria-label="جمع النقاط"
-                  >
-                    جمع النقاط {lastCollectedPoints ? `+${lastCollectedPoints}` : pendingGrowthPoints > 0 ? `+${pendingGrowthPoints}` : ''}
-                  </button>
+                  <div className="flex shrink-0 flex-col items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleCollectPoints}
+                      className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 to-purple-700 text-white shadow-[0_10px_24px_rgba(168,85,247,0.38)] transition-transform active:scale-90"
+                      aria-label={`مصنع المكافأة: +${FACTORY_REWARD_POINTS} نقطة`}
+                      title={`مصنع المكافأة +${FACTORY_REWARD_POINTS} نقطة`}
+                    >
+                      <Factory className="h-8 w-8" strokeWidth={2.2} />
+                    </button>
+                    <span className="text-[10px] font-black text-fuchsia-700 dark:text-fuchsia-300">
+                      مصنع +{FACTORY_REWARD_POINTS}
+                    </span>
+                  </div>
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
                     <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
                     {streakDays} يوم تفاعل

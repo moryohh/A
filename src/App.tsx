@@ -67,8 +67,8 @@ import {
   updateUserProfileData,
 } from './services/communityService';
 import { fetchUnreadMessageCount } from './services/messengerService';
-import { getLevelSnapshot } from './services/pointsService';
-import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
+import { FACTORY_REWARD_POINTS, getLevelSnapshot } from './services/pointsService';
+import { getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
   fetchCompetitionSnapshot,
   recordActivityBlock,
@@ -713,16 +713,8 @@ function AppContent() {
 
   const handleCollectGrowthPoints = () => {
     if (!currentUser) return 0;
-    const result = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? 0);
-    if (result.collected <= 0) return 0;
-    setGrowthSession({ points: result.points, pendingPoints: 0 });
-    if (result.completedCycles > 0) {
-      const updatedUser = { ...currentUser, growthShieldTier: result.nextShieldTier };
-      setCurrentUser(updatedUser);
-      void updateUserProfileData(currentUser.id, { growthShieldTier: result.nextShieldTier });
-      showToast('اكتملت دورة النبتة! حصلت على درع جديد.');
-    }
-    return result.collected;
+    void handleScoreUpdate(FACTORY_REWARD_POINTS);
+    return FACTORY_REWARD_POINTS;
   };
 
   // Handlers - Direct Teacher Switching without Story Modals
