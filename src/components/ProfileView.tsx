@@ -19,15 +19,13 @@ import {
   Calendar,
   LockKeyhole,
   UserX,
-  Factory,
-  Building2,
 } from 'lucide-react';
 import { useAppTheme, AppThemeId } from '../services/themeService';
 import { gameAudio } from '../utils/gameAudio';
 import { UserProfile, CommunityPost, CompetitionSnapshot } from '../types';
 import { DEFAULT_CARTOON_AVATARS, CartoonAvatarOption } from '../data/cartoonAvatars';
 import { updateUserProfileData } from '../services/communityService';
-import { FACTORY_REWARD_POINTS, getLevelSnapshot } from '../services/pointsService';
+import { getLevelSnapshot } from '../services/pointsService';
 
 interface ProfileViewProps {
   user?: UserProfile | null;
@@ -605,27 +603,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex shrink-0 flex-col items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handleCollectPoints}
-                      className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 to-purple-700 text-white shadow-[0_10px_24px_rgba(168,85,247,0.38)] transition-transform active:scale-90"
-                      aria-label={`مصنع المكافأة: +${FACTORY_REWARD_POINTS} نقطة`}
-                      title={`مصنع المكافأة +${FACTORY_REWARD_POINTS} نقطة`}
-                    >
-                      <Factory className="h-8 w-8" strokeWidth={2.2} />
+                    <button type="button" onClick={handleCollectPoints} className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-lg transition-transform active:scale-90" aria-label="جمع النقاط" title="جمع النقاط">
+                      <Sparkles className="h-8 w-8" strokeWidth={2.2} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleResetProgress}
-                      className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-300 bg-white text-rose-600 shadow-md transition-transform active:scale-90"
-                      aria-label="شركة: تصفير التقدم"
-                      title="شركة: تصفير التقدم"
-                    >
-                      <Building2 className="h-6 w-6" strokeWidth={2.2} />
-                    </button>
-                    <span className="text-[10px] font-black text-fuchsia-700 dark:text-fuchsia-300">
-                      مصنع +{FACTORY_REWARD_POINTS}
-                    </span>
+                    <span className="text-[10px] font-black text-cyan-700 dark:text-cyan-300">جمع النقاط</span>
                   </div>
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
                     <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
