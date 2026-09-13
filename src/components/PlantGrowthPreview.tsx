@@ -1,5 +1,5 @@
 import React, { useId, useMemo, useState } from 'react';
-import { Factory, FlaskConical, Sparkles, X } from 'lucide-react';
+import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
 
 const growthStages = [
