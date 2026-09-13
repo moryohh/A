@@ -117,9 +117,10 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
             className="absolute top-3"
             style={{
               left: `calc(50% + ${slot}px)`,
-              zIndex: current ? 20 : 10 - Math.abs(slot),
-              opacity: current ? 1 : 0.9,
-              transform: `translateX(-50%) scale(${current ? 1.08 : 0.58}) rotate(${current ? 0 : slot < 0 ? -7 : 7}deg)`,
+              // تبقى الدروع القديمة فوق خلفية البطاقة ولكن خلف الدرع الحالي.
+              zIndex: current ? 20 : Math.max(2, 12 - (safeLevel - item)),
+              opacity: current ? 1 : 0.82,
+              transform: `translateX(-50%) scale(${current ? 1.08 : 0.68}) rotate(${current ? 0 : slot < 0 ? -8 : 8}deg)`,
               transformOrigin: 'center bottom',
             }}
           >
