@@ -22,7 +22,7 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
   if (!member) return null;
 
   const memberPosts = posts.filter((post) => member.id ? post.userId === member.id : post.userName === member.name);
-  const canMessage = Boolean(member.id && member.id !== currentUserId && !member.isDemoAccount);
+  const canMessage = Boolean(member.id && member.id !== currentUserId);
 
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center" dir="rtl">
@@ -44,7 +44,6 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
               </div>
             )}
             <h3 className={`mt-3 text-xl font-black ${theme.classes.textMain}`}>{member.name}</h3>
-            {member.isDemoAccount && <p className="mt-1 text-[11px] font-bold text-sky-500">حساب تجريبي</p>}
             <p className={`mt-1 text-xs ${theme.classes.textMuted}`}>{memberPosts.length} منشور في المجتمع</p>
             {member.isDemoAccount && (
               <div className={`mt-4 rounded-2xl border p-3 text-right ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>

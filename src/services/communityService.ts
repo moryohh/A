@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { getSupabaseAccessToken } from './authService';
 import { CommunityPost, CommunityComment, UserProfile } from '../types';
-import { getDemoCommunityAccount } from '../data/demoCommunityAccounts';
+import { getCommunityBotAccount } from '../data/demoCommunityAccounts';
 
 const LOCAL_STORAGE_POSTS_KEY = 'nahn_maak_community_posts_v2';
 const LOCAL_STORAGE_LIKES_KEY = 'nahn_maak_user_liked_posts_v2';
@@ -105,22 +105,26 @@ export function rankCommunityPosts(posts: CommunityPost[]): CommunityPost[] {
 }
 
 function mapCommunityApiComment(row: any): CommunityComment {
-  const account = getDemoCommunityAccount(`comment:${row?.id || row?.created_at || row?.content || ''}`);
+  const authorName = row?.author_name || 'طالب المنصة';
+  const isBotAccount = Boolean(row?.is_bot) || !row?.user_id || ['api', 'bot', 'external'].includes(String(row?.source || row?.author_type || '').toLowerCase());
+  const account = isBotAccount
+    ? getCommunityBotAccount(`author:${row?.author_id || authorName.toLowerCase()}`, authorName)
+    : undefined;
   return {
     id: String(row?.id || `comment-${Date.now()}`),
     postId: row?.post_id ? String(row.post_id) : undefined,
-    userId: account.id,
-    userName: row?.author_name || 'طالب المنصة',
-    userAvatar: account.avatarUrl || '',
+    userId: account?.id || row?.user_id || undefined,
+    userName: authorName,
+    userAvatar: account?.avatarUrl || row?.author_avatar_url || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     text: row?.comment_text || row?.content || '',
     likes: Number(row?.likes_count || 0),
     isLiked: false,
     createdAt: row?.created_at,
-    userLevel: account.level,
-    userPoints: account.points,
-    userProgress: account.progress,
-    isDemoAccount: true,
+    userLevel: account?.level ?? row?.author_level,
+    userPoints: account?.points ?? row?.author_points,
+    userProgress: account?.progress ?? row?.author_progress,
+    isDemoAccount: Boolean(account),
   };
 }
 
@@ -135,12 +139,16 @@ function mapCommunityApiPost(row: any, currentUserId?: string, likedSet?: Set<st
     : [];
   const postId = String(row?.id || `post-${Date.now()}`);
   const isOwnPost = currentUserId ? row?.user_id === currentUserId : false;
-  const account = isOwnPost ? undefined : getDemoCommunityAccount(`post:${postId}`);
+  const authorName = row?.author_display_name || row?.author_name || 'طالب المنصة';
+  const isBotAccount = !isOwnPost && (Boolean(row?.is_bot) || !row?.user_id || ['api', 'bot', 'external'].includes(String(row?.source || row?.author_type || '').toLowerCase()));
+  const account = isBotAccount
+    ? getCommunityBotAccount(`author:${row?.author_id || authorName.toLowerCase()}`, authorName)
+    : undefined;
 
   return {
     id: postId,
     userId: account?.id || row?.user_id || undefined,
-    userName: row?.author_display_name || 'طالب المنصة',
+    userName: authorName,
     userAvatar: account?.avatarUrl || row?.author_avatar_url || '',
     timeAgo: calculateTimeAgo(row?.created_at),
     content: row?.content || row?.post_text || '',
@@ -154,9 +162,9 @@ function mapCommunityApiPost(row: any, currentUserId?: string, likedSet?: Set<st
     isOwnPost,
     createdAt: row?.created_at,
     comments,
-    userLevel: account?.level,
-    userPoints: account?.points,
-    userProgress: account?.progress,
+    userLevel: account?.level ?? row?.author_level,
+    userPoints: account?.points ?? row?.author_points,
+    userProgress: account?.progress ?? row?.author_progress,
     isDemoAccount: Boolean(account),
   };
 }

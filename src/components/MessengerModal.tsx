@@ -48,6 +48,7 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
+  const [requestSent, setRequestSent] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const refreshSummaries = useCallback(async () => {
@@ -64,6 +65,12 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
     }
     setActiveContact(member);
     setError('');
+    setRequestSent(false);
+    if (member.isDemoAccount) {
+      setMessages([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const loaded = await fetchDirectMessages(currentUser, member.id);
@@ -124,6 +131,24 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
     setIsSending(true);
     setError('');
     try {
+      if (activeContact.isDemoAccount) {
+        const storageKey = 'nahn_maak_bot_message_requests_v1';
+        const request = {
+          id: `bot-request-${Date.now()}`,
+          senderId: currentUser.id,
+          recipientId: activeContact.id,
+          recipientName: activeContact.name,
+          body: draft.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          const previous = JSON.parse(localStorage.getItem(storageKey) || '[]');
+          localStorage.setItem(storageKey, JSON.stringify([request, ...(Array.isArray(previous) ? previous : [])].slice(0, 100)));
+        } catch {}
+        setDraft('');
+        setRequestSent(true);
+        return;
+      }
       const sent = await sendDirectMessage(currentUser, activeContact, draft);
       setMessages((previous) => previous.some((message) => message.id === sent.id) ? previous : [...previous, sent]);
       setDraft('');
@@ -197,6 +222,7 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
               )}
             </div>
             {error && <p className="mx-3 mb-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-center text-xs font-bold text-rose-400">{error}</p>}
+            {requestSent && <p className="mx-3 mb-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-center text-xs font-bold text-emerald-400">تم إرسال طلب المراسلة</p>}
             <div className={`shrink-0 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${theme.classes.cardBorder} ${theme.classes.headerBg}`}>
               <div className={`flex items-end gap-2 rounded-2xl border p-2 ${theme.classes.cardBorder} ${theme.classes.cardSubtleBg}`}>
                 <textarea

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, ArrowRight, MessageCircle } from 'lucide-react';
+import { Bell, ArrowRight, Send } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 
 interface HeaderProps {
@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="Messenger"
           title="Messenger"
         >
-          <MessageCircle className="h-[19px] w-[19px] fill-white/15" />
+          <Send className="h-[19px] w-[19px] -rotate-12 fill-white/15" />
           {unreadMessagesCount > 0 && (
             <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[8px] font-black text-white">
               {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
