@@ -34,6 +34,7 @@ import { CreatePostModal } from './components/CreatePostModal';
 import { CommunityCommentsModal } from './components/CommunityCommentsModal';
 import { MessengerModal } from './components/MessengerModal';
 import { CommunityProfileModal } from './components/CommunityProfileModal';
+import { CommunityAccountActionsModal } from './components/CommunityAccountActionsModal';
 import { MainHomeView } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
@@ -209,6 +210,7 @@ function AppContent() {
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [messengerContact, setMessengerContact] = useState<CommunityMember | null>(null);
   const [communityProfileMember, setCommunityProfileMember] = useState<CommunityMember | null>(null);
+  const [communityAccountActionsMember, setCommunityAccountActionsMember] = useState<CommunityMember | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   // Load Community posts and stories from Supabase on startup and when user changes
@@ -1100,7 +1102,7 @@ function AppContent() {
               onToggleLikePost={handleToggleLikeCommunityPost}
               onSharePost={handleShareCommunityPost}
               onReportPost={handleReportCommunityPost}
-              onOpenProfile={(member) => setCommunityProfileMember(member)}
+              onOpenProfile={(member) => setCommunityAccountActionsMember(member)}
               onMessage={(member) => openMessenger(member)}
               onBack={() => {
                 setActiveTab('home');
@@ -1191,10 +1193,23 @@ function AppContent() {
         currentUserId={currentUser?.id}
         onOpenProfile={(member) => {
           setActiveCommunityPostForComments(null);
-          setCommunityProfileMember(member);
+          setCommunityAccountActionsMember(member);
         }}
         onMessage={(member) => {
           setActiveCommunityPostForComments(null);
+          openMessenger(member);
+        }}
+      />
+
+      <CommunityAccountActionsModal
+        member={communityAccountActionsMember}
+        onClose={() => setCommunityAccountActionsMember(null)}
+        onVisitProfile={(member) => {
+          setCommunityAccountActionsMember(null);
+          setCommunityProfileMember(member);
+        }}
+        onMessage={(member) => {
+          setCommunityAccountActionsMember(null);
           openMessenger(member);
         }}
       />

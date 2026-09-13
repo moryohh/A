@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { CommunityMember, CommunityPost } from '../types';
 import { useAppTheme } from '../services/themeService';
+import { CommunityAvatar } from './CommunityAvatar';
 
 interface CommunityProfileModalProps {
   member: CommunityMember | null;
@@ -36,16 +37,10 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="text-center">
-            {member.avatarUrl ? (
-              <img src={member.avatarUrl} alt={member.name} className="mx-auto h-24 w-24 rounded-full border-4 border-sky-400/50 bg-slate-800 object-cover shadow-xl" />
-            ) : (
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-sky-400/50 bg-sky-500/15 text-3xl font-black text-sky-400">
-                {member.name.trim().charAt(0) || 'ط'}
-              </div>
-            )}
+            <CommunityAvatar src={member.avatarUrl} alt={member.name} className="mx-auto h-24 w-24 rounded-full border-4 border-lime-500/60 bg-lime-500 object-cover shadow-xl" />
             <h3 className={`mt-3 text-xl font-black ${theme.classes.textMain}`}>{member.name}</h3>
             <p className={`mt-1 text-xs ${theme.classes.textMuted}`}>{memberPosts.length} منشور في المجتمع</p>
-            {member.isDemoAccount && (
+            {(member.level || member.points || member.progress || member.bio) && (
               <div className={`mt-4 rounded-2xl border p-3 text-right ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
                 <div className={`flex items-center justify-between text-sm font-black ${theme.classes.textMain}`}>
                   <span>المستوى {member.level || 1}</span>

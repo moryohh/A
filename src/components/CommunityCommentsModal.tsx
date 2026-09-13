@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Heart, MessageSquare, Reply, Send, X } from 'lucide-react';
 import { CommunityComment, CommunityMember, CommunityPost } from '../types';
+import { CommunityAvatar } from './CommunityAvatar';
 
 interface CommunityCommentsModalProps {
   post: CommunityPost | null;
@@ -62,7 +63,7 @@ export const CommunityCommentsModal: React.FC<CommunityCommentsModalProps> = ({ 
             const likes = Number(comment.likes || 0) + (isLiked ? 1 : 0);
             return (
               <article key={comment.id} className="flex items-start gap-2.5">
-                <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="mt-1 shrink-0 active:scale-95" aria-label={`فتح ملف ${comment.userName}`}><img src={comment.userAvatar} alt={comment.userName} className="h-10 w-10 rounded-full border border-sky-100 bg-sky-50 object-cover" /></button>
+                <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="mt-1 shrink-0 active:scale-95" aria-label={`فتح ملف ${comment.userName}`}><CommunityAvatar src={comment.userAvatar} alt={comment.userName} className="h-10 w-10 rounded-full border border-lime-500/60 bg-lime-500 object-cover" /></button>
                 <div className="min-w-0 flex-1">
                   <div className="rounded-2xl rounded-tr-md bg-[#e9eef5] px-3.5 py-2.5">
                     <button type="button" onClick={() => onOpenProfile({ id: comment.userId, name: comment.userName, avatarUrl: comment.userAvatar, level: comment.userLevel, points: comment.userPoints, progress: comment.userProgress, isDemoAccount: comment.isDemoAccount })} className="text-sm font-black text-slate-800 transition hover:text-sky-700">{comment.userName}</button>

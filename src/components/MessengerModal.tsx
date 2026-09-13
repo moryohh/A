@@ -12,6 +12,7 @@ import {
   sendDirectMessage,
 } from '../services/messengerService';
 import { useAppTheme } from '../services/themeService';
+import { CommunityAvatar } from './CommunityAvatar';
 
 interface MessengerModalProps {
   isOpen: boolean;
@@ -23,14 +24,7 @@ interface MessengerModalProps {
 
 const Avatar: React.FC<{ member: CommunityMember; size?: 'sm' | 'lg' }> = ({ member, size = 'sm' }) => {
   const dimension = size === 'lg' ? 'h-20 w-20 text-2xl' : 'h-11 w-11 text-base';
-  if (member.avatarUrl) {
-    return <img src={member.avatarUrl} alt={member.name} className={`${dimension} shrink-0 rounded-full border-2 border-sky-400/50 bg-slate-800 object-cover`} />;
-  }
-  return (
-    <div className={`${dimension} flex shrink-0 items-center justify-center rounded-full border-2 border-sky-400/50 bg-sky-500/15 font-black text-sky-300`}>
-      {member.name.trim().charAt(0) || 'ط'}
-    </div>
-  );
+  return <CommunityAvatar src={member.avatarUrl} alt={member.name} className={`${dimension} shrink-0 rounded-full border-2 border-lime-500/60 bg-lime-500 object-cover`} />;
 };
 
 export const MessengerModal: React.FC<MessengerModalProps> = ({
