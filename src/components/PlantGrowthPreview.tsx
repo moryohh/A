@@ -306,35 +306,17 @@ export const PlantGrowthPreview: React.FC = () => {
     window.setTimeout(() => setBurst(false), 1250);
   };
 
-  const simulateFactoryPoints = () => {
-    gameAudio.playClick();
-    setBurst(true);
-    setPoints((current) => Math.min(700, current + 80));
-    window.setTimeout(() => setBurst(false), 1250);
-  };
-
   return (
     <>
-      <div className="fixed bottom-24 left-4 z-[65] flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
-          aria-label="فتح مختبر النمو والدروع"
-          title="مختبر النمو والدروع"
-        >
-          <FlaskConical className="h-6 w-6" />
-        </button>
-        <button
-          type="button"
-          onClick={() => { simulateFactoryPoints(); setIsOpen(true); }}
-          className="flex h-14 w-14 items-center justify-center rounded-full border border-fuchsia-300/60 bg-gradient-to-br from-fuchsia-600 to-violet-500 text-white shadow-2xl shadow-fuchsia-900/30 transition-transform active:scale-95"
-          aria-label="المصنع: إضافة 80 نقطة تجريبية"
-          title="المصنع +80 نقطة تجريبية"
-        >
-          <Factory className="h-6 w-6" />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => { gameAudio.playClick(); setIsOpen(true); }}
+        className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
+        aria-label="فتح مختبر النمو والدروع"
+        title="مختبر النمو والدروع"
+      >
+        <FlaskConical className="h-6 w-6" />
+      </button>
 
       {isOpen && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/75 p-3 font-cairo backdrop-blur-sm sm:items-center" dir="rtl">
