@@ -674,53 +674,26 @@ function AppContent() {
 
   const lastRewardRef = React.useRef<{ points: number; at: number } | null>(null);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const activityKey = `nahnu_maak:activity-day:${currentUser.id}`;
+    if (window.localStorage.getItem(activityKey) === todayKey) return;
+    window.localStorage.setItem(activityKey, todayKey);
+    const nextStreakDays = (currentUser.streakDays ?? 0) + 1;
+    const updatedUser = { ...currentUser, streakDays: nextStreakDays };
+    setCurrentUser(updatedUser);
+    void updateUserProfileData(currentUser.id, { streakDays: nextStreakDays });
+  }, [currentUser?.id]);
+
   const handleScoreUpdate = async (points: number) => {
     if (!currentUser || points <= 0) return;
     const now = Date.now();
     const lastReward = lastRewardRef.current;
     if (lastReward && lastReward.points === points && now - lastReward.at < 5000) return;
     lastRewardRef.current = { points, at: now };
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const activityKey = `nahnu_maak:activity-day:${currentUser.id}`;
-    const alreadyActiveToday = typeof window !== 'undefined' && window.localStorage.getItem(activityKey) === todayKey;
-    if (typeof window !== 'undefined') window.localStorage.setItem(activityKey, todayKey);
-
-    const nextTotalPoints = (currentUser.points ?? 0) + points;
-    const levelSnapshot = getLevelSnapshot(nextTotalPoints);
-    const nextStreakDays = alreadyActiveToday ? (currentUser.streakDays ?? 0) : (currentUser.streakDays ?? 0) + 1;
-    const optimisticUser: UserProfile = {
-      ...currentUser,
-      points: nextTotalPoints,
-      level: levelSnapshot.level,
-      streakDays: nextStreakDays,
-    };
-
-    setCurrentUser(optimisticUser);
     setGrowthSession(queueGrowthPoints(currentUser.id, points));
-    setCompetitionSnapshot((previous) => previous ? { ...previous, points: nextTotalPoints, level: levelSnapshot.level } : previous);
-    showToast(`أضيفت ${points} ${points === 1 ? 'نقطة' : 'نقاط'} إلى مستواك`);
-
-    const [savedUser] = await Promise.all([
-      updateUserProfileData(currentUser.id, {
-        points: nextTotalPoints,
-        level: levelSnapshot.level,
-        streakDays: nextStreakDays,
-      }),
-      recordPeriodPoints(points).then((snapshot) => {
-        if (snapshot) {
-          setCompetitionSnapshot(snapshot);
-        }
-        return snapshot;
-      }),
-    ]);
-    if (savedUser) {
-      setCurrentUser((previous) => ({
-        ...(previous || optimisticUser),
-        ...savedUser,
-        points: savedUser.points ?? nextTotalPoints,
-        level: savedUser.level ?? levelSnapshot.level,
-      }));
-    }
+    showToast(`أضيفت ${points} نقطة معلّقة — اضغط «جمع النقاط» لتفعيلها`);
   };
 
   const handleCollectGrowthPoints = () => {
