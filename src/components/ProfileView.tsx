@@ -602,12 +602,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           >
             <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex shrink-0 flex-col items-center gap-1.5">
-                    <button type="button" onClick={handleCollectPoints} className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-lg transition-transform active:scale-90" aria-label="جمع النقاط" title="جمع النقاط">
-                      <Sparkles className="h-8 w-8" strokeWidth={2.2} />
-                    </button>
-                    <span className="text-[10px] font-black text-cyan-700 dark:text-cyan-300">جمع النقاط</span>
-                  </div>
+                  {pendingGrowthPoints > 0 && (
+                    <div className="flex shrink-0 flex-col items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleCollectPoints}
+                        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-lg transition-transform active:scale-90"
+                        aria-label={`جمع ${pendingGrowthPoints} نقطة`}
+                        title={`جمع ${pendingGrowthPoints} نقطة`}
+                      >
+                        <Sparkles className="h-8 w-8" strokeWidth={2.2} />
+                        <span className="absolute -right-2 -top-2 rounded-full border-2 border-white bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-white shadow">+{pendingGrowthPoints}</span>
+                      </button>
+                      <span className="text-[10px] font-black text-cyan-700 dark:text-cyan-300">جمع النقاط</span>
+                    </div>
+                  )}
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
                     <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
                     {streakDays} يوم تفاعل
