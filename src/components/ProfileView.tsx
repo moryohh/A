@@ -93,7 +93,7 @@ const ShieldArtwork: React.FC<{ tier: number; compact?: boolean }> = ({ tier, co
   return <div className={`relative ${compact ? 'h-16 w-16' : 'h-44 w-44'}`}>
     {aura && <span className="pointer-events-none absolute -inset-4 z-0 rounded-full blur-xl animate-pulse" style={{ background: `radial-gradient(circle, ${aura.color}, transparent 65%)`, opacity: aura.opacity }} />}
     <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${visualTier}.png`} alt={shieldNames[safeTier]} className="relative z-10 h-full w-full object-contain drop-shadow-xl" style={{ filter }} />
-    {(safeTier <= 1 || emblem) && <span className="pointer-events-none absolute left-1/2 top-[51%] z-20 flex h-[31%] w-[31%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[42%] border border-white/25 text-[36%] font-black leading-none shadow-inner" style={{ background: safeTier <= 1 ? 'linear-gradient(145deg, rgba(82,45,22,.95), rgba(182,104,43,.92))' : 'linear-gradient(145deg, rgba(15,23,42,.64), rgba(255,255,255,.16))', color: aura?.color || '#fff' }}>{emblem}</span>}
+
   </div>;
 };
 
@@ -265,7 +265,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
       </svg>
       </div>
       </div>
-      <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm">المستوى {level} · {progress}%</span>
+      <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
     </div>
   );
 };
