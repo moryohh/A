@@ -672,8 +672,15 @@ function AppContent() {
     };
   }, [currentUser?.id]);
 
+  const lastRewardRef = React.useRef<{ points: number; at: number } | null>(null);
+
   const handleScoreUpdate = async (points: number) => {
     if (!currentUser || points <= 0) return;
+    const now = Date.now();
+    const lastReward = lastRewardRef.current;
+    if (lastReward && lastReward.points === points && now - lastReward.at < 5000) return;
+    lastRewardRef.current = { points, at: now };
+    if (typeof window !== 'undefined') window.localStorage.setItem(`nahnu_maak:activity-day:${currentUser.id}`, new Date().toISOString().slice(0, 10));
 
     const nextTotalPoints = (currentUser.points ?? 0) + points;
     const levelSnapshot = getLevelSnapshot(nextTotalPoints);
