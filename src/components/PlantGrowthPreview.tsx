@@ -315,15 +315,26 @@ export const PlantGrowthPreview: React.FC = () => {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
-        aria-label="فتح معاينة نمو الشجرة"
-        title="معاينة نمو الشجرة"
-      >
-        <FlaskConical className="h-6 w-6" />
-      </button>
+      <div className="fixed bottom-24 left-4 z-[65] flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
+          aria-label="فتح مختبر النمو والدروع"
+          title="مختبر النمو والدروع"
+        >
+          <FlaskConical className="h-6 w-6" />
+        </button>
+        <button
+          type="button"
+          onClick={() => { simulateFactoryPoints(); setIsOpen(true); }}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-fuchsia-300/60 bg-gradient-to-br from-fuchsia-600 to-violet-500 text-white shadow-2xl shadow-fuchsia-900/30 transition-transform active:scale-95"
+          aria-label="المصنع: إضافة 80 نقطة تجريبية"
+          title="المصنع +80 نقطة تجريبية"
+        >
+          <Factory className="h-6 w-6" />
+        </button>
+      </div>
 
       {isOpen && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/75 p-3 font-cairo backdrop-blur-sm sm:items-center" dir="rtl">
@@ -391,16 +402,7 @@ export const PlantGrowthPreview: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={simulateFactoryPoints}
-                className="inline-flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-fuchsia-600 to-violet-500 px-2 py-3 text-xs font-black text-white shadow-lg shadow-fuchsia-900/20 transition-transform active:scale-95"
-                title="إضافة 80 نقطة تجريبية للمختبر"
-              >
-                <Factory className="h-4 w-4" />
-                المصنع +80
-              </button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={collectPoints}
@@ -410,11 +412,7 @@ export const PlantGrowthPreview: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  gameAudio.playClick();
-                  setPoints(0);
-                  setBurst(false);
-                }}
+                onClick={() => { gameAudio.playClick(); setPoints(0); setBurst(false); }}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition-transform active:scale-95"
               >
                 إعادة التجربة
