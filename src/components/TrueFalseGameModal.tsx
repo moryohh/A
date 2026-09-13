@@ -111,10 +111,12 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
     }
   }, [isCompleted, correctCount, config.questions.length, onScoreUpdate]);
 
-  // Play a short intro only when the game becomes visible; it remains silent while closed.
+  // Play the supplied 24-second game bed while the game is open.
   useEffect(() => {
-    if (isOpen && soundEnabled) gameAudio.playGameStart();
-  }, [isOpen]);
+    if (isOpen && soundEnabled) gameAudio.playGameSessionTheme();
+    else gameAudio.stopGameSessionTheme();
+    return () => gameAudio.stopGameSessionTheme();
+  }, [isOpen, soundEnabled]);
 
   // Audio effects using GameAudioEngine
   const playAudio = (type: 'correct' | 'wrong' | 'win' | 'click' | 'streak') => {
@@ -222,6 +224,7 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
       });
     } else {
       playAudio('wrong');
+      if (soundEnabled) gameAudio.playGameLoss();
       setWrongCount((prev) => prev + 1);
       setStreak(0);
     }
