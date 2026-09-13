@@ -66,8 +66,8 @@ import {
   updateUserProfileData,
 } from './services/communityService';
 import { fetchUnreadMessageCount } from './services/messengerService';
-import { FACTORY_REWARD_POINTS, getLevelSnapshot } from './services/pointsService';
-import { getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
+import { getLevelSnapshot } from './services/pointsService';
+import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
   fetchCompetitionSnapshot,
   recordActivityBlock,
@@ -712,8 +712,18 @@ function AppContent() {
 
   const handleCollectGrowthPoints = () => {
     if (!currentUser) return 0;
-    void handleScoreUpdate(FACTORY_REWARD_POINTS);
-    return FACTORY_REWARD_POINTS;
+    const collected = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? -1);
+    if (collected.collected <= 0) return 0;
+    setGrowthSession({
+      points: collected.points,
+      pendingPoints: collected.pendingPoints,
+    });
+    if (collected.nextShieldTier !== (currentUser.growthShieldTier ?? -1)) {
+      const updatedUser = { ...currentUser, growthShieldTier: collected.nextShieldTier };
+      setCurrentUser(updatedUser);
+      void updateUserProfileData(currentUser.id, { growthShieldTier: collected.nextShieldTier });
+    }
+    return collected.collected;
   };
 
   // Handlers - Direct Teacher Switching without Story Modals
