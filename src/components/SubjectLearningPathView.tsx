@@ -3,6 +3,7 @@ import { EducationalLesson, SubjectChapter, SubjectChapterLesson, OpenLessonCont
 import { getCurriculumForSubject } from '../data/mockCurriculums';
 import { getSubjectIndex, getSubjectChapters, getChapterLessons, getLessonDetails, formatArabicLessonTitle, buildLessonKey } from '../services/lessonsService';
 import { MapRewardsModal } from './MapRewardsModal';
+import { gameAudio } from '../utils/gameAudio';
 import { MapLeaderboardModal } from './MapLeaderboardModal';
 import { AdventureWorldMap } from './AdventureWorldMap';
 import { useAppTheme } from '../services/themeService';
@@ -359,7 +360,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
   const selectedChapterIndex = Math.max(0, chapters.findIndex((c) => c.number === selectedChapterNumber));
 
   return (
-    <div className="min-h-full px-2 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-1 text-right animate-in fade-in duration-300 select-none space-y-2 sm:px-3">
+    <div className="min-h-full px-2 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-1 text-right animate-in fade-in duration-300 select-none space-y-2 sm:px-3" onClickCapture={() => gameAudio.playPrimaryNavigation()}>
       {/* TOAST NOTIFICATION */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black text-xs sm:text-sm shadow-2xl border-2 border-white animate-bounce flex items-center gap-2">
