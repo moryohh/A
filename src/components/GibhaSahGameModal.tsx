@@ -371,7 +371,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       window.setTimeout(() => setCelebrationBurst(null), 650);
       playAudio('wrong');
       if (soundEnabled) gameAudio.playGameLoss();
-    if (soundEnabled) gameAudio.playGameLoss();
       setFeedbackStatus('wrong');
       setFeedbackMessage('إجابة خاطئة! تم نقل السؤال لآخر السلسلة والانتقال للسؤال التالي.');
 
@@ -436,7 +435,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     } else {
       playAudio('wrong');
       if (soundEnabled) gameAudio.playGameLoss();
-    if (soundEnabled) gameAudio.playGameLoss();
       setFeedbackStatus('wrong');
       setFeedbackMessage('تم احتساب إجابة خاطئة! تم نقل السؤال لآخر السلسلة.');
 
