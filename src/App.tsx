@@ -28,7 +28,6 @@ import { TeacherInfoModal } from './components/TeacherInfoModal';
 import { BottomNav, NavTab } from './components/BottomNav';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { ProfileView } from './components/ProfileView';
-import { PlantGrowthPreview } from './components/PlantGrowthPreview';
 import { SettingsView } from './components/SettingsView';
 import { CommunityView } from './components/CommunityView';
 import { CreatePostModal } from './components/CreatePostModal';
@@ -1125,9 +1124,6 @@ function AppContent() {
             />
           )}
         </main>
-
-        {/* Temporary isolated preview lab — remove this one component to disable it. */}
-        <PlantGrowthPreview />
 
         {/* Fixed Bottom Navigation */}
         <BottomNav
