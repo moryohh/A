@@ -78,7 +78,7 @@ const ShieldArtwork: React.FC<{ tier: number; compact?: boolean }> = ({ tier, co
       : safeTier === 5
         ? { color: '#f472b6', opacity: 0.24 }
         : safeTier === 6
-          ? { color: '#4ade80', opacity: 0.3 }
+          ? { color: '#22c55e', opacity: 0.4 }
           : safeTier === 7
             ? { color: '#ef4444', opacity: 0.4 }
             : null;
@@ -138,7 +138,7 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   );
 };
 
-const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
+const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number; level: number }> = ({ points, animate, progress, level }) => {
   const stageIndex = treeMilestones.findIndex((stage) => stage.points === getTreeStage(points).points);
   const stage = treeMilestones[Math.max(0, stageIndex)];
   const showRoot = stageIndex >= 1;
@@ -265,9 +265,12 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number 
       </svg>
       </div>
       </div>
-      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-white bg-white px-2 py-0.5 text-[9px] font-black shadow-sm" style={{ color: stage.tone }}>
-        {progress}%
-      </span>
+      <div className="absolute -bottom-3 left-1/2 w-36 -translate-x-1/2 rounded-xl border border-white bg-white/95 px-2 py-1.5 text-center shadow-md">
+        <p className="text-[9px] font-black text-slate-600">المستوى {level}</p>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, backgroundColor: stage.tone }} />
+        </div>
+      </div>
     </div>
   );
 };
@@ -649,7 +652,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </div>
                 </div>
               {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
-              <GrowthTree points={treePoints} animate={isCollectingPoints} progress={treeProgress} />
+              <GrowthTree points={treePoints} animate={isCollectingPoints} progress={treeProgress} level={userLevel} />
             </div>
           </section>
         </div>
