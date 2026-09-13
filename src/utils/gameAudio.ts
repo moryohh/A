@@ -87,6 +87,7 @@ class GameAudioEngine {
   }
 
   public playGameSessionTheme() {
+    // The external player loops the 24-second track continuously while the game is open.
     this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.55, true);
   }
 
