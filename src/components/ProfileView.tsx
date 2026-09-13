@@ -265,12 +265,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
       </svg>
       </div>
       </div>
-      <div className="absolute -bottom-3 left-1/2 w-36 -translate-x-1/2 rounded-xl border border-white bg-white/95 px-2 py-1.5 text-center shadow-md">
-        <p className="text-[9px] font-black text-slate-600">المستوى {level}</p>
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, backgroundColor: stage.tone }} />
-        </div>
-      </div>
+      <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm">المستوى {level} · {progress}%</span>
     </div>
   );
 };
@@ -593,23 +588,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="absolute right-3 top-3">
               <LevelShield level={displayShieldTier} />
             </div>
-            <div className="absolute left-7 top-6 flex h-44 w-16 flex-col items-center">
-              <span className="mb-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
-                المستوى {userLevel + 1}
-              </span>
-              <div className="relative h-28 w-6 overflow-hidden rounded-full border border-white/20 bg-black/10 shadow-inner">
-                <div
-                  className="absolute bottom-0 left-0 w-full rounded-full transition-all duration-700"
-                  style={{ height: `${levelSnapshot.progressPercent}%`, backgroundColor: theme.colors.primary }}
-                />
-              </div>
-              <span className="mt-2 text-base font-black leading-none" style={{ color: theme.colors.primary }}>
-                {levelSnapshot.progressPercent}%
-              </span>
-              <span className="mt-3 whitespace-nowrap rounded-full border bg-white/75 px-2 py-1 text-[10px] font-black shadow-sm" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}35` }}>
-                إجمالي النقاط: {Number(totalPoints).toFixed(1)}
-              </span>
-            </div>
+            <span className="absolute bottom-3 left-3 rounded-full border bg-white/75 px-2 py-1 text-[10px] font-black" style={{ color: theme.colors.primary }}>
+              إجمالي النقاط: {Number(totalPoints).toFixed(1)}
+            </span>
           </div>
 
           <section
@@ -652,7 +633,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </div>
                 </div>
               {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
-              <GrowthTree points={treePoints} animate={isCollectingPoints} progress={treeProgress} level={userLevel} />
+              <GrowthTree points={treePoints} animate={isCollectingPoints} progress={levelSnapshot.progressPercent} level={userLevel + 1} />
             </div>
           </section>
         </div>
