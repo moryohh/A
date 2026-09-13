@@ -552,6 +552,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <span className="mt-2 text-base font-black leading-none" style={{ color: theme.colors.primary }}>
                 {levelSnapshot.progressPercent}%
               </span>
+              <span className="mt-3 whitespace-nowrap rounded-full border bg-white/75 px-2 py-1 text-[10px] font-black shadow-sm" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}35` }}>
+                إجمالي النقاط: {Number(totalPoints).toFixed(1)}
+              </span>
             </div>
           </div>
 
