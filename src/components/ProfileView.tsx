@@ -100,27 +100,33 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, -1), 7);
   if (safeLevel < 0) return <div className="flex h-48 w-52 flex-col items-center justify-center text-center" aria-label="لا يوجد درع بعد"><div className="h-28 w-24 rounded-[42%] border-4 border-dashed border-slate-300 bg-slate-100/70 opacity-65"/><p className="mt-2 text-xs font-black text-slate-500">لا يوجد درع بعد</p><p className="text-[10px] font-bold text-slate-400">اجمع 20 نقطة لتحصل على الخشبي</p></div>;
   const shields = Array.from({ length: safeLevel + 1 }, (_, index) => index);
+  const getLayer = (item: number) => Math.ceil((safeLevel - item) / 2);
   const getSlot = (item: number) => {
     const distance = safeLevel - item;
     if (distance === 0) return 0;
-    const spread = 31 + Math.floor((distance - 1) / 2) * 28;
+    const layer = getLayer(item);
+    // زوج قريب: نصفه ظاهر. كل زوج أقدم: 40% تقريبًا خلف الزوج الذي قبله.
+    const spread = layer === 1 ? 39 : 39 + (layer - 1) * 31;
     return distance % 2 === 1 ? -spread : spread;
   };
   return (
     <div className="relative h-48 w-64 shrink-0" aria-label={shieldNames[safeLevel]}>
       {shields.map((item) => {
         const current = item === safeLevel;
+        const distance = safeLevel - item;
+        const layer = getLayer(item);
         const slot = getSlot(item);
+        // كل طبقة خلفية أصغر 10% من الطبقة التي أمامها.
+        const scale = current ? 1.08 : 0.9 ** layer;
         return (
           <div
             key={item}
             className="absolute top-3"
             style={{
               left: `calc(50% + ${slot}px)`,
-              // تبقى الدروع القديمة فوق خلفية البطاقة ولكن خلف الدرع الحالي.
-              zIndex: current ? 20 : Math.max(2, 12 - (safeLevel - item)),
-              opacity: current ? 1 : 0.82,
-              transform: `translateX(-50%) scale(${current ? 1.08 : 0.68}) rotate(${current ? 0 : slot < 0 ? -8 : 8}deg)`,
+              zIndex: current ? 30 : 20 - layer,
+              opacity: current ? 1 : Math.max(0.62, 0.94 - layer * 0.08),
+              transform: `translateX(-50%) scale(${scale}) rotate(${current ? 0 : slot < 0 ? -5 : 5}deg)`,
               transformOrigin: 'center bottom',
             }}
           >
