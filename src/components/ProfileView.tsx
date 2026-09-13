@@ -20,6 +20,7 @@ import {
   LockKeyhole,
   UserX,
   Factory,
+  Building2,
 } from 'lucide-react';
 import { useAppTheme, AppThemeId } from '../services/themeService';
 import { gameAudio } from '../utils/gameAudio';
@@ -312,11 +313,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     ? -1
     : Math.min(Math.floor((totalPoints - 20) / 100), shieldNames.length - 1);
   const displayShieldTier = Math.max(shieldTier, pointsBasedShieldTier);
-  const treeStage = getTreeStage(growthPoints);
-  const nextTreeStage = treeMilestones.find((stage) => stage.points > growthPoints);
+  // النبتة مرتبطة بالنقاط الحقيقية وتبدأ دورة جديدة بعد كل 100 نقطة.
+  const treePoints = ((Number(totalPoints) % 100) + 100) % 100;
+  const treeStage = getTreeStage(treePoints);
+  const nextTreeStage = treeMilestones.find((stage) => stage.points > treePoints);
   const treeProgress = nextTreeStage
-    ? Math.round(((growthPoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
-    : Math.min(99, Math.round(growthPoints));
+    ? Math.round(((treePoints - treeStage.points) / Math.max(1, nextTreeStage.points - treeStage.points)) * 100)
+    : 100;
   const [isCollectingPoints, setIsCollectingPoints] = useState(false);
   const [lastCollectedPoints, setLastCollectedPoints] = useState<number | null>(null);
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
@@ -408,6 +411,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setLastCollectedPoints(collected);
     window.setTimeout(() => setIsCollectingPoints(false), 1250);
     window.setTimeout(() => setLastCollectedPoints(null), 1250);
+  };
+
+  const handleResetProgress = async () => {
+    if (!user?.id || !window.confirm('تصفير نقاطك ومستواك؟ هذا الإجراء للتجربة ولا يمكن التراجع عنه.')) return;
+    const resetUser: UserProfile = { ...user, points: 0, level: getLevelSnapshot(0).level };
+    onUpdateUser?.(resetUser);
+    const savedUser = await updateUserProfileData(user.id, { points: 0, level: getLevelSnapshot(0).level });
+    if (savedUser) onUpdateUser?.(savedUser);
   };
 
   return (
@@ -619,6 +630,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     >
                       <Factory className="h-8 w-8" strokeWidth={2.2} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleResetProgress}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-300 bg-white text-rose-600 shadow-md transition-transform active:scale-90"
+                      aria-label="شركة: تصفير التقدم"
+                      title="شركة: تصفير التقدم"
+                    >
+                      <Building2 className="h-6 w-6" strokeWidth={2.2} />
+                    </button>
                     <span className="text-[10px] font-black text-fuchsia-700 dark:text-fuchsia-300">
                       مصنع +{FACTORY_REWARD_POINTS}
                     </span>
@@ -629,7 +649,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </div>
                 </div>
               {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
-              <GrowthTree points={growthPoints} animate={isCollectingPoints} progress={treeProgress} />
+              <GrowthTree points={treePoints} animate={isCollectingPoints} progress={treeProgress} />
             </div>
           </section>
         </div>
