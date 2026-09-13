@@ -301,6 +301,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const storedAvatar = avatarStorageKey ? localStorage.getItem(avatarStorageKey) : null;
   const userAvatar = storedAvatar || user?.avatarUrl || DEFAULT_CARTOON_AVATARS[0].url;
   const streakDays = user?.streakDays ?? 0;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const isActiveToday = user?.id ? localStorage.getItem(`nahnu_maak:activity-day:${user.id}`) === todayKey : false;
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
   const userLevel = levelSnapshot.level;
@@ -617,8 +619,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </div>
                   )}
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
-                    <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
-                    {streakDays} يوم تفاعل
+                    <Flame className={`h-3.5 w-3.5 fill-amber-400 text-amber-500 ${isActiveToday ? 'animate-pulse' : 'opacity-45'}`} />
+                    {isActiveToday ? 'نشط اليوم' : `${streakDays} يوم تفاعل`}
                   </div>
                 </div>
               {lastCollectedPoints && <span className="pointer-events-none absolute right-28 top-7 z-30 text-lg font-black text-amber-500" style={{ animation: 'rewardToTree 1250ms cubic-bezier(.2,.8,.2,1) both' }}>+{lastCollectedPoints}</span>}
