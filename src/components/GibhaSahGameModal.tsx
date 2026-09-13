@@ -141,10 +141,12 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     handleRestartInternal(round.questions);
   }, [isOpen, customConfig, lessonId, lessonTitle, category]);
 
-  // Play a short intro only when the game becomes visible; it remains silent while closed.
+  // Play the supplied 24-second game bed while the game is open.
   useEffect(() => {
-    if (isOpen && soundEnabled) gameAudio.playGameStart();
-  }, [isOpen]);
+    if (isOpen && soundEnabled) gameAudio.playGameSessionTheme();
+    else gameAudio.stopGameSessionTheme();
+    return () => gameAudio.stopGameSessionTheme();
+  }, [isOpen, soundEnabled]);
 
   // Remaining questions filtered by unsolved card numbers
   const remainingQuestions = shuffledQuestions.filter(
@@ -239,6 +241,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   // Handle timeout -> moves question to end of queue so next question comes up!
   const handleTimeOut = () => {
     playAudio('wrong');
+    if (soundEnabled) gameAudio.playGameLoss();
     setFeedbackStatus('wrong');
     const currentUser = activeTurn === 'user1' ? user1Name : user2Name;
     setFeedbackMessage(
@@ -367,6 +370,8 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       setCelebrationBurst('wrong');
       window.setTimeout(() => setCelebrationBurst(null), 650);
       playAudio('wrong');
+      if (soundEnabled) gameAudio.playGameLoss();
+    if (soundEnabled) gameAudio.playGameLoss();
       setFeedbackStatus('wrong');
       setFeedbackMessage('إجابة خاطئة! تم نقل السؤال لآخر السلسلة والانتقال للسؤال التالي.');
 
@@ -430,6 +435,8 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       }, 1200);
     } else {
       playAudio('wrong');
+      if (soundEnabled) gameAudio.playGameLoss();
+    if (soundEnabled) gameAudio.playGameLoss();
       setFeedbackStatus('wrong');
       setFeedbackMessage('تم احتساب إجابة خاطئة! تم نقل السؤال لآخر السلسلة.');
 
