@@ -2,6 +2,7 @@ import React from 'react';
 import { EducationalLesson } from '../types';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 import { SubjectNeonIcon } from './SubjectNeonIcon';
+import { gameAudio } from '../utils/gameAudio';
 
 interface MainHomeViewProps {
   onSelectSubject: (subject: (typeof GRADE_6_SUBJECTS)[0]) => void;
@@ -14,7 +15,7 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
   onSelectLesson,
 }) => {
   return (
-    <div className="min-h-full px-3 py-3 pb-24 text-right animate-in fade-in duration-300 select-none">
+    <div className="min-h-full px-3 py-3 pb-24 text-right animate-in fade-in duration-300 select-none" onClickCapture={() => gameAudio.playPrimaryNavigation()}>
       {/* 2-Column Grid of 8 Subjects matching the image exactly */}
       <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
         {GRADE_6_SUBJECTS.map((subject) => {
