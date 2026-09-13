@@ -13,6 +13,7 @@ class GameAudioEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private externalPlayers = new Map<string, HTMLAudioElement>();
+  private gameSessionThemeRequested = false;
 
   private getContext(): AudioContext | null {
     if (this.isMuted) return null;
@@ -88,16 +89,29 @@ class GameAudioEngine {
 
   public playGameSessionTheme() {
     // The external player loops the 24-second track continuously while the game is open.
+    this.gameSessionThemeRequested = true;
     this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.55, true);
   }
 
   public stopGameSessionTheme() {
+    this.gameSessionThemeRequested = false;
     this.stopExternal('game-session-theme');
   }
 
   public playGameLoss() {
-    this.stopGameSessionTheme();
+    const shouldResumeTheme = this.gameSessionThemeRequested;
+    this.stopExternal('game-session-theme');
     this.playExternal('game-loss', GAME_LOSS_AUDIO, 0.85, false);
+
+    const lossPlayer = this.externalPlayers.get('game-loss');
+    if (lossPlayer) {
+      lossPlayer.onended = () => {
+        lossPlayer.onended = null;
+        if (shouldResumeTheme && this.gameSessionThemeRequested && !this.isMuted) {
+          this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.55, true);
+        }
+      };
+    }
   }
 
   // Tactile button click / tap
