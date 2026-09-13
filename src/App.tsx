@@ -66,7 +66,8 @@ import {
   reportCommunityPost,
   updateUserProfileData,
 } from './services/communityService';
-import { fetchUnreadMessageCount } from './services/messengerService';
+import { fetchUnreadMessageCount, markAllMessagesRead } from './services/messengerService';
+import { getSupabaseClient } from './lib/supabase';
 import { getLevelSnapshot } from './services/pointsService';
 import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
@@ -256,6 +257,19 @@ function AppContent() {
   }, [currentUser?.id]);
 
   React.useEffect(() => {
+    if (!currentUser?.id) return;
+    const client = getSupabaseClient();
+    if (!client) return;
+    const channel = client
+      .channel(`message-badge-${currentUser.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `recipient_id=eq.${currentUser.id}` }, () => {
+        fetchUnreadMessageCount(currentUser).then(setUnreadMessageCount).catch(() => undefined);
+      })
+      .subscribe();
+    return () => { client.removeChannel(channel); };
+  }, [currentUser?.id]);
+
+  React.useEffect(() => {
     if (!currentUser?.id) {
       setUnreadMessageCount(0);
       return;
@@ -286,6 +300,8 @@ function AppContent() {
     setMessengerContact(member);
     setCommunityProfileMember(null);
     setIsMessengerOpen(true);
+    setUnreadMessageCount(0);
+    if (currentUser) markAllMessagesRead(currentUser).catch(() => undefined);
   };
 
   // Modals & Drawers state

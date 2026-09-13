@@ -129,5 +129,22 @@ export async function fetchUnreadMessageCount(currentUser: UserProfile): Promise
     .eq('recipient_id', userId)
     .is('read_at', null);
   if (error) return 0;
-  return count || 0;
+  if (!count) return 0;
+  const { data: unreadRows } = await client
+    .from('direct_messages')
+    .select('sender_id')
+    .eq('recipient_id', userId)
+    .is('read_at', null)
+    .limit(500);
+  return Math.min(9, new Set((unreadRows || []).map((row: any) => String(row.sender_id))).size);
+}
+
+export async function markAllMessagesRead(currentUser: UserProfile): Promise<void> {
+  const { client, userId } = requireClientAndUser(currentUser);
+  const { error } = await client
+    .from('direct_messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('recipient_id', userId)
+    .is('read_at', null);
+  if (error) throw new Error(error.message || 'تعذر تحديث حالة الرسائل');
 }
