@@ -680,14 +680,19 @@ function AppContent() {
     const lastReward = lastRewardRef.current;
     if (lastReward && lastReward.points === points && now - lastReward.at < 5000) return;
     lastRewardRef.current = { points, at: now };
-    if (typeof window !== 'undefined') window.localStorage.setItem(`nahnu_maak:activity-day:${currentUser.id}`, new Date().toISOString().slice(0, 10));
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const activityKey = `nahnu_maak:activity-day:${currentUser.id}`;
+    const alreadyActiveToday = typeof window !== 'undefined' && window.localStorage.getItem(activityKey) === todayKey;
+    if (typeof window !== 'undefined') window.localStorage.setItem(activityKey, todayKey);
 
     const nextTotalPoints = (currentUser.points ?? 0) + points;
     const levelSnapshot = getLevelSnapshot(nextTotalPoints);
+    const nextStreakDays = alreadyActiveToday ? (currentUser.streakDays ?? 0) : (currentUser.streakDays ?? 0) + 1;
     const optimisticUser: UserProfile = {
       ...currentUser,
       points: nextTotalPoints,
       level: levelSnapshot.level,
+      streakDays: nextStreakDays,
     };
 
     setCurrentUser(optimisticUser);
@@ -699,6 +704,7 @@ function AppContent() {
       updateUserProfileData(currentUser.id, {
         points: nextTotalPoints,
         level: levelSnapshot.level,
+        streakDays: nextStreakDays,
       }),
       recordPeriodPoints(points).then((snapshot) => {
         if (snapshot) {
