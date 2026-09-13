@@ -113,7 +113,6 @@ const LevelShield: React.FC<{ level: number }> = ({ level }) => {
     <div className="relative h-48 w-64 shrink-0" aria-label={shieldNames[safeLevel]}>
       {shields.map((item) => {
         const current = item === safeLevel;
-        const distance = safeLevel - item;
         const layer = getLayer(item);
         const slot = getSlot(item);
         // كل طبقة خلفية أصغر 10% من الطبقة التي أمامها.
