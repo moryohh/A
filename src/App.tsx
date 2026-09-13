@@ -700,15 +700,31 @@ function AppContent() {
     if (!currentUser) return 0;
     const collected = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? -1);
     if (collected.collected <= 0) return 0;
+
+    const nextTotalPoints = (currentUser.points ?? 0) + collected.collected;
+    const levelSnapshot = getLevelSnapshot(nextTotalPoints);
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      points: nextTotalPoints,
+      level: levelSnapshot.level,
+      growthShieldTier: collected.nextShieldTier,
+    };
+    setCurrentUser(updatedUser);
     setGrowthSession({
       points: collected.points,
       pendingPoints: collected.pendingPoints,
     });
-    if (collected.nextShieldTier !== (currentUser.growthShieldTier ?? -1)) {
-      const updatedUser = { ...currentUser, growthShieldTier: collected.nextShieldTier };
-      setCurrentUser(updatedUser);
-      void updateUserProfileData(currentUser.id, { growthShieldTier: collected.nextShieldTier });
-    }
+    setCompetitionSnapshot((previous) => previous ? {
+      ...previous,
+      points: nextTotalPoints,
+      level: levelSnapshot.level,
+    } : previous);
+    void updateUserProfileData(currentUser.id, {
+      points: nextTotalPoints,
+      level: levelSnapshot.level,
+      growthShieldTier: collected.nextShieldTier,
+    });
+    showToast(`تم تفعيل ${collected.collected} نقطة في مستواك`);
     return collected.collected;
   };
 
