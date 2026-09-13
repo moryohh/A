@@ -272,6 +272,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const totalPoints = user?.points ?? 0;
   const levelSnapshot = getLevelSnapshot(totalPoints);
   const userLevel = levelSnapshot.level;
+  // الدرع إنجاز دائم: أول درع عند 20 نقطة، ثم ترقية عند كل 100 نقطة.
+  // لا نسمح لجلسة النمو المؤقتة أن تخفي الدرع الحقيقي المحفوظ.
+  const pointsBasedShieldTier = totalPoints < 20
+    ? -1
+    : Math.min(Math.floor((totalPoints - 20) / 100), shieldNames.length - 1);
+  const displayShieldTier = Math.max(shieldTier, pointsBasedShieldTier);
   const treeStage = getTreeStage(growthPoints);
   const nextTreeStage = treeMilestones.find((stage) => stage.points > growthPoints);
   const treeProgress = nextTreeStage
@@ -537,7 +543,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="relative mt-3 h-[14.5rem] overflow-hidden rounded-2xl border p-3 text-right" style={{ borderColor: `${theme.colors.primary}30`, backgroundColor: `${theme.colors.primary}08` }}>
             <div className="absolute right-3 top-3">
-              <LevelShield level={shieldTier} />
+              <LevelShield level={displayShieldTier} />
             </div>
             <div className="absolute left-7 top-6 flex h-44 w-16 flex-col items-center">
               <span className="mb-2 whitespace-nowrap text-sm font-black leading-none" style={{ color: theme.colors.primary }}>
