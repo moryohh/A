@@ -99,8 +99,36 @@ const ShieldArtwork: React.FC<{ tier: number; compact?: boolean }> = ({ tier, co
 const LevelShield: React.FC<{ level: number }> = ({ level }) => {
   const safeLevel = Math.min(Math.max(level, -1), 7);
   if (safeLevel < 0) return <div className="flex h-48 w-52 flex-col items-center justify-center text-center" aria-label="لا يوجد درع بعد"><div className="h-28 w-24 rounded-[42%] border-4 border-dashed border-slate-300 bg-slate-100/70 opacity-65"/><p className="mt-2 text-xs font-black text-slate-500">لا يوجد درع بعد</p><p className="text-[10px] font-bold text-slate-400">اجمع 20 نقطة لتحصل على الخشبي</p></div>;
-  const shields=Array.from({length:safeLevel+1},(_,index)=>index);
-  return <div className="relative h-48 w-52 shrink-0" aria-label={shieldNames[safeLevel]}>{shields.map((item)=>{const current=item===safeLevel,distance=safeLevel-item;return <div key={item} className="absolute top-0" style={{right:current?'1px':`${22+distance*16}px`,zIndex:item+1,opacity:current?1:Math.max(.62,.9-distance*.08),transform:`scale(${current?1.12:Math.max(.68,.95-distance*.1)}) rotate(${current?0:-distance*7}deg)`,transformOrigin:'center bottom'}}><ShieldArtwork tier={item}/></div>})}</div>;
+  const shields = Array.from({ length: safeLevel + 1 }, (_, index) => index);
+  const getSlot = (item: number) => {
+    const distance = safeLevel - item;
+    if (distance === 0) return 0;
+    const spread = 31 + Math.floor((distance - 1) / 2) * 28;
+    return distance % 2 === 1 ? -spread : spread;
+  };
+  return (
+    <div className="relative h-48 w-64 shrink-0" aria-label={shieldNames[safeLevel]}>
+      {shields.map((item) => {
+        const current = item === safeLevel;
+        const slot = getSlot(item);
+        return (
+          <div
+            key={item}
+            className="absolute top-3"
+            style={{
+              left: `calc(50% + ${slot}px)`,
+              zIndex: current ? 20 : 10 - Math.abs(slot),
+              opacity: current ? 1 : 0.9,
+              transform: `translateX(-50%) scale(${current ? 1.08 : 0.58}) rotate(${current ? 0 : slot < 0 ? -7 : 7}deg)`,
+              transformOrigin: 'center bottom',
+            }}
+          >
+            <ShieldArtwork tier={item} />
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number }> = ({ points, animate, progress }) => {
