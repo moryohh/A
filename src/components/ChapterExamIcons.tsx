@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BookOpenCheck, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, Shuffle, X } from 'lucide-react';
-import { chooseRandomExam, CurriculumExamRecord, fetchChapterExamBank } from '../services/examBankService';
+import { Award, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'lucide-react';
+import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
 
@@ -965,10 +965,36 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
   );
 };
 
+const ExamSatellite = ({ loading }: { loading: boolean }) => (
+  <span className="relative block h-24 w-28" aria-hidden="true">
+    <span className="absolute inset-x-2 top-1/2 h-12 -translate-y-1/2 rounded-full bg-sky-400/20 blur-xl" />
+    <span className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-center motion-safe:animate-[satelliteFloat_2.8s_ease-in-out_infinite]">
+      <svg viewBox="0 0 150 82" className="h-16 w-28 drop-shadow-[0_8px_12px_rgba(56,189,248,.45)]">
+        <rect x="58" y="27" width="34" height="28" rx="7" fill="#f8fafc" stroke="#38bdf8" strokeWidth="4" />
+        <circle cx="75" cy="41" r="8" fill={loading ? '#fbbf24' : '#0ea5e9'} />
+        <path d="M58 32 42 19M92 32l16-13" stroke="#e2e8f0" strokeWidth="4" />
+        <path d="M8 20h36v42H8zM106 20h36v42h-36z" fill="#2563eb" stroke="#7dd3fc" strokeWidth="3" />
+        <path d="M20 20v42M32 20v42M118 20v42M130 20v42M8 34h36M8 48h36M106 34h36M106 48h36" stroke="#bae6fd" strokeWidth="2" />
+        <path d="M75 27V14" stroke="#f8fafc" strokeWidth="4" /><circle cx="75" cy="10" r="5" fill="#fbbf24" />
+      </svg>
+    </span>
+    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-lg border border-amber-200 bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950 shadow-lg">امتحان</span>
+  </span>
+);
+
+function ministryExamLabel(exam: CurriculumExamIndexRecord, index: number) {
+  const source = `${exam.title || ''} ${exam.source_file || ''}`.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  const year = source.match(/(?:19|20)\d{2}/)?.[0];
+  const roundMatch = source.match(/(?:الدور|دور|round)[\s_-]*(الأول|الثاني|الثالث|1|2|3)/i)?.[1];
+  const round = roundMatch === '1' ? 'الأول' : roundMatch === '2' ? 'الثاني' : roundMatch === '3' ? 'الثالث' : roundMatch || 'الأول';
+  return year ? `سنة ${year} — الدور ${round}` : `نموذج وزاري ${index + 1} — الدور ${round}`;
+}
+
 export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate }) => {
-  const [monthly, setMonthly] = useState<CurriculumExamRecord[]>([]);
-  const [ministry, setMinistry] = useState<CurriculumExamRecord[]>([]);
+  const [monthly, setMonthly] = useState<CurriculumExamIndexRecord[]>([]);
+  const [ministry, setMinistry] = useState<CurriculumExamIndexRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
+  const [selectedKind, setSelectedKind] = useState<'monthly' | 'ministry'>('monthly');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -1000,20 +1026,26 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
     }
   };
 
-  const readableExams = (exams: CurriculumExamRecord[]) => exams.filter((exam) => questionEntries(exam.payload).length > 0);
-
-  const openRandomExam = (exams: CurriculumExamRecord[]) => {
-    const randomExam = chooseRandomExam(readableExams(exams));
-    if (randomExam) {
-      setSelected(randomExam);
+  const openSelectedExam = async (exam: CurriculumExamIndexRecord) => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const fullExam = await fetchExamById(exam.id);
+      if (questionEntries(fullExam.payload).length === 0) throw new Error('Unreadable exam');
+      setSelectedKind(exam.exam_type);
+      setSelected(fullExam);
       setIsPickerOpen(false);
+    } catch {
+      setLoadError('تعذر تحميل هذا الامتحان. حاول مرة أخرى.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const renderExamColumn = (
     title: string,
     description: string,
-    exams: CurriculumExamRecord[],
+    exams: CurriculumExamIndexRecord[],
     emptyMessage: string,
     accentClass: string,
   ) => (
@@ -1022,12 +1054,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
         <p className={`text-[11px] font-black ${accentClass}`}>{description}</p>
         <h3 className="text-lg font-black text-white">{title}</h3>
       </div>
-      {readableExams(exams).length > 0 && (
-        <button type="button" onClick={() => openRandomExam(exams)} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 p-3 text-xs font-black text-slate-950 transition hover:bg-amber-300">
-          <Shuffle className="h-4 w-4" />
-          اختيار عشوائي
-        </button>
-      )}
+      <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white/80">{exams.length} امتحان متاح</div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
         {isLoading ? (
           <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">جاري تحميل الامتحانات...</p>
@@ -1035,26 +1062,19 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
           <p className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4 text-center text-xs font-bold leading-6 text-red-100">{loadError}</p>
         ) : exams.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">{emptyMessage}</p>
-        ) : exams.map((exam) => {
-          const questionCount = questionEntries(exam.payload).length;
-          const isReadable = questionCount > 0;
+        ) : exams.map((exam, index) => {
+          const displayName = exam.exam_type === 'monthly' ? `الامتحان ${index + 1}` : ministryExamLabel(exam, index);
           return (
             <button
               key={exam.id}
               type="button"
-              onClick={() => {
-                if (!isReadable) return;
-                setSelected(exam);
-                setIsPickerOpen(false);
-              }}
-              disabled={!isReadable}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => openSelectedExam(exam)}
+              disabled={isLoading}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:border-sky-300/50 hover:bg-sky-500/15 disabled:opacity-45"
             >
               <span className="min-w-0">
-                <span className="block truncate text-xs font-black leading-6 text-white">{exam.title}</span>
-                <span className="block text-[10px] font-bold text-white/55">
-                  {isReadable ? `${questionCount} سؤال` : 'صيغة غير مقروءة'}
-                </span>
+                <span className="block truncate text-xs font-black leading-6 text-white">{displayName}</span>
+                <span className="block text-[10px] font-bold text-white/55">اضغط لتحميل هذا الامتحان فقط</span>
               </span>
               <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
             </button>
@@ -1066,13 +1086,10 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
 
   return (
     <>
-      <div className={`${className || 'absolute left-3 top-3'} z-40 flex items-center gap-2`} dir="rtl">
-        <button type="button" onClick={openExamPicker} disabled={isLoading} className="group flex items-center gap-2 rounded-2xl border border-amber-200/50 bg-amber-400 px-3 py-2 text-right text-[11px] font-black text-slate-950 shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label={`الامتحان الشهري للفصل ${chapterNumber}`}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
-          <span>الامتحان الشهري</span>
-        </button>
-        <button type="button" onClick={openExamPicker} disabled={isLoading} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-200/50 bg-sky-500 text-white shadow-xl transition hover:scale-[1.03] disabled:opacity-60" aria-label="الامتحانات الوزارية">
-          <Award className="h-5 w-5" />
+      <div className={`${className || 'absolute left-3 top-3'} z-40`} dir="rtl">
+        <style>{`@keyframes satelliteFloat{0%,100%{transform:translateY(-5px) rotate(-2deg)}50%{transform:translateY(7px) rotate(2deg)}}`}</style>
+        <button type="button" onClick={openExamPicker} disabled={isLoading} className="group rounded-3xl transition hover:scale-105 disabled:opacity-60" aria-label={`فتح فهرس امتحانات الفصل ${chapterNumber}`}>
+          <ExamSatellite loading={isLoading} />
         </button>
       </div>
 
@@ -1108,7 +1125,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
           </div>
         </div>
       )}
-      {selected && <ExamPreview exam={selected} subjectName={subjectName} examKind={ministry.some((exam) => exam.id === selected.id) ? 'ministry' : 'monthly'} onScoreUpdate={onScoreUpdate} onClose={() => setSelected(null)} />}
+      {selected && <ExamPreview exam={selected} subjectName={subjectName} examKind={selectedKind} onScoreUpdate={onScoreUpdate} onClose={() => setSelected(null)} />}
     </>
   );
 };

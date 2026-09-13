@@ -14,14 +14,16 @@ export interface CurriculumExamRecord {
   payload: Record<string, unknown>;
 }
 
+export type CurriculumExamIndexRecord = Omit<CurriculumExamRecord, 'payload'>;
+
 export async function fetchChapterExamBank(
   subjectId: string,
   chapterNumber: number,
-): Promise<{ monthly: CurriculumExamRecord[]; ministry: CurriculumExamRecord[] }> {
+): Promise<{ monthly: CurriculumExamIndexRecord[]; ministry: CurriculumExamIndexRecord[] }> {
   const [monthlyResult, ministryResult] = await Promise.all([
     supabase
       .from('curriculum_exam_bank')
-      .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status,payload')
+      .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
       .eq('subject_id', subjectId)
       .eq('exam_type', 'monthly')
       .eq('chapter_number', chapterNumber)
@@ -29,7 +31,7 @@ export async function fetchChapterExamBank(
       .limit(200),
     supabase
       .from('curriculum_exam_bank')
-      .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status,payload')
+      .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
       .eq('subject_id', subjectId)
       .eq('exam_type', 'ministry')
       .order('title')
@@ -40,12 +42,17 @@ export async function fetchChapterExamBank(
   if (ministryResult.error) throw ministryResult.error;
 
   return {
-    monthly: (monthlyResult.data || []) as CurriculumExamRecord[],
-    ministry: (ministryResult.data || []) as CurriculumExamRecord[],
+    monthly: (monthlyResult.data || []) as CurriculumExamIndexRecord[],
+    ministry: (ministryResult.data || []) as CurriculumExamIndexRecord[],
   };
 }
 
-export function chooseRandomExam(exams: CurriculumExamRecord[]): CurriculumExamRecord | null {
-  if (exams.length === 0) return null;
-  return exams[Math.floor(Math.random() * exams.length)] || null;
+export async function fetchExamById(examId: string): Promise<CurriculumExamRecord> {
+  const { data, error } = await supabase
+    .from('curriculum_exam_bank')
+    .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status,payload')
+    .eq('id', examId)
+    .single();
+  if (error) throw error;
+  return data as CurriculumExamRecord;
 }
