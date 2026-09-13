@@ -157,6 +157,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
         @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
         @keyframes treeSwaySoft { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
         @keyframes pointFly { 0% { transform: translate(42px, 42px) scale(.55); opacity:0; } 25% { opacity:1; } 100% { transform: translate(-18px, -42px) scale(1); opacity:0; } }
+        @keyframes collectPulse { 0%, 100% { opacity:.35; transform:scale(.96); } 50% { opacity:1; transform:scale(1.04); } }
         @keyframes rewardToTree { 0% { transform: translate(0, 0) scale(.75); opacity:0; } 18% { opacity:1; } 100% { transform: translate(-105px, 38px) scale(1.15); opacity:0; } }
         @keyframes leafPulse { 0%, 100% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); } 50% { filter: drop-shadow(0 0 10px rgba(34,197,94,.55)); } }
       `}</style>
@@ -607,14 +608,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       <button
                         type="button"
                         onClick={handleCollectPoints}
-                        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-lg transition-transform active:scale-90"
+                        className="animate-[collectPulse_1.4s_ease-in-out_infinite] rounded-2xl px-4 py-3 text-base font-black text-cyan-700 transition-transform active:scale-95 dark:text-cyan-300"
                         aria-label={`جمع ${pendingGrowthPoints} نقطة`}
                         title={`جمع ${pendingGrowthPoints} نقطة`}
                       >
-                        <Sparkles className="h-8 w-8" strokeWidth={2.2} />
-                        <span className="absolute -right-2 -top-2 rounded-full border-2 border-white bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-white shadow">+{pendingGrowthPoints}</span>
+                        جمع النقاط <span className="text-amber-500">+{pendingGrowthPoints}</span>
                       </button>
-                      <span className="text-[10px] font-black text-cyan-700 dark:text-cyan-300">جمع النقاط</span>
                     </div>
                   )}
                   <div className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-amber-200/60 bg-amber-50/75 px-2.5 py-1.5 text-[10px] font-black text-amber-700">
