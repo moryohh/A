@@ -65,6 +65,7 @@ import {
   addCommunityComment,
   reportCommunityPost,
   updateUserProfileData,
+  fetchCommunityMemberProfile,
 } from './services/communityService';
 import { fetchUnreadMessageCount, markAllMessagesRead } from './services/messengerService';
 import { getSupabaseClient } from './lib/supabase';
@@ -302,6 +303,14 @@ function AppContent() {
     setIsMessengerOpen(true);
     setUnreadMessageCount(0);
     if (currentUser) markAllMessagesRead(currentUser).catch(() => undefined);
+  };
+
+  const openCommunityProfile = async (member: CommunityMember) => {
+    setCommunityProfileMember(member);
+    if (!member.isDemoAccount) {
+      const realProfile = await fetchCommunityMemberProfile(member);
+      setCommunityProfileMember((current) => current?.id === member.id ? realProfile : current);
+    }
   };
 
   // Modals & Drawers state
@@ -1222,7 +1231,7 @@ function AppContent() {
         onClose={() => setCommunityAccountActionsMember(null)}
         onVisitProfile={(member) => {
           setCommunityAccountActionsMember(null);
-          setCommunityProfileMember(member);
+          openCommunityProfile(member);
         }}
         onMessage={(member) => {
           setCommunityAccountActionsMember(null);
@@ -1247,6 +1256,11 @@ function AppContent() {
         currentUser={currentUser}
         initialContact={messengerContact}
         onUnreadCountChange={setUnreadMessageCount}
+        onOpenProfile={(member) => {
+          setIsMessengerOpen(false);
+          setMessengerContact(null);
+          openCommunityProfile(member);
+        }}
       />
 
       <NotificationsModal

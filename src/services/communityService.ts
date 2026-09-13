@@ -1,7 +1,8 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { getSupabaseAccessToken } from './authService';
-import { CommunityPost, CommunityComment, UserProfile } from '../types';
+import { CommunityPost, CommunityComment, CommunityMember, UserProfile } from '../types';
 import { getCommunityBotAccount } from '../data/demoCommunityAccounts';
+import { getLevelSnapshot } from './pointsService';
 
 const LOCAL_STORAGE_POSTS_KEY = 'nahn_maak_community_posts_v2';
 const LOCAL_STORAGE_LIKES_KEY = 'nahn_maak_user_liked_posts_v2';
@@ -367,6 +368,35 @@ export async function updateUserProfileData(
     console.warn('Error updating user profile in Supabase:', err);
   }
   return null;
+}
+
+export async function fetchCommunityMemberProfile(member: CommunityMember): Promise<CommunityMember> {
+  if (!member.id || member.isDemoAccount) return member;
+  const client = getSupabaseClient();
+  if (!client) return member;
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .select('id,full_name,avatar_url,level,points,study_hours,streak_days,growth_shield_tier')
+      .eq('id', member.id)
+      .maybeSingle();
+    if (error || !data) return member;
+    const points = Number(data.points ?? 0);
+    return {
+      ...member,
+      name: data.full_name || member.name,
+      avatarUrl: data.avatar_url || member.avatarUrl,
+      level: Number(data.level ?? 1),
+      points,
+      progress: getLevelSnapshot(points).progressPercent,
+      studyHours: Number(data.study_hours ?? 0),
+      streakDays: Number(data.streak_days ?? 0),
+      shieldTier: Number(data.growth_shield_tier ?? -1),
+      hasRealProfileData: true,
+    };
+  } catch {
+    return member;
+  }
 }
 
 /**

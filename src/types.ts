@@ -74,6 +74,10 @@ export interface CommunityMember {
   progress?: number;
   isDemoAccount?: boolean;
   bio?: string;
+  studyHours?: number;
+  streakDays?: number;
+  shieldTier?: number;
+  hasRealProfileData?: boolean;
 }
 
 export interface CommunityPost {

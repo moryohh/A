@@ -20,6 +20,7 @@ interface MessengerModalProps {
   currentUser: UserProfile | null;
   initialContact: CommunityMember | null;
   onUnreadCountChange?: (count: number) => void;
+  onOpenProfile?: (member: CommunityMember) => void;
 }
 
 const Avatar: React.FC<{ member: CommunityMember; size?: 'sm' | 'lg' }> = ({ member, size = 'sm' }) => {
@@ -33,6 +34,7 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
   currentUser,
   initialContact,
   onUnreadCountChange,
+  onOpenProfile,
 }) => {
   const { theme } = useAppTheme();
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
@@ -166,13 +168,13 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
             </button>
           ) : <div className="h-10 w-10" />}
 
-          <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+          <button type="button" disabled={!activeContact || !onOpenProfile} onClick={() => activeContact && onOpenProfile?.(activeContact)} className="flex min-w-0 flex-1 items-center justify-center gap-2 disabled:cursor-default" aria-label={activeContact ? `زيارة صفحة ${activeContact.name}` : 'المحادثات'}>
             {activeContact ? <Avatar member={activeContact} /> : <MessageCircle className="h-6 w-6 text-sky-400" />}
             <div className="min-w-0 text-right">
               <h2 className={`truncate text-base font-black ${theme.classes.textMain}`}>{activeContact?.name || 'Messenger'}</h2>
               <p className={`text-[10px] ${theme.classes.textMuted}`}>{activeContact ? 'محادثة خاصة' : 'محادثاتك الخاصة'}</p>
             </div>
-          </div>
+          </button>
 
           <button type="button" onClick={onClose} className={`flex h-10 w-10 items-center justify-center rounded-full border active:scale-95 ${theme.classes.cardBorder} ${theme.classes.cardSubtleBg}`} aria-label="إغلاق Messenger">
             <X className="h-5 w-5" />
