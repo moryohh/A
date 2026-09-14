@@ -143,7 +143,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const rewardIssuedRef = useRef(false);
-  const aiAttemptRef = useRef(0);
 
   // Initialize or re-sync config & shuffle questions
   useEffect(() => {
@@ -284,10 +283,8 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
 
     setIsAiThinking(true);
     const timer = window.setTimeout(() => {
-      const attemptIndex = aiAttemptRef.current;
       const probabilitySequence = [0.25, 0.5, 0.75, 1, 0, 0.5];
-      const correctProbability = probabilitySequence[attemptIndex] ?? 0.5;
-      aiAttemptRef.current += 1;
+      const correctProbability = probabilitySequence[Math.floor(Math.random() * probabilitySequence.length)] ?? 0.5;
       const wrongCards = activeCards.filter((card) => card.number !== currentQ.correctCardNumber);
       const shouldAnswerCorrectly = Math.random() < correctProbability || wrongCards.length === 0;
       const chosenCard = shouldAnswerCorrectly
@@ -512,7 +509,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     setSoloScore(0);
     setActiveTurn('user1');
     setIsAiThinking(false);
-    aiAttemptRef.current = 0;
     setTimeLeft(25);
     setIsFinished(false);
     setCelebrationBurst(null);
