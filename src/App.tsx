@@ -355,6 +355,96 @@ function AppContent() {
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const hardwareBackStateRef = React.useRef({
+    activeTab,
+    homeSubView,
+    selectedStory,
+    isAttachmentOpen,
+    isCommentsOpen,
+    isNotificationsOpen,
+    isTeacherInfoOpen,
+    isGamesOpen,
+    isDailyExamOpen,
+    isCreatePostOpen,
+    activeCommunityPostForComments,
+    isMessengerOpen,
+    communityProfileMember,
+    communityAccountActionsMember,
+    activeExamResult,
+  });
+  hardwareBackStateRef.current = {
+    activeTab,
+    homeSubView,
+    selectedStory,
+    isAttachmentOpen,
+    isCommentsOpen,
+    isNotificationsOpen,
+    isTeacherInfoOpen,
+    isGamesOpen,
+    isDailyExamOpen,
+    isCreatePostOpen,
+    activeCommunityPostForComments,
+    isMessengerOpen,
+    communityProfileMember,
+    communityAccountActionsMember,
+    activeExamResult,
+  };
+
+  // Make Android's system Back button unwind the in-app UI before leaving the site.
+  React.useEffect(() => {
+    const rootState = { ...(window.history.state || {}), nahnuMaakRoot: true };
+    window.history.replaceState(rootState, '', window.location.href);
+    window.history.pushState({ ...rootState, nahnuMaakGuard: true }, '', window.location.href);
+
+    const restoreGuard = () => {
+      window.history.pushState({ ...rootState, nahnuMaakGuard: true }, '', window.location.href);
+    };
+
+    const closeTopLayer = () => {
+      const state = hardwareBackStateRef.current;
+      if (state.activeExamResult) { setActiveExamResult(null); return true; }
+      if (state.isNotificationsOpen) { setIsNotificationsOpen(false); return true; }
+      if (state.isMessengerOpen) { setIsMessengerOpen(false); setMessengerContact(null); return true; }
+      if (state.communityProfileMember) { setCommunityProfileMember(null); return true; }
+      if (state.communityAccountActionsMember) { setCommunityAccountActionsMember(null); return true; }
+      if (state.activeCommunityPostForComments) { setActiveCommunityPostForComments(null); return true; }
+      if (state.isCreatePostOpen) { setIsCreatePostOpen(false); return true; }
+      if (state.isDailyExamOpen) { setIsDailyExamOpen(false); return true; }
+      if (state.isGamesOpen) { setIsGamesOpen(false); return true; }
+      if (state.isAttachmentOpen) { setIsAttachmentOpen(false); setActiveAttachment(null); return true; }
+      if (state.isCommentsOpen) { setIsCommentsOpen(false); return true; }
+      if (state.selectedStory) { setSelectedStory(null); return true; }
+      if (state.isTeacherInfoOpen) { setIsTeacherInfoOpen(false); return true; }
+      if (state.activeTab === 'home' && state.homeSubView === 'lesson_player') {
+        setHomeSubView('learning_path');
+        return true;
+      }
+      if (state.activeTab === 'home' && state.homeSubView === 'learning_path') {
+        setHomeSubView('main_home');
+        setOpenLessonContext(null);
+        return true;
+      }
+      if (state.activeTab !== 'home') {
+        setActiveTab('home');
+        setHomeSubView('main_home');
+        return true;
+      }
+      return false;
+    };
+
+    const handleHardwareBack = () => {
+      if (closeTopLayer()) {
+        window.setTimeout(restoreGuard, 0);
+      } else {
+        // The app is already at its root; continue to the page visited before it.
+        window.setTimeout(() => window.history.back(), 0);
+      }
+    };
+
+    window.addEventListener('popstate', handleHardwareBack);
+    return () => window.removeEventListener('popstate', handleHardwareBack);
+  }, []);
+
   // Initialize and listen to Auth state (Google OAuth, dev bypass, sessions)
   React.useEffect(() => {
     let isMounted = true;
