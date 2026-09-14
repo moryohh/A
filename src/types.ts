@@ -131,6 +131,28 @@ export interface EducationalLesson {
   teacherStories?: TeacherStory[];
 }
 
+export interface NotificationExamAnswer {
+  label: string;
+  prompt?: string;
+  userAnswer?: string;
+  modelAnswer?: string;
+  score?: number;
+  maxScore?: number;
+  status?: 'correct' | 'partial' | 'wrong' | 'ungraded';
+  feedback?: string;
+}
+
+export interface NotificationExamResult {
+  title: string;
+  subject?: string;
+  completedAt?: string;
+  score?: number;
+  totalScore?: number;
+  percentage?: number;
+  summary?: string;
+  answers: NotificationExamAnswer[];
+}
+
 export interface AppNotification {
   id: string;
   title: string;
@@ -138,6 +160,15 @@ export interface AppNotification {
   time: string;
   isRead: boolean;
   type: 'lesson' | 'attachment' | 'system' | 'community';
+  action?: {
+    kind: 'community-comment' | 'messages' | 'exam-result';
+    postId?: string;
+    commentId?: string;
+    memberId?: string;
+    memberName?: string;
+    memberAvatarUrl?: string;
+    examResult?: NotificationExamResult;
+  };
 }
 
 export interface EducationalGame {
