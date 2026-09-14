@@ -283,7 +283,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
 
     setIsAiThinking(true);
     const timer = window.setTimeout(() => {
-      const probabilitySequence = [0.25, 0.5, 0.75, 1, 0, 0.5];
+      const probabilitySequence = [0.25, 0.5, 0.75, 1, 0, 0.5, 1, 1];
       const correctProbability = probabilitySequence[Math.floor(Math.random() * probabilitySequence.length)] ?? 0.5;
       const wrongCards = activeCards.filter((card) => card.number !== currentQ.correctCardNumber);
       const shouldAnswerCorrectly = Math.random() < correctProbability || wrongCards.length === 0;
