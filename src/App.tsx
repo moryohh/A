@@ -355,6 +355,7 @@ function AppContent() {
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const exitBackDeadlineRef = React.useRef(0);
   const hardwareBackStateRef = React.useRef({
     activeTab,
     homeSubView,
@@ -436,8 +437,15 @@ function AppContent() {
       if (closeTopLayer()) {
         window.setTimeout(restoreGuard, 0);
       } else {
-        // The app is already at its root; continue to the page visited before it.
-        window.setTimeout(() => window.history.back(), 0);
+        const now = Date.now();
+        if (now <= exitBackDeadlineRef.current) {
+          exitBackDeadlineRef.current = 0;
+          window.setTimeout(() => window.history.back(), 0);
+          return;
+        }
+        exitBackDeadlineRef.current = now + 1000;
+        setToastMessage('اضغط زر الرجوع مرة أخرى للخروج');
+        window.setTimeout(restoreGuard, 0);
       }
     };
 
