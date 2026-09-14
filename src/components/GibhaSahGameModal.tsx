@@ -64,7 +64,7 @@ function buildGibhaRound(source: GibhaSahGameConfig): GibhaSahGameConfig {
     return [label.trim(), question] as const;
   })).values()).filter((question) => Boolean(question.answerLabel || source.cards.find((card) => card.number === question.correctCardNumber)?.label));
   if (pool.length === 0) return source;
-  const target = 9;
+  const target = 10;
   const selected = shuffleArray(pool).slice(0, target);
   const cards: GibhaSahCard[] = selected.map((question, idx) => ({
     id: idx + 1,
