@@ -393,12 +393,22 @@ function AppContent() {
 
   // Make Android's system Back button unwind the in-app UI before leaving the site.
   React.useEffect(() => {
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
     const rootState = { ...(window.history.state || {}), nahnuMaakRoot: true };
-    window.history.replaceState(rootState, '', window.location.href);
-    window.history.pushState({ ...rootState, nahnuMaakGuard: true }, '', window.location.href);
+    window.history.replaceState(rootState, '', cleanUrl);
+    window.history.pushState(
+      { ...rootState, nahnuMaakGuard: true },
+      '',
+      `${cleanUrl}#nahnu-maak-app`,
+    );
 
     const restoreGuard = () => {
-      window.history.pushState({ ...rootState, nahnuMaakGuard: true }, '', window.location.href);
+      // Restore synchronously: Android may close a standalone PWA before a delayed callback runs.
+      window.history.pushState(
+        { ...rootState, nahnuMaakGuard: true },
+        '',
+        `${cleanUrl}#nahnu-maak-app`,
+      );
     };
 
     const closeTopLayer = () => {
@@ -435,17 +445,18 @@ function AppContent() {
 
     const handleHardwareBack = () => {
       if (closeTopLayer()) {
-        window.setTimeout(restoreGuard, 0);
+        restoreGuard();
       } else {
         const now = Date.now();
         if (now <= exitBackDeadlineRef.current) {
           exitBackDeadlineRef.current = 0;
-          window.setTimeout(() => window.history.back(), 0);
+          window.removeEventListener('popstate', handleHardwareBack);
+          window.history.go(-2);
           return;
         }
         exitBackDeadlineRef.current = now + 1000;
         setToastMessage('اضغط زر الرجوع مرة أخرى للخروج');
-        window.setTimeout(restoreGuard, 0);
+        restoreGuard();
       }
     };
 
