@@ -239,7 +239,6 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                     {course.featured && <BadgePercent className="h-4 w-4" style={{ color: theme.colors.secondary }} />}
                     <h2 className={`text-base font-black leading-7 sm:text-lg ${theme.classes.textMain}`}>{course.title}</h2>
                   </div>
-                  <p className={`text-xs leading-5 ${theme.classes.textMuted}`}>{course.description}</p>
                 </div>
               </div>
 
