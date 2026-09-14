@@ -16,6 +16,8 @@ import {
   OpenLessonContext,
   LearningPosition,
   CompetitionSnapshot,
+  NotificationExamAnswer,
+  NotificationExamResult,
 } from './types';
 import { Header } from './components/Header';
 import { StoriesSection } from './components/StoriesSection';
@@ -24,6 +26,7 @@ import { VideoPlayerCard } from './components/VideoPlayerCard';
 import { AttachmentModal } from './components/AttachmentModal';
 import { CommentsDrawer } from './components/CommentsDrawer';
 import { NotificationsModal } from './components/NotificationsModal';
+import { ExamResultDetailsModal } from './components/ExamResultDetailsModal';
 import { TeacherInfoModal } from './components/TeacherInfoModal';
 import { BottomNav, NavTab } from './components/BottomNav';
 import { SubscriptionsView } from './components/SubscriptionsView';
@@ -214,6 +217,7 @@ function AppContent() {
   const [communityProfileMember, setCommunityProfileMember] = useState<CommunityMember | null>(null);
   const [communityAccountActionsMember, setCommunityAccountActionsMember] = useState<CommunityMember | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [activeExamResult, setActiveExamResult] = useState<NotificationExamResult | null>(null);
 
   // Load Community posts and stories from Supabase on startup and when user changes
   React.useEffect(() => {
@@ -237,6 +241,11 @@ function AppContent() {
                   time: comment.timeAgo,
                   isRead: false,
                   type: 'community' as const,
+                  action: {
+                    kind: 'community-comment' as const,
+                    postId: post.id,
+                    commentId: comment.id,
+                  },
                 }))
               : []
           ));
@@ -263,7 +272,25 @@ function AppContent() {
     if (!client) return;
     const channel = client
       .channel(`message-badge-${currentUser.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `recipient_id=eq.${currentUser.id}` }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `recipient_id=eq.${currentUser.id}` }, (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        const senderId = String(row.sender_id || '');
+        const senderName = String(row.sender_name || 'مرسل جديد');
+        const notification: AppNotification = {
+          id: `direct-message-${String(row.id || Date.now())}`,
+          title: `رسالة جديدة من ${senderName}`,
+          message: String(row.body || 'أرسل لك رسالة جديدة'),
+          time: 'الآن',
+          isRead: false,
+          type: 'community',
+          action: {
+            kind: 'messages',
+            memberId: senderId || undefined,
+            memberName: senderName,
+            memberAvatarUrl: typeof row.sender_avatar_url === 'string' ? row.sender_avatar_url : undefined,
+          },
+        };
+        setNotifications((previous) => [notification, ...previous.filter((item) => item.id !== notification.id)].slice(0, 50));
         fetchUnreadMessageCount(currentUser).then(setUnreadMessageCount).catch(() => undefined);
       })
       .subscribe();
@@ -290,6 +317,7 @@ function AppContent() {
       time: 'الآن',
       isRead: false,
       type: 'community',
+      action: { kind: 'messages' },
     };
     setNotifications((previous) => [
       messageNotification,
@@ -591,6 +619,7 @@ function AppContent() {
     subject: string;
     lessonTitle: string;
     completedAt: string;
+    answers?: NotificationExamAnswer[];
   }) => {
     const completedDate = new Date(result.completedAt).toLocaleDateString('ar-IQ', {
       year: 'numeric',
@@ -604,6 +633,19 @@ function AppContent() {
       time: 'الآن',
       isRead: false,
       type: 'system',
+      action: {
+        kind: 'exam-result',
+        examResult: {
+          title: 'نتيجة الامتحان اليومي',
+          subject: `${result.subject} — ${result.lessonTitle}`,
+          completedAt: result.completedAt,
+          score: result.score,
+          totalScore: result.totalScore,
+          percentage: result.percentage,
+          summary: `أكملت الامتحان بتاريخ ${completedDate}`,
+          answers: result.answers || [],
+        },
+      },
     };
     setNotifications((previous) => [
       notification,
@@ -619,6 +661,7 @@ function AppContent() {
         title: string;
         message: string;
         submittedAt: string;
+        examResult?: NotificationExamResult;
       }>).detail;
       if (!detail?.id || !detail.message) return;
       const notification: AppNotification = {
@@ -628,6 +671,15 @@ function AppContent() {
         time: 'الآن',
         isRead: false,
         type: 'system',
+        action: {
+          kind: 'exam-result',
+          examResult: detail.examResult || {
+            title: detail.title || 'نتيجة الامتحان',
+            completedAt: detail.submittedAt,
+            summary: detail.message,
+            answers: [],
+          },
+        },
       };
       setNotifications((previous) => [
         notification,
@@ -880,6 +932,40 @@ function AppContent() {
   const handleMarkAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     showToast('تم تحديد جميع الإشعارات كأنها قُرئت');
+  };
+
+  const handleOpenNotification = (notification: AppNotification) => {
+    setNotifications((previous) => previous.map((item) => (
+      item.id === notification.id ? { ...item, isRead: true } : item
+    )));
+    setIsNotificationsOpen(false);
+    const action = notification.action;
+    if (!action) return;
+
+    if (action.kind === 'community-comment' && action.postId) {
+      const post = communityPosts.find((item) => item.id === action.postId);
+      if (post) {
+        setActiveTab('community');
+        setActiveCommunityPostForComments(post);
+      } else {
+        showToast('تعذر العثور على المنشور؛ ربما تم حذفه');
+      }
+      return;
+    }
+
+    if (action.kind === 'messages') {
+      const member = action.memberId ? {
+        id: action.memberId,
+        name: action.memberName || 'مرسل جديد',
+        avatarUrl: action.memberAvatarUrl,
+      } : null;
+      openMessenger(member);
+      return;
+    }
+
+    if (action.kind === 'exam-result' && action.examResult) {
+      setActiveExamResult(action.examResult);
+    }
   };
 
   // Community Handlers
@@ -1268,6 +1354,12 @@ function AppContent() {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         onMarkAllAsRead={handleMarkAllNotificationsRead}
+        onOpenNotification={handleOpenNotification}
+      />
+
+      <ExamResultDetailsModal
+        result={activeExamResult}
+        onClose={() => setActiveExamResult(null)}
       />
 
       <TeacherInfoModal
