@@ -117,6 +117,50 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
   }, [isOpen, currentUser?.id, activeContact?.id, openConversation, refreshSummaries]);
 
   useEffect(() => {
+    if (!isOpen || !currentUser?.id || !activeContact?.id || activeContact.isDemoAccount) return;
+
+    let cancelled = false;
+    let inFlight = false;
+    const pollMessages = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const loaded = await fetchDirectMessages(currentUser, activeContact.id);
+        if (cancelled) return;
+        const hasUnreadIncoming = loaded.some(
+          (message) => message.recipientId === currentUser.id && !message.readAt,
+        );
+        setMessages((previous) => {
+          const previousLast = previous[previous.length - 1];
+          const loadedLast = loaded[loaded.length - 1];
+          if (
+            previous.length === loaded.length
+            && previousLast?.id === loadedLast?.id
+            && previousLast?.readAt === loadedLast?.readAt
+          ) {
+            return previous;
+          }
+          return loaded;
+        });
+        if (hasUnreadIncoming) {
+          await markConversationRead(currentUser, activeContact.id);
+          if (!cancelled) await refreshSummaries();
+        }
+      } catch {
+        // Realtime remains the primary path; polling is only a quiet fallback.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = window.setInterval(pollMessages, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isOpen, currentUser, activeContact, refreshSummaries]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, activeContact?.id]);
 
