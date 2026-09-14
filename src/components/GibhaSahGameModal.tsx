@@ -50,12 +50,14 @@ function shuffleArray<T>(array: T[]): T[] {
 
 function buildGibhaRound(source: GibhaSahGameConfig): GibhaSahGameConfig {
   const rawPool = source.questionPool?.length ? source.questionPool : source.questions;
-  const pool = Array.from(new Map(rawPool.map((question) => [question.question.trim(), question])).values());
+  const uniqueQuestions = Array.from(new Map(rawPool.map((question) => [question.question.trim(), question])).values());
+  const pool = Array.from(new Map(uniqueQuestions.map((question) => {
+    const label = question.answerLabel || source.cards.find((card) => card.number === question.correctCardNumber)?.label || '';
+    return [label.trim(), question] as const;
+  })).values()).filter((question) => Boolean(question.answerLabel || source.cards.find((card) => card.number === question.correctCardNumber)?.label));
   if (pool.length === 0) return source;
-  const target = 10;
-  const selected = pool.length > target
-    ? shuffleArray(pool).slice(0, target)
-    : Array.from({ length: target }, (_, idx) => pool[idx % pool.length]);
+  const target = 9;
+  const selected = shuffleArray(pool).slice(0, target);
   const cards: GibhaSahCard[] = selected.map((question, idx) => ({
     id: idx + 1,
     number: idx + 1,
@@ -309,10 +311,11 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   };
 
   // Execute answer confirmation
-  const handleConfirmAnswer = () => {
-    if (selectedCardId === null || !currentQ || feedbackStatus !== 'idle') return;
+  const handleConfirmAnswer = (directCardId?: number) => {
+    const chosenCardId = directCardId ?? selectedCardId;
+    if (chosenCardId === null || !currentQ || feedbackStatus !== 'idle') return;
 
-    const isCorrect = selectedCardId === currentQ.correctCardNumber;
+    const isCorrect = chosenCardId === currentQ.correctCardNumber;
     onAssessmentResult?.(isCorrect ? 1 : 0, 1);
     const currentUser = activeTurn === 'user1' ? user1Name : user2Name;
 
@@ -349,13 +352,13 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
         {
           question: currentQ,
           winningUser: gameMode === 'teams' ? currentUser : 'المستخدم',
-          cardNumber: selectedCardId,
+          cardNumber: chosenCardId,
         },
       ]);
 
       // Remove card from board completely to free up space (10 -> 9 -> 8 ...)
       setTimeout(() => {
-        setSolvedCardNumbers((prev) => [...prev, selectedCardId]);
+        setSolvedCardNumbers((prev) => [...prev, chosenCardId]);
         setSelectedCardId(null);
         setFeedbackStatus('idle');
         setFeedbackMessage('');
@@ -597,7 +600,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
                 <User className="h-6 w-6 text-cyan-200" aria-hidden="true" />
               )}
             </div>
-            <span className="hidden text-[10px] font-black text-cyan-100/80 sm:inline">اللاعب</span>
           </div>
         </div>
 
@@ -605,158 +607,19 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
         <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 space-y-3 z-10 custom-scrollbar overscroll-contain">
           {!isFinished ? (
             <>
-              {/* 2. HUD / Players Pods & Timer (Matching Screenshot) */}
-              <div id="hud-players-row" className="grid grid-cols-12 gap-2 sm:gap-3 items-center">
-                {/* Left Card: User 2 (or second player) */}
-                <div
-                  id="user2-hud-card"
-                  onClick={() => {
-                    if (gameMode === 'teams' && feedbackStatus === 'idle') setActiveTurn('user2');
-                  }}
-                  className={`col-span-5 sm:col-span-5 rounded-2xl p-2 sm:p-2.5 transition-all relative border ${
-                    activeTurn === 'user2' && gameMode === 'teams'
-                      ? 'bg-gradient-to-b from-[#0f2d2b] to-[#071917] border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)] scale-[1.02]'
-                      : 'bg-gradient-to-b from-[#102431] to-[#08151f] border-slate-700/80 hover:border-slate-500'
-                  }`}
-                  style={{
-                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 10px rgba(0,0,0,0.5)'
-                  }}
-                >
-                  {/* Top: Edit Name & Status indicator dot */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
-                      {editingPlayer === 'user2' ? (
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="text"
-                            value={tempPlayerName}
-                            onChange={(e) => setTempPlayerName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSavePlayerName()}
-                            autoFocus
-                            className="w-16 bg-black/80 border border-emerald-400 text-white text-[10px] px-1 py-0.5 rounded text-center font-bold"
-                          />
-                          <button
-                            onClick={handleSavePlayerName}
-                            className="text-emerald-400 hover:text-emerald-300"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-black text-emerald-300 line-clamp-1 max-w-[75px]">
-                            {user2Name}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartEditName('user2');
-                            }}
-                            className="text-gray-400 hover:text-emerald-300 p-0.5"
-                            title="تعديل اسم اللاعب"
-                          >
-                            <Edit2 className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Center Score Number */}
-                  <div className="text-center py-0.5">
-                    <span className="text-2xl sm:text-3xl font-black text-white font-mono tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                      {team2Score}
-                    </span>
-                  </div>
-
-                  {/* Bottom Hearts / Lives (Matching Screenshot) */}
-                  <div className="flex items-center justify-center gap-1 mt-0.5">
-                    <span className="text-rose-500 text-xs drop-shadow-[0_0_4px_rgba(244,63,94,0.6)]">❤️</span>
-                    <span className="text-rose-500 text-xs drop-shadow-[0_0_4px_rgba(244,63,94,0.6)]">❤️</span>
-                    <span className="text-rose-500 text-xs drop-shadow-[0_0_4px_rgba(244,63,94,0.6)]">❤️</span>
-                    <span className="text-slate-600 text-xs">🖤</span>
-                  </div>
+              {/* 2. Clean HUD: avatars, hearts, scores and time only. */}
+              <div id="hud-players-row" className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user2')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user2' && gameMode === 'teams' ? 'border-emerald-300 bg-emerald-400/10 shadow-[0_0_18px_rgba(52,211,153,.25)]' : 'border-white/10 bg-white/5'}`}>
+                  <div className="flex items-center justify-center gap-2"><span className="text-4xl" aria-label="الفراولة">🍓</span><strong className="font-mono text-2xl font-black tracking-widest text-white">{String(team2Score).padStart(4, '0')}</strong></div>
+                  <div className="mt-1 text-center text-sm">❤️ ❤️ ❤️</div>
+                </button>
+                <div id="digital-timer-pod" className="rounded-2xl border border-cyan-400/40 bg-slate-950/70 px-3 py-2 text-center shadow-lg">
+                  <span className="font-mono text-xl font-black tracking-wider text-cyan-300">00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}</span>
                 </div>
-
-                {/* Middle Pod: Digital Timer Capsule & Referee Actions */}
-                <div className="col-span-2 sm:col-span-2 flex flex-col items-center justify-center gap-1.5">
-                  {/* Digital Metallic Timer Pod */}
-                  <div
-                    id="digital-timer-pod"
-                    className="px-2 sm:px-3 py-1 rounded-xl bg-gradient-to-b from-[#182d3d] to-[#0a151f] border border-cyan-500/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center gap-1 text-center"
-                  >
-                    <Clock className="w-3 h-3 text-cyan-400" />
-                    <span className="font-mono font-black text-xs sm:text-sm text-cyan-300">
-                      00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-                    </span>
-                  </div>
-
-                  {/* Action / Referee Check Buttons */}
-                  <div className="flex items-center gap-1">
-                    {/* Checkmark Button (Correct) */}
-                    <button
-                      id="referee-btn-correct"
-                      disabled={feedbackStatus !== 'idle'}
-                      onClick={() => handleJudgeAnswer(true)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-b from-[#163c32] to-[#0d231d] border border-emerald-400/60 text-emerald-300 hover:text-emerald-200 flex items-center justify-center shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-transform active:scale-90 disabled:opacity-40 cursor-pointer"
-                      title="احتساب صح وحذف البطاقة"
-                    >
-                      <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 stroke-[3]" />
-                    </button>
-
-                    {/* Cross Button (Wrong / Rotate to Back) */}
-                    <button
-                      id="referee-btn-wrong"
-                      disabled={feedbackStatus !== 'idle'}
-                      onClick={() => handleJudgeAnswer(false)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-b from-[#3a1d25] to-[#221016] border border-rose-400/60 text-rose-300 hover:text-rose-200 flex items-center justify-center shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-transform active:scale-90 disabled:opacity-40 cursor-pointer"
-                      title="احتساب خطأ ونقل السؤال لآخر السلسلة"
-                    >
-                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 stroke-[3]" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Right Card: Doctor / Teacher / User 1 Avatar Card (Matching Screenshot) */}
-                <div
-                  id="user1-hud-card"
-                  onClick={() => {
-                    if (gameMode === 'teams' && feedbackStatus === 'idle') setActiveTurn('user1');
-                  }}
-                  className={`col-span-5 sm:col-span-5 rounded-2xl p-1.5 sm:p-2 transition-all relative border overflow-hidden ${
-                    activeTurn === 'user1' && gameMode === 'teams'
-                      ? 'bg-gradient-to-b from-[#152e44] to-[#0b1c2b] border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.35)] scale-[1.02]'
-                      : 'bg-gradient-to-b from-[#102431] to-[#08151f] border-slate-700/80 hover:border-slate-500'
-                  }`}
-                  style={{
-                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 10px rgba(0,0,0,0.5)'
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    {/* The active player's exact profile avatar */}
-                    <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-cyan-400/60 bg-[#162738] shrink-0 shadow-[0_0_14px_rgba(34,211,238,0.24)]">
-                      {playerAvatarUrl ? (
-                        <img src={playerAvatarUrl} alt="صورة اللاعب" width={56} height={56} className="h-full w-full object-cover" />
-                      ) : (
-                        <User className="absolute inset-0 m-auto h-7 w-7 text-cyan-200" aria-hidden="true" />
-                      )}
-                      <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9]" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-black text-cyan-200/80">اللاعب الحالي</div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs font-mono font-black text-white">{team1Score} نقطة</span>
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <span className="text-cyan-400 text-xs drop-shadow-[0_0_4px_rgba(6,182,212,0.6)]">💙</span>
-                        <span className="text-cyan-400 text-xs drop-shadow-[0_0_4px_rgba(6,182,212,0.6)]">💙</span>
-                        <span className="text-cyan-400 text-xs drop-shadow-[0_0_4px_rgba(6,182,212,0.6)]">💙</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user1')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user1' && gameMode === 'teams' ? 'border-cyan-300 bg-cyan-400/10 shadow-[0_0_18px_rgba(34,211,238,.25)]' : 'border-white/10 bg-white/5'}`}>
+                  <div className="flex items-center justify-center gap-2"><div className="h-11 w-11 overflow-hidden rounded-xl border border-cyan-300/60 bg-slate-800">{playerAvatarUrl ? <img src={playerAvatarUrl} alt="صورة اللاعب" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-3xl">🍓</span>}</div><strong className="font-mono text-2xl font-black tracking-widest text-white">{String(gameMode === 'solo' ? soloScore : team1Score).padStart(4, '0')}</strong></div>
+                  <div className="mt-1 text-center text-sm">💙 💙 💙</div>
+                </button>
               </div>
 
               {/* 3. Question Banner with Sci-Fi Oscilloscope Waveform (Matching Screenshot) */}
@@ -783,86 +646,17 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
                     />
                   </svg>
 
-                  {/* Top Badge Indicators Row (Matching Screenshot Tags) */}
-                  <div className="flex items-center justify-between text-[10px] font-bold text-gray-300 mb-2 relative z-10">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        <span>تحدي مباشر</span>
-                      </span>
-                      <span className="bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 px-2 py-0.5 rounded-full">
-                        {totalCardsCount - remainingCardsCount + 1} تم الإنجاز
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-300 font-mono font-black">
-                        +{currentQ.points} نقطة
-                      </span>
-                      <button
-                        id="btn-skip-question"
-                        disabled={feedbackStatus !== 'idle'}
-                        onClick={handleSkipQuestion}
-                        className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-gray-200 hover:text-cyan-300 border border-white/10 transition-colors cursor-pointer"
-                        title="نقل السؤال لآخر السلسلة وعرض التالي"
-                      >
-                        <FastForward className="w-3 h-3 text-cyan-400" />
-                        <span>تخطي ⏭</span>
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Question Text */}
-                  <h4 className="text-xs sm:text-base font-bold text-white leading-relaxed text-center relative z-10 px-1">
+                  <h4 className="relative z-10 px-2 py-3 text-center text-lg font-black leading-relaxed text-white sm:text-xl">
                     <ScientificText value={currentQ.question} />
                   </h4>
-
-                  {/* Selection Confirmation Bar */}
-                  {feedbackStatus === 'idle' && selectedCardId !== null && (
-                    <div className="flex items-center justify-center gap-2 pt-2 relative z-10 animate-in fade-in">
-                      <span className="text-xs text-gray-300">
-                        تم اختيار: <strong className="text-cyan-300">البطاقة ({selectedCardId})</strong>
-                      </span>
-                      <button
-                        id="btn-confirm-answer"
-                        onClick={handleConfirmAnswer}
-                        className="px-3.5 py-1 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-black font-black rounded-xl text-xs shadow-md transition-transform active:scale-95 cursor-pointer"
-                      >
-                        تأكيد الإجابة ✓
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Correct Feedback Banner */}
-                  {feedbackStatus === 'correct' && (
-                    <div className="game-pop mt-2 p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-black flex items-center justify-center gap-1.5 animate-in zoom-in-95">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{feedbackMessage}</span>
-                    </div>
-                  )}
-
-                  {/* Wrong Feedback Banner */}
-                  {feedbackStatus === 'wrong' && (
-                    <div className="game-pop mt-2 p-2 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-300 text-xs font-black flex items-center justify-center gap-1.5 animate-in shake">
-                      <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{feedbackMessage}</span>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* 4. Minimal answer choices: only the answer and its number. */}
-              <div className="flex items-center justify-between px-1 pt-1 text-[11px] font-black text-amber-200">
-                <span>الاختيارات</span>
-                <span className="rounded-md border border-amber-300/50 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] text-amber-200">
-                  {remainingCardsCount} متبقية
-                </span>
-              </div>
-
-              {/* 5. Compact gold answer boxes */}
+              {/* 4. Clean 3x3 answer board with text-only choices. */}
               <div
                 id="gibha-sah-cards-grid"
-                className={`grid grid-cols-2 gap-2 sm:gap-2.5 transition-all duration-300 pb-2 ${
+                className={`grid grid-cols-3 gap-2 transition-all duration-300 pb-2 ${
                   celebrationBurst === 'combo' ? 'scale-[1.01] drop-shadow-[0_0_18px_rgba(251,191,36,0.35)]' : ''
                 }`}
               >
@@ -874,18 +668,18 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
                       key={card.id}
                       id={`card-item-${card.number}`}
                       disabled={feedbackStatus !== 'idle'}
-                      onClick={() => handleCardClick(card.number)}
+                      onClick={() => {
+                        handleCardClick(card.number);
+                        handleConfirmAnswer(card.number);
+                      }}
                       style={{ animationDelay: `${cardIndex * 35}ms` }}
-                      className={`min-h-0 rounded-xl border px-2.5 py-2.5 text-center transition-[transform,box-shadow,background-color,border-color,opacity] duration-150 flex items-center justify-between gap-2 cursor-pointer active:scale-[0.97] animate-in fade-in zoom-in-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 ${
+                      className={`min-h-[72px] rounded-xl border px-2 py-3 text-center transition-[transform,box-shadow,background-color,border-color,opacity] duration-150 flex items-center justify-center cursor-pointer active:scale-[0.97] animate-in fade-in zoom-in-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 ${
                         isSelected
                           ? 'border-amber-200 bg-gradient-to-r from-amber-300 to-yellow-200 text-amber-950 shadow-[0_0_18px_rgba(251,191,36,0.5)] ring-2 ring-amber-200'
                           : 'border-amber-300/65 bg-gradient-to-r from-amber-500/20 via-yellow-400/10 to-amber-500/20 text-amber-100 hover:border-amber-200 hover:bg-amber-400/25 hover:shadow-[0_6px_14px_rgba(251,191,36,0.22)]'
                       }`}
                     >
-                      <span className="min-w-0 truncate text-[12px] font-black leading-5 sm:text-[13px]">{card.label}</span>
-                      <span className={`flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md border px-1 font-mono text-[10px] font-black ${isSelected ? 'border-amber-700/40 bg-amber-950/10 text-amber-950' : 'border-amber-200/70 bg-amber-300/20 text-amber-100'}`}>
-                        {card.number}
-                      </span>
+                      <span className="text-[11px] font-black leading-5 sm:text-[13px]">{card.label}</span>
                     </button>
                   );
                 })}
@@ -903,7 +697,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black px-3 py-1 rounded-full mb-1">
                   <PartyPopper className="w-4 h-4 text-emerald-400" />
-                  <span>تم مسح وتفريغ جميع البطاقات الـ 10 بنجاح!</span>
+                  <span>تم حل جميع الخيارات الـ {totalCardsCount} بنجاح!</span>
                 </div>
                 <h3 className="text-lg sm:text-xl font-black text-white">
                   {gameMode === 'teams' ? (
