@@ -44,6 +44,7 @@ interface LessonGamesModalProps {
     subject: string;
     lessonTitle: string;
     completedAt: string;
+    answers?: NotificationExamAnswer[];
   }) => void;
   playerAvatarUrl?: string;
   playerId?: string;
