@@ -16,7 +16,7 @@ import {
   Database,
   FileText,
 } from 'lucide-react';
-import { EducationalGame, OpenLessonContext } from '../types';
+import { EducationalGame, NotificationExamAnswer, OpenLessonContext } from '../types';
 import { MillionaireGameModal } from './MillionaireGameModal';
 import { TrueFalseGameModal } from './TrueFalseGameModal';
 import { GibhaSahGameModal } from './GibhaSahGameModal';
