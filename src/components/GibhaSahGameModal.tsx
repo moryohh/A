@@ -25,6 +25,7 @@ import {
 import { gameAudio } from '../utils/gameAudio';
 import { getImageChoiceReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
+import { DEFAULT_COMMUNITY_AVATAR } from './CommunityAvatar';
 
 interface GibhaSahGameModalProps {
   isOpen: boolean;
@@ -46,6 +47,13 @@ function shuffleArray<T>(array: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function formatGameScore(score: number): string {
+  return Math.max(0, Math.round(score)).toLocaleString('en-US', {
+    useGrouping: false,
+    minimumIntegerDigits: 4,
+  });
 }
 
 function buildGibhaRound(source: GibhaSahGameConfig): GibhaSahGameConfig {
@@ -591,16 +599,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
             </button>
           </div>
 
-          {/* The selected profile avatar replaces the old teacher name and game emblem. */}
-          <div className="relative z-10 flex items-center gap-2.5">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border-2 border-cyan-300/70 bg-[#162738] shadow-[0_0_16px_rgba(34,211,238,0.28)]">
-              {playerAvatarUrl ? (
-                <img src={playerAvatarUrl} alt="صورة اللاعب" width={48} height={48} className="h-full w-full object-cover" />
-              ) : (
-                <User className="h-6 w-6 text-cyan-200" aria-hidden="true" />
-              )}
-            </div>
-          </div>
+          <div className="h-12 w-12" aria-hidden="true" />
         </div>
 
         {/* Main Content Area */}
@@ -610,14 +609,14 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
               {/* 2. Clean HUD: avatars, hearts, scores and time only. */}
               <div id="hud-players-row" className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user2')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user2' && gameMode === 'teams' ? 'border-emerald-300 bg-emerald-400/10 shadow-[0_0_18px_rgba(52,211,153,.25)]' : 'border-white/10 bg-white/5'}`}>
-                  <div className="flex items-center justify-center gap-2"><span className="text-4xl" aria-label="الفراولة">🍓</span><strong className="font-mono text-2xl font-black tracking-widest text-white">{String(team2Score).padStart(4, '0')}</strong></div>
+                  <div className="flex items-center justify-center gap-2"><img src={DEFAULT_COMMUNITY_AVATAR} alt="Ai" className="h-11 w-11 rounded-xl border border-lime-400 bg-lime-500 object-cover" /><div><span className="block text-[10px] font-black text-lime-300">Ai</span><strong dir="ltr" className="block font-mono text-2xl font-black tracking-widest text-white [unicode-bidi:isolate]">{formatGameScore(team2Score)}</strong></div></div>
                   <div className="mt-1 text-center text-sm">❤️ ❤️ ❤️</div>
                 </button>
                 <div id="digital-timer-pod" className="rounded-2xl border border-cyan-400/40 bg-slate-950/70 px-3 py-2 text-center shadow-lg">
                   <span className="font-mono text-xl font-black tracking-wider text-cyan-300">00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}</span>
                 </div>
                 <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user1')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user1' && gameMode === 'teams' ? 'border-cyan-300 bg-cyan-400/10 shadow-[0_0_18px_rgba(34,211,238,.25)]' : 'border-white/10 bg-white/5'}`}>
-                  <div className="flex items-center justify-center gap-2"><div className="h-11 w-11 overflow-hidden rounded-xl border border-cyan-300/60 bg-slate-800">{playerAvatarUrl ? <img src={playerAvatarUrl} alt="صورة اللاعب" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-3xl">🍓</span>}</div><strong className="font-mono text-2xl font-black tracking-widest text-white">{String(gameMode === 'solo' ? soloScore : team1Score).padStart(4, '0')}</strong></div>
+                  <div className="flex items-center justify-center gap-2"><div className="h-11 w-11 overflow-hidden rounded-xl border border-cyan-300/60 bg-slate-800">{playerAvatarUrl ? <img src={playerAvatarUrl} alt="صورة اللاعب" className="h-full w-full object-cover" /> : <User className="m-auto h-full w-6 text-cyan-200" />}</div><strong dir="ltr" className="font-mono text-2xl font-black tracking-widest text-white [unicode-bidi:isolate]">{formatGameScore(gameMode === 'solo' ? soloScore : team1Score)}</strong></div>
                   <div className="mt-1 text-center text-sm">💙 💙 💙</div>
                 </button>
               </div>
@@ -656,7 +655,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
               {/* 4. Clean 3x3 answer board with text-only choices. */}
               <div
                 id="gibha-sah-cards-grid"
-                className={`grid grid-cols-3 gap-2 transition-all duration-300 pb-2 ${
+                className={`grid grid-cols-2 gap-2 transition-all duration-300 pb-2 ${
                   celebrationBurst === 'combo' ? 'scale-[1.01] drop-shadow-[0_0_18px_rgba(251,191,36,0.35)]' : ''
                 }`}
               >
