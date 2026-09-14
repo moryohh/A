@@ -1,4 +1,5 @@
 import { CommunityMember } from '../types';
+import { DEFAULT_CARTOON_AVATARS } from './cartoonAvatars';
 
 export interface DemoCommunityAccount extends CommunityMember {
   id: string;
@@ -10,11 +11,10 @@ export interface DemoCommunityAccount extends CommunityMember {
 }
 
 const buildBotAvatar = (index: number): string => {
-  const hue = (index * 137.508) % 360;
-  const eyeOffset = 8 + (index % 5);
-  const mouthCurve = 3 + (index % 7);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 78% 62%)"/><stop offset="1" stop-color="hsl(${(hue + 48) % 360} 72% 38%)"/></linearGradient></defs><rect width="96" height="96" rx="28" fill="url(#g)"/><circle cx="48" cy="42" r="28" fill="#fff" fill-opacity=".92"/><circle cx="${37 - eyeOffset / 5}" cy="39" r="4" fill="#172033"/><circle cx="${59 + eyeOffset / 5}" cy="39" r="4" fill="#172033"/><path d="M35 53 Q48 ${53 + mouthCurve} 61 53" fill="none" stroke="#172033" stroke-width="4" stroke-linecap="round"/><circle cx="27" cy="49" r="4" fill="#fb7185" fill-opacity=".65"/><circle cx="69" cy="49" r="4" fill="#fb7185" fill-opacity=".65"/></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  // The first catalogue entry is the universal fallback; bots use the
+  // remaining local avatars so real users can keep their selected images.
+  const botAvatars = DEFAULT_CARTOON_AVATARS.slice(1);
+  return botAvatars[index % botAvatars.length]?.url || DEFAULT_CARTOON_AVATARS[0].url;
 };
 
 const profiles = Array.from({ length: 200 }, (_, index): DemoCommunityAccount => {
