@@ -3,6 +3,7 @@ import { Award, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'luc
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
+import { NotificationExamResult } from '../types';
 
 interface ChapterExamIconsProps {
   subjectId: string;
@@ -42,6 +43,7 @@ type ChapterExamNotificationDetail = {
   title: string;
   message: string;
   submittedAt: string;
+  examResult: NotificationExamResult;
 };
 
 const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
@@ -534,11 +536,30 @@ function buildResultMessage(submission: ChapterSubmission) {
 }
 
 function notifyChapterExamResult(submission: ChapterSubmission) {
+  const message = buildResultMessage(submission);
+  const score = findNumericValue(submission.correction_result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+  const totalScore = findNumericValue(submission.correction_result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
   const detail: ChapterExamNotificationDetail = {
     id: `chapter-exam-result-${submission.id}`,
     title: 'نتيجة الامتحان',
-    message: buildResultMessage(submission),
+    message,
     submittedAt: submission.submitted_at,
+    examResult: {
+      title: submission.exam_title,
+      subject: submission.subject_name,
+      completedAt: submission.submitted_at,
+      score: score ?? undefined,
+      totalScore: totalScore ?? undefined,
+      percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
+      summary: textFromCorrectionResult(submission.correction_result) || message,
+      answers: submission.entries.map((entry) => ({
+        label: [entry.question, entry.part].filter(Boolean).join(' — '),
+        prompt: entry.prompt,
+        userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
+        modelAnswer: entry.modelAnswer,
+        status: 'ungraded' as const,
+      })),
+    },
   };
   window.dispatchEvent(new CustomEvent<ChapterExamNotificationDetail>('chapter-exam-result', { detail }));
 }
