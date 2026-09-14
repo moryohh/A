@@ -396,6 +396,13 @@ function AppContent() {
     const cleanUrl = `${window.location.pathname}${window.location.search}`;
     const rootState = { ...(window.history.state || {}), nahnuMaakRoot: true };
     window.history.replaceState(rootState, '', cleanUrl);
+    // Two distinct same-document entries guarantee that one Android Back press
+    // cannot leave the site even on devices that deliver popstate late.
+    window.history.pushState(
+      { ...rootState, nahnuMaakGuardBase: true },
+      '',
+      `${cleanUrl}#nahnu-maak-guard`,
+    );
     window.history.pushState(
       { ...rootState, nahnuMaakGuard: true },
       '',
@@ -403,7 +410,7 @@ function AppContent() {
     );
 
     const restoreGuard = () => {
-      // Restore synchronously: Android may close a standalone PWA before a delayed callback runs.
+      // After Back lands on guard-base, synchronously restore the top guard.
       window.history.pushState(
         { ...rootState, nahnuMaakGuard: true },
         '',
