@@ -8,6 +8,7 @@ interface NotificationsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMarkAllAsRead: () => void;
+  onOpenNotification: (notification: AppNotification) => void;
 }
 
 export const NotificationsModal: React.FC<NotificationsModalProps> = ({
@@ -15,6 +16,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   isOpen,
   onClose,
   onMarkAllAsRead,
+  onOpenNotification,
 }) => {
   const { theme } = useAppTheme();
   if (!isOpen) return null;
@@ -56,9 +58,11 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto space-y-2.5 my-2 no-scrollbar">
           {notifications.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.id}
-              className={`p-3 rounded-2xl border text-right transition-all`}
+              onClick={() => onOpenNotification(item)}
+              className={`w-full p-3 rounded-2xl border text-right transition-all cursor-pointer active:scale-[0.99]`}
               style={{
                 backgroundColor: !item.isRead
                   ? `${theme.colors.primary}18`
@@ -100,7 +104,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
 
           {notifications.length === 0 && (
