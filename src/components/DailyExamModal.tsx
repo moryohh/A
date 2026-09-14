@@ -330,7 +330,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
           const evaluation = nextEvaluations[questionKey];
           const writtenAnswer = Object.entries(studentDrafts)
             .filter(([key]) => key.toLowerCase().startsWith(questionKey))
-            .map(([, value]) => value.trim())
+            .map(([, value]) => String(value).trim())
             .filter(Boolean)
             .join('\n');
           const answerScore = evaluation?.score;
