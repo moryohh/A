@@ -5,7 +5,8 @@ import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === 'true';
+  const isGitHubPagesBuild = process.env.VITE_DEPLOY_TARGET === 'github-pages' ||
+    (process.env.GITHUB_ACTIONS === 'true' && process.env.VITE_DEPLOY_TARGET !== 'cloudflare');
   const appBase = isGitHubPagesBuild ? '/A/' : '/';
 
   return {

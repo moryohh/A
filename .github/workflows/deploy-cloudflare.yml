@@ -37,6 +37,7 @@ jobs:
         run: npm run build
         env:
           VITE_C_OCR_API_URL: ${{ vars.VITE_C_OCR_API_URL }}
+          VITE_DEPLOY_TARGET: cloudflare
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
