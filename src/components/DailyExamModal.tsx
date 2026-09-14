@@ -19,7 +19,7 @@ import {
   submitSolutionImageForEvaluation,
   ImageEvaluationResult,
 } from '../services/imageEvaluationService';
-import { OpenLessonContext } from '../types';
+import { NotificationExamAnswer, OpenLessonContext } from '../types';
 import { getDailyExamReward } from '../services/pointsService';
 
 interface DailyExamModalProps {
@@ -39,6 +39,7 @@ interface DailyExamModalProps {
     subject: string;
     lessonTitle: string;
     completedAt: string;
+    answers?: NotificationExamAnswer[];
   }) => void;
 }
 
@@ -325,6 +326,31 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
         subject: exam.subject,
         lessonTitle: exam.lessonTitle,
         completedAt: finishedAt,
+        answers: (['q1', 'q2'] as const).map((questionKey, index) => {
+          const evaluation = nextEvaluations[questionKey];
+          const writtenAnswer = Object.entries(studentDrafts)
+            .filter(([key]) => key.toLowerCase().startsWith(questionKey))
+            .map(([, value]) => value.trim())
+            .filter(Boolean)
+            .join('\n');
+          const answerScore = evaluation?.score;
+          const answerTotal = evaluation?.maxScore;
+          const status = !evaluation?.success
+            ? 'ungraded' as const
+            : answerScore === answerTotal
+              ? 'correct' as const
+              : answerScore === 0
+                ? 'wrong' as const
+                : 'partial' as const;
+          return {
+            label: `السؤال ${index + 1}`,
+            userAnswer: writtenAnswer || (questionImages[questionKey] ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
+            score: answerScore,
+            maxScore: answerTotal,
+            status,
+            feedback: evaluation?.feedback || evaluation?.error || questionErrors[questionKey] || undefined,
+          };
+        }),
       });
       if (!rewardIssuedRef.current && [nextEvaluations.q1, nextEvaluations.q2].every((result) => result?.success)) {
         rewardIssuedRef.current = true;
