@@ -130,6 +130,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   const [isTimerRunning, setIsTimerRunning] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
+  const [isAiThinking, setIsAiThinking] = useState(false);
 
   // Solved History log
   const [history, setHistory] = useState<
@@ -142,6 +143,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const rewardIssuedRef = useRef(false);
+  const aiAttemptRef = useRef(0);
 
   // Initialize or re-sync config & shuffle questions
   useEffect(() => {
@@ -274,6 +276,33 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     }, 1500);
   };
 
+  useEffect(() => {
+    if (!isOpen || isFinished || gameMode !== 'teams' || activeTurn !== 'user2' || feedbackStatus !== 'idle' || !currentQ || activeCards.length === 0) {
+      setIsAiThinking(false);
+      return undefined;
+    }
+
+    setIsAiThinking(true);
+    const timer = window.setTimeout(() => {
+      const attemptIndex = aiAttemptRef.current;
+      const probabilitySequence = [0.25, 0.5, 0.75, 1, 0, 0.5];
+      const correctProbability = probabilitySequence[attemptIndex] ?? 0.5;
+      aiAttemptRef.current += 1;
+      const wrongCards = activeCards.filter((card) => card.number !== currentQ.correctCardNumber);
+      const shouldAnswerCorrectly = Math.random() < correctProbability || wrongCards.length === 0;
+      const chosenCard = shouldAnswerCorrectly
+        ? currentQ.correctCardNumber
+        : wrongCards[Math.floor(Math.random() * wrongCards.length)]?.number;
+      setIsAiThinking(false);
+      if (typeof chosenCard === 'number') {
+        setSelectedCardId(chosenCard);
+        handleConfirmAnswer(chosenCard);
+      }
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen, isFinished, gameMode, activeTurn, feedbackStatus, currentQ?.id, solvedCardNumbers.length]);
+
   if (!isOpen) return null;
 
   if (config.questions.length === 0 || config.cards.length === 0) {
@@ -319,7 +348,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   };
 
   // Execute answer confirmation
-  const handleConfirmAnswer = (directCardId?: number) => {
+  function handleConfirmAnswer(directCardId?: number) {
     const chosenCardId = directCardId ?? selectedCardId;
     if (chosenCardId === null || !currentQ || feedbackStatus !== 'idle') return;
 
@@ -397,7 +426,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
         }
       }, 1500);
     }
-  };
+  }
 
   // Referee Scoring Actions (Manual Referee buttons for live games)
   const handleJudgeAnswer = (isCorrect: boolean) => {
@@ -482,6 +511,8 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     setTeam2Score(0);
     setSoloScore(0);
     setActiveTurn('user1');
+    setIsAiThinking(false);
+    aiAttemptRef.current = 0;
     setTimeLeft(25);
     setIsFinished(false);
     setCelebrationBurst(null);
@@ -608,17 +639,17 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
             <>
               {/* 2. Clean HUD: avatars, hearts, scores and time only. */}
               <div id="hud-players-row" className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user2')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user2' && gameMode === 'teams' ? 'border-emerald-300 bg-emerald-400/10 shadow-[0_0_18px_rgba(52,211,153,.25)]' : 'border-white/10 bg-white/5'}`}>
-                  <div className="flex items-center justify-center gap-2"><img src={DEFAULT_COMMUNITY_AVATAR} alt="Ai" className="h-11 w-11 rounded-xl border border-lime-400 bg-lime-500 object-cover" /><div><span className="block text-[10px] font-black text-lime-300">Ai</span><strong dir="ltr" className="block font-mono text-2xl font-black tracking-widest text-white [unicode-bidi:isolate]">{formatGameScore(team2Score)}</strong></div></div>
+                <div className={`rounded-2xl border p-2 transition ${activeTurn === 'user2' && gameMode === 'teams' ? 'border-emerald-300 bg-emerald-400/10 shadow-[0_0_18px_rgba(52,211,153,.25)]' : 'border-white/10 bg-white/5'}`}>
+                  <div className="flex items-center justify-center gap-2"><img src={DEFAULT_COMMUNITY_AVATAR} alt="Ai" className={`h-11 w-11 rounded-xl border border-lime-400 bg-lime-500 object-cover ${isAiThinking ? 'animate-pulse' : ''}`} /><div><span className="block text-[10px] font-black text-lime-300">{isAiThinking ? 'Ai يفكر...' : 'Ai'}</span><strong dir="ltr" className="block font-mono text-2xl font-black tracking-widest text-white [unicode-bidi:isolate]">{formatGameScore(team2Score)}</strong></div></div>
                   <div className="mt-1 text-center text-sm">❤️ ❤️ ❤️</div>
-                </button>
+                </div>
                 <div id="digital-timer-pod" className="rounded-2xl border border-cyan-400/40 bg-slate-950/70 px-3 py-2 text-center shadow-lg">
                   <span className="font-mono text-xl font-black tracking-wider text-cyan-300">00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}</span>
                 </div>
-                <button type="button" onClick={() => gameMode === 'teams' && setActiveTurn('user1')} className={`rounded-2xl border p-2 transition ${activeTurn === 'user1' && gameMode === 'teams' ? 'border-cyan-300 bg-cyan-400/10 shadow-[0_0_18px_rgba(34,211,238,.25)]' : 'border-white/10 bg-white/5'}`}>
+                <div className={`rounded-2xl border p-2 transition ${activeTurn === 'user1' && gameMode === 'teams' ? 'border-cyan-300 bg-cyan-400/10 shadow-[0_0_18px_rgba(34,211,238,.25)]' : 'border-white/10 bg-white/5'}`}>
                   <div className="flex items-center justify-center gap-2"><div className="h-11 w-11 overflow-hidden rounded-xl border border-cyan-300/60 bg-slate-800">{playerAvatarUrl ? <img src={playerAvatarUrl} alt="صورة اللاعب" className="h-full w-full object-cover" /> : <User className="m-auto h-full w-6 text-cyan-200" />}</div><strong dir="ltr" className="font-mono text-2xl font-black tracking-widest text-white [unicode-bidi:isolate]">{formatGameScore(gameMode === 'solo' ? soloScore : team1Score)}</strong></div>
                   <div className="mt-1 text-center text-sm">💙 💙 💙</div>
-                </button>
+                </div>
               </div>
 
               {/* 3. Question Banner with Sci-Fi Oscilloscope Waveform (Matching Screenshot) */}
@@ -666,7 +697,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
                     <button
                       key={card.id}
                       id={`card-item-${card.number}`}
-                      disabled={feedbackStatus !== 'idle'}
+                      disabled={feedbackStatus !== 'idle' || (gameMode === 'teams' && activeTurn === 'user2') || isAiThinking}
                       onClick={() => {
                         handleCardClick(card.number);
                         handleConfirmAnswer(card.number);
