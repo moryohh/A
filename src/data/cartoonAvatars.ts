@@ -12,12 +12,26 @@ export interface CartoonAvatarOption {
 }
 
 const avatarUrl = (fileName: string) => `${import.meta.env.BASE_URL}avatars/${fileName}.jpg`;
+const defaultFaceSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#84cc16"/><circle cx="50" cy="50" r="38" fill="#fffdf2"/><circle cx="36" cy="43" r="5" fill="#263447"/><circle cx="64" cy="43" r="5" fill="#263447"/><circle cx="27" cy="58" r="6" fill="#f9a8d4" opacity=".8"/><circle cx="73" cy="58" r="6" fill="#f9a8d4" opacity=".8"/><path d="M34 60c8 11 24 11 32 0" fill="none" stroke="#263447" stroke-width="5" stroke-linecap="round"/></svg>`;
+export const DEFAULT_FACE_AVATAR = `data:image/svg+xml,${encodeURIComponent(defaultFaceSvg)}`;
 
 /**
  * Local avatar catalogue. Level 1 contains the fruit mascots, while level 3
  * unlocks the study mascots. Future avatars can be added with a new unlockLevel.
  */
 export const DEFAULT_CARTOON_AVATARS: CartoonAvatarOption[] = [
+  {
+    id: 'avatar-default-face',
+    name: 'الوجه المبتسم الافتراضي',
+    category: 'الصور الافتراضية',
+    description: 'يظهر تلقائيًا عند ضعف الإنترنت أو تعذر تحميل صورة أخرى',
+    emoji: '☺️',
+    bgColor: '#ECFCCB',
+    borderColor: '#84CC16',
+    url: DEFAULT_FACE_AVATAR,
+    unlockLevel: 1,
+    isFree: true,
+  },
   {
     id: 'avatar-strawberry',
     name: 'الفراولة المرحة',
@@ -140,4 +154,4 @@ export const DEFAULT_CARTOON_AVATARS: CartoonAvatarOption[] = [
   },
 ];
 
-export const FALLBACK_DEFAULT_AVATAR = DEFAULT_CARTOON_AVATARS[0].url;
+export const FALLBACK_DEFAULT_AVATAR = DEFAULT_FACE_AVATAR;

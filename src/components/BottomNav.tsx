@@ -69,6 +69,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     decoding="async"
                     className={`w-6 h-6 rounded-full object-cover border-2 transition-transform ${isActive ? 'scale-110' : ''} ${avatarUrl?.includes('/avatars/') ? 'scale-[1.3]' : ''}`}
                     style={{ borderColor: isActive ? theme.colors.primary : `${theme.colors.primary}70` }}
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = FALLBACK_DEFAULT_AVATAR;
+                    }}
                   />
                 ) : Icon ? (
                   <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
