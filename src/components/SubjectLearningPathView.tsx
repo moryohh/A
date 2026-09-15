@@ -7,6 +7,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { MapLeaderboardModal } from './MapLeaderboardModal';
 import { AdventureWorldMap } from './AdventureWorldMap';
 import { ScienceLaboratoryModal } from './ScienceLaboratoryModal';
+import { LaboratoryBalloon } from './LaboratoryBalloon';
 import { useAppTheme } from '../services/themeService';
 import {
   ArrowRight,
@@ -33,7 +34,6 @@ import {
   Compass,
   AlertCircle,
   RefreshCw,
-  FlaskConical,
 } from 'lucide-react';
 
 interface SubjectLearningPathViewProps {
@@ -536,13 +536,11 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
                             </div>
 
                             {hasLaboratory && lessonItem.number === 2 && (
-                              <button
-                                type="button"
-                                onClick={(event) => { event.stopPropagation(); setLaboratoryChapterNumber(chapter.number); }}
-                                className="rounded-xl border border-cyan-400/60 bg-cyan-950 px-2 py-1 text-xs font-bold text-cyan-100 flex items-center gap-1"
-                              >
-                                <FlaskConical className="w-3.5 h-3.5" /> مختبر
-                              </button>
+                              <LaboratoryBalloon
+                                compact
+                                subjectName={subject.name}
+                                onClick={() => setLaboratoryChapterNumber(chapter.number)}
+                              />
                             )}
                             <button className="px-3 py-1 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-black text-xs flex items-center gap-1 shadow">
                               <Play className="w-3 h-3 fill-current" />
