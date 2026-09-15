@@ -9,6 +9,7 @@ import { SubjectChapter, SubjectChapterLesson } from '../types';
 import { useAppTheme } from '../services/themeService';
 import { formatArabicLessonTitle } from '../services/lessonsService';
 import { ChapterExamIcons } from './ChapterExamIcons';
+import { LaboratoryBalloon } from './LaboratoryBalloon';
 import {
   Check,
   Lock,
@@ -22,7 +23,6 @@ import {
   X,
   Loader2,
   ArrowRight,
-  FlaskConical,
 } from 'lucide-react';
 
 interface AdventureWorldMapProps {
@@ -263,6 +263,10 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
     { id: `chest-mid-ch${selectedChapterIndex + 1}`, y: 3100, x: 740, label: 'كنز المسار' },
     { id: `chest-bot-ch${selectedChapterIndex + 1}`, y: 5100, x: 260, label: 'كنز الانطلاق' },
   ];
+  // Place the laboratory over the upper-left snowy mountain, away from lessons.
+  // For alternate biome chapters, keep it in the corresponding third image, never in space.
+  const balloonY = 4420;
+  const balloonX = nodes.some((node) => Math.abs(node.y - balloonY) < 310 && node.x < 390) ? 825 : 200;
 
   return (
     <div className="relative w-full max-w-xl mx-auto flex flex-col items-center select-none font-cairo">
@@ -602,26 +606,18 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
           {/* ========================================================= */}
           {/* COMPACT INTERACTIVE TREASURE CHESTS (1 per Biome Image) */}
           {/* ========================================================= */}
+          {onOpenLaboratory && currentChapter && (
+            <div
+              style={{ left: `${balloonX / 10}%`, top: `${balloonY / 60}%` }}
+              className="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+            >
+              <LaboratoryBalloon
+                subjectName={subjectName}
+                onClick={() => onOpenLaboratory(currentChapter.number)}
+              />
+            </div>
+          )}
           {chapterChests.map((chest) => {
-            // The visible left lake is the starting area ("كنز الانطلاق"), not "كنز القمة".
-            if (chest.id.startsWith('chest-bot-') && onOpenLaboratory && currentChapter) {
-              return (
-                <div
-                  key={chest.id}
-                  style={{ left: `${(chest.x / 1000) * 100}%`, top: `${(chest.y / 6000) * 100}%` }}
-                  className="absolute z-30 -translate-x-1/2 -translate-y-1/2"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onOpenLaboratory(currentChapter.number)}
-                    className="flex items-center gap-2 rounded-xl border-2 border-cyan-200 bg-gradient-to-r from-cyan-600 to-sky-500 px-3 py-2 text-sm font-black text-white shadow-[0_0_22px_rgba(34,211,238,0.8)] transition-transform hover:scale-105 active:scale-95"
-                    aria-label={`فتح مختبر ${subjectName} للفصل ${currentChapter.number}`}
-                  >
-                    <FlaskConical className="w-5 h-5" /> مختبر
-                  </button>
-                </div>
-              );
-            }
             const isOpened = openedChests.includes(chest.id);
             return (
               <div

@@ -224,3 +224,20 @@ a,
     animation: none;
   }
 }
+
+/* Floating laboratory balloon: gentle bob, drift and perspective. */
+.science-lab-balloon-drift {
+  animation: science-lab-balloon-float 6.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes science-lab-balloon-float {
+  0%, 100% { transform: translate3d(0, 3px, 0) scale(0.98); }
+  25% { transform: translate3d(5px, -9px, 0) scale(1.025); }
+  50% { transform: translate3d(1px, -4px, 0) scale(1.035); }
+  75% { transform: translate3d(-5px, 8px, 0) scale(0.975); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .science-lab-balloon-drift { animation: none; }
+}
