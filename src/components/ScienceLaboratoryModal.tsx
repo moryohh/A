@@ -19,7 +19,8 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
 }) => {
   const [chapterNumber, setChapterNumber] = useState(initialChapterNumber);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
-  const available = subjectId === 'biology' && (chapterNumber === 1 || chapterNumber === 2);
+  const available = subjectId === 'biology' && [1, 2, 3].includes(chapterNumber);
+  const chapterName = ['الأول', 'الثاني', 'الثالث'][chapterNumber - 1] || String(chapterNumber);
   const contentType = subjectId === 'biology' ? 'الرسومات' : 'التجارب';
 
   useEffect(() => {
@@ -62,10 +63,10 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
       </div>
       {available ? (
         <div className="relative flex-1 min-h-0">
-          {isFrameLoading && <p className="absolute inset-0 flex items-center justify-center text-sky-200">جاري فتح رسومات الفصل {chapterNumber === 1 ? 'الأول' : 'الثاني'}…</p>}
+          {isFrameLoading && <p className="absolute inset-0 flex items-center justify-center text-sky-200">جاري فتح رسومات الفصل {chapterName}…</p>}
           <iframe
             key={chapterNumber}
-            title={`رسومات الأحياء التفاعلية للفصل ${chapterNumber === 1 ? 'الأول' : 'الثاني'}`}
+            title={`رسومات الأحياء التفاعلية للفصل ${chapterName}`}
             src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html`}
             onLoad={() => setIsFrameLoading(false)}
             className="h-full w-full border-0 bg-slate-950"
