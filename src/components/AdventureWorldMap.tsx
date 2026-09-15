@@ -22,6 +22,7 @@ import {
   X,
   Loader2,
   ArrowRight,
+  FlaskConical,
 } from 'lucide-react';
 
 interface AdventureWorldMapProps {
@@ -41,6 +42,7 @@ interface AdventureWorldMapProps {
   isLoadingChapters?: boolean;
   onBack?: () => void;
   onScoreUpdate?: (points: number) => void;
+  onOpenLaboratory?: (chapterNumber: number) => void;
 }
 
 // Exactly 6 images preserved in their strict original sequence
@@ -70,6 +72,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   isLoadingChapters = false,
   onBack,
   onScoreUpdate,
+  onOpenLaboratory,
 }) => {
   const { theme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -600,6 +603,25 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
           {/* COMPACT INTERACTIVE TREASURE CHESTS (1 per Biome Image) */}
           {/* ========================================================= */}
           {chapterChests.map((chest) => {
+            // The lake on the left hosts the laboratory instead of the top treasure chest.
+            if (chest.id.startsWith('chest-top-') && onOpenLaboratory && currentChapter) {
+              return (
+                <div
+                  key={chest.id}
+                  style={{ left: `${(chest.x / 1000) * 100}%`, top: `${(chest.y / 6000) * 100}%` }}
+                  className="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenLaboratory(currentChapter.number)}
+                    className="flex items-center gap-2 rounded-xl border-2 border-cyan-200 bg-gradient-to-r from-cyan-600 to-sky-500 px-3 py-2 text-sm font-black text-white shadow-[0_0_22px_rgba(34,211,238,0.8)] transition-transform hover:scale-105 active:scale-95"
+                    aria-label={`فتح مختبر ${subjectName} للفصل ${currentChapter.number}`}
+                  >
+                    <FlaskConical className="w-5 h-5" /> مختبر
+                  </button>
+                </div>
+              );
+            }
             const isOpened = openedChests.includes(chest.id);
             return (
               <div

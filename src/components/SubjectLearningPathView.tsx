@@ -6,6 +6,7 @@ import { MapRewardsModal } from './MapRewardsModal';
 import { gameAudio } from '../utils/gameAudio';
 import { MapLeaderboardModal } from './MapLeaderboardModal';
 import { AdventureWorldMap } from './AdventureWorldMap';
+import { ScienceLaboratoryModal } from './ScienceLaboratoryModal';
 import { useAppTheme } from '../services/themeService';
 import {
   ArrowRight,
@@ -32,6 +33,7 @@ import {
   Compass,
   AlertCircle,
   RefreshCw,
+  FlaskConical,
 } from 'lucide-react';
 
 interface SubjectLearningPathViewProps {
@@ -92,6 +94,8 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
   // Modals state
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [laboratoryChapterNumber, setLaboratoryChapterNumber] = useState<number | null>(null);
+  const hasLaboratory = ['biology', 'chemistry', 'physics'].includes(subject.id);
 
   // Chests opened state
   const [openedChests, setOpenedChests] = useState<string[]>([]);
@@ -409,6 +413,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
             isLoadingChapters={isLoading}
             onBack={onBack}
             onScoreUpdate={onScoreUpdate}
+            onOpenLaboratory={hasLaboratory ? setLaboratoryChapterNumber : undefined}
           />
         </div>
       ) : (
@@ -530,6 +535,15 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
                               </div>
                             </div>
 
+                            {hasLaboratory && lessonItem.number === 2 && (
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); setLaboratoryChapterNumber(chapter.number); }}
+                                className="rounded-xl border border-cyan-400/60 bg-cyan-950 px-2 py-1 text-xs font-bold text-cyan-100 flex items-center gap-1"
+                              >
+                                <FlaskConical className="w-3.5 h-3.5" /> مختبر
+                              </button>
+                            )}
                             <button className="px-3 py-1 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-black text-xs flex items-center gap-1 shadow">
                               <Play className="w-3 h-3 fill-current" />
                               <span>{isInProgress ? 'متابعة' : 'بدء'}</span>
@@ -547,6 +561,15 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
       )}
 
       {/* MODALS */}
+      {laboratoryChapterNumber !== null && hasLaboratory && (
+        <ScienceLaboratoryModal
+          subjectId={subject.id}
+          subjectName={subject.name}
+          chapters={chapters}
+          initialChapterNumber={laboratoryChapterNumber}
+          onClose={() => setLaboratoryChapterNumber(null)}
+        />
+      )}
       <MapRewardsModal
         isOpen={isRewardsOpen}
         onClose={() => setIsRewardsOpen(false)}
@@ -563,4 +586,3 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
     </div>
   );
 };
-
