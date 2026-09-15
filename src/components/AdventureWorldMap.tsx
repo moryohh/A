@@ -603,8 +603,8 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
           {/* COMPACT INTERACTIVE TREASURE CHESTS (1 per Biome Image) */}
           {/* ========================================================= */}
           {chapterChests.map((chest) => {
-            // The lake on the left hosts the laboratory instead of the top treasure chest.
-            if (chest.id.startsWith('chest-top-') && onOpenLaboratory && currentChapter) {
+            // The visible left lake is the starting area ("كنز الانطلاق"), not "كنز القمة".
+            if (chest.id.startsWith('chest-bot-') && onOpenLaboratory && currentChapter) {
               return (
                 <div
                   key={chest.id}
