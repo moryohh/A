@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0f172a" />
+      <stop offset="50%" stopColor="#0284c7" />
+      <stop offset="100%" stopColor="#0369a1" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+      <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+    </radialGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#38bdf8" />
+      <stop offset="100%" stopColor="#818cf8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded squircle with safe zone -->
+  <rect width="512" height="512" rx="110" fill="url(#bg-grad)" />
+  <circle cx="256" cy="256" r="220" fill="url(#glow)" />
+
+  <!-- Microscope & Cell Cytology Motif -->
+  <g transform="translate(256, 240) scale(1.15)">
+    <!-- Microscope Lens / Eye Piece -->
+    <path d="M-15 -140 L15 -140 L12 -80 L-12 -80 Z" fill="#ffffff" />
+    <path d="M-22 -145 L22 -145 L20 -135 L-20 -135 Z" fill="#bae6fd" />
+    <circle cx="0" cy="-60" r="26" fill="#e0f2fe" stroke="#38bdf8" strokeWidth="4" />
+    <circle cx="0" cy="-60" r="14" fill="#0284c7" />
+
+    <!-- Microscope Body Arm -->
+    <path d="M-8 -60 C -80 -40 -90 40 -60 90 L-40 90 C -70 50 -55 -20 0 -35" fill="none" stroke="#f8fafc" strokeWidth="18" strokeLinecap="round" />
+
+    <!-- Stage and Specimen Slide -->
+    <rect x="-70" y="30" width="140" height="14" rx="4" fill="#f8fafc" />
+    <rect x="-35" y="24" width="70" height="6" rx="2" fill="#38bdf8" opacity="0.9" />
+
+    <!-- Concentric Tissue Cells under inspection (Slide view) -->
+    <circle cx="0" cy="37" r="16" fill="#0ea5e9" opacity="0.3" />
+    
+    <!-- Base Plate -->
+    <path d="M-75 110 L75 110 C85 110 90 125 80 135 L-80 135 C-90 125 -85 110 -75 110 Z" fill="#f8fafc" />
+    
+    <!-- Biology Cell Rosette Elements -->
+    <circle cx="55" cy="-45" r="12" fill="#38bdf8" opacity="0.8" />
+    <circle cx="75" cy="-15" r="8" fill="#818cf8" opacity="0.7" />
+    <circle cx="85" cy="-55" r="6" fill="#38bdf8" opacity="0.6" />
+    <circle cx="40" cy="-75" r="7" fill="#c084fc" opacity="0.7" />
+  </g>
+
+  <!-- Title Badge (Arabic letters/scientific symbol) -->
+  <text x="256" y="455" text-anchor="middle" font-family="'Cairo', sans-serif" font-weight="bold" font-size="34" fill="#ffffff" letter-spacing="1">أطلس الأنسجة</text>
+</svg>
