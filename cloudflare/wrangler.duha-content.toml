@@ -1,0 +1,11 @@
+name = "duha-content-index"
+main = "duha-content-worker.js"
+compatibility_date = "2026-09-27"
+
+[[d1_databases]]
+binding = "CONTENT_DB"
+database_name = "duha-content-index"
+database_id = "88f179a9-4cab-4649-8981-fece0c155ba2"
+
+# R2 is intentionally not declared until the account enables R2.
+# No user or Supabase data is deleted by this Worker.
