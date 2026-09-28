@@ -1,0 +1,9 @@
+name = "duha-content-r2"
+main = "duha-content-r2-worker.js"
+compatibility_date = "2026-09-28"
+
+[[r2_buckets]]
+binding = "CONTENT_R2"
+bucket_name = "duha-educational-content"
+
+# Read-only public API; no write route is deployed in this worker.
