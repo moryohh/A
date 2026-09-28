@@ -42,6 +42,7 @@ export interface LessonContentBundle {
   mcqData?: any;
   trueFalseData?: any;
   phData?: any;
+  dataSource?: 'cloudflare' | 'supabase' | 'fallback';
 }
 
 /**
@@ -773,6 +774,7 @@ export async function getLessonContentBundle(
     : [];
 
   let rawSectionRows: any[] = [];
+  let dataSource: LessonContentBundle['dataSource'] = 'supabase';
 
   // Trial path: fetch the exact immutable records from R2 by source ID.
   if (recordIds.length > 0) {
@@ -793,6 +795,7 @@ export async function getLessonContentBundle(
           const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
           return { id: row.id, subject_id: context.subjectId, section_id: section, file_name: fileName, content: row.content };
         });
+      if (rawSectionRows.length > 0) dataSource = 'cloudflare';
     } catch (err) {
       console.warn('[getLessonContentBundle] Cloudflare R2 unavailable; using Supabase fallback:', err);
     }
@@ -990,6 +993,7 @@ export async function getLessonContentBundle(
     mcqData: mcqJson,
     trueFalseData: tfJson,
     phData: phJson,
+    dataSource,
   };
 
   lessonBundleCache.set(cacheKey, bundle);

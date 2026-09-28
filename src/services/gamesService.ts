@@ -5,6 +5,7 @@ import { TrueFalseGameConfig, TrueFalseQuestion, getTrueFalseGameForLesson } fro
 import { GibhaSahGameConfig, GibhaSahQuestion, GibhaSahCard, getGibhaSahGameForLesson } from '../data/mockGibhaSah';
 import { getMillionaireGameForLesson } from '../data/mockMillionaire';
 import { extractChapterAndSegment } from './curriculumService';
+import { fetchCloudflareExactSection } from './cloudflareContentService';
 
 export interface LessonGamesBundle {
   mcqConfig: MillionaireGameConfig;
@@ -13,6 +14,7 @@ export interface LessonGamesBundle {
   dailyExamAvailable: boolean;
   source: 'database' | 'fallback';
   loadedAt: number;
+  dataSource?: 'cloudflare' | 'supabase' | 'fallback';
 }
 
 // In-memory cache for game bundles by key (subject_lessonId)
@@ -57,6 +59,21 @@ async function fetchExactSectionContent(
       .select('id, file_name, subject_id, section_id, content')
       .in('subject_id', dbSubjects)
       .in('section_id', sectionAliases);
+
+  // Cloudflare trial path. The helper only returns a record when its immutable
+  // source ID, subject, section, chapter and lesson all match exactly.
+  try {
+    const cloudContent = await fetchCloudflareExactSection(
+      dbSubjects,
+      sectionAliases,
+      chapterNumber,
+      lessonNumber,
+      () => true,
+    );
+    if (cloudContent) return cloudContent;
+  } catch (error) {
+    console.warn('[gamesService] Cloudflare exact lookup failed; using Supabase fallback:', error);
+  }
 
   // Prefer the exact content-index relation; file names may use legacy conventions.
   try {
@@ -578,6 +595,7 @@ export async function fetchLessonGamesData(
           gibhaSahConfig,
           dailyExamAvailable: Boolean(bundle.curriculumData?.pages?.length),
           source: 'database',
+          dataSource: bundle.dataSource || 'supabase',
           loadedAt: Date.now(),
         };
       }
@@ -657,6 +675,7 @@ export async function fetchLessonGamesData(
       gibhaSahConfig,
       dailyExamAvailable: false,
       source: mcqRes || tfRes || phRes ? 'database' : 'fallback',
+      dataSource: mcqRes || tfRes || phRes ? 'cloudflare' : 'fallback',
       loadedAt: Date.now(),
     };
 
@@ -670,6 +689,7 @@ export async function fetchLessonGamesData(
       gibhaSahConfig: getGibhaSahGameForLesson(actualLessonId, actualLessonTitle, actualCategory),
       dailyExamAvailable: false,
       source: 'fallback',
+      dataSource: 'fallback',
       loadedAt: Date.now(),
     };
     gamesCache[cacheKey] = fallbackBundle;

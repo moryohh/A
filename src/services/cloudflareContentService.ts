@@ -33,6 +33,29 @@ export async function fetchCloudflareEducationalRecord(recordId: string): Promis
   return response.json();
 }
 
+export async function fetchCloudflareExactSection(
+  subjectIds: string[],
+  sectionIds: string[],
+  chapterNumber: number,
+  lessonNumber: number,
+  isUsable: (content: any) => boolean,
+): Promise<any | null> {
+  const candidates = (await Promise.all(
+    subjectIds.map((subject) => fetchCloudflareContentIndex(subject))
+  )).flat().filter((row) => sectionIds.includes(row.section_id));
+
+  // Fetch only records whose filename proves the requested chapter and lesson.
+  // No neighboring lesson is substituted here.
+  for (const row of candidates) {
+    const chapter = row.file_name.match(/(?:^|[_-])(?:ch|chapter|فصل)[_-]?(\d+)/i)?.[1];
+    const lesson = row.file_name.match(/(?:^|[_-])(?:lesson|les|segment|درس)[_-]?(\d+)/i)?.[1];
+    if (Number(chapter) !== chapterNumber || Number(lesson) !== lessonNumber) continue;
+    const content = await fetchCloudflareEducationalRecord(row.source_id);
+    if (isUsable(content)) return content;
+  }
+  return null;
+}
+
 export function getCloudflareContentEndpoints() {
   return { index: CONTENT_INDEX_API, r2: CONTENT_R2_API };
 }
