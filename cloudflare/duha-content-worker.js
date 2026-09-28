@@ -36,7 +36,7 @@ export default {
     const section = url.searchParams.get("section") || null;
     const q = url.searchParams.get("q") || null;
     const requestedLimit = Number(url.searchParams.get("limit") || "20");
-    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 20, 100));
+    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 20, 2000));
 
     const predicates = [];
     const params = [];

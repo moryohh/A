@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { SUBJECTS_CURRICULUM_DATA } from '../data/mockCurriculums';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
+import { fetchCloudflareContentIndex, fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
 // In-Memory Cache Store for Lazy-Loaded Data
 const subjectIndexCache = new Map<string, SubjectIndex>();
@@ -455,7 +456,25 @@ export async function getSubjectIndex(
   let rawRows: any[] = [];
   let fetchError: any = null;
 
-  if (supabase && isSupabaseConfigured()) {
+  // Trial path: use the Cloudflare D1 index first; retain Supabase as fallback.
+  try {
+    const cloudRows = await fetchCloudflareContentIndex(normKey);
+    if (cloudRows.length > 0) {
+      rawRows = cloudRows.map((row) => ({
+        record_id: row.source_id,
+        subject_id: row.subject_id,
+        section_id: row.section_id,
+        file_name: row.file_name,
+        lesson_id: row.file_name?.split('/').pop()?.replace('.json', ''),
+        title: row.title,
+        has_content: true,
+      }));
+    }
+  } catch (err) {
+    console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase fallback:', err);
+  }
+
+  if (rawRows.length === 0 && supabase && isSupabaseConfigured()) {
     try {
       // 1. Try querying the dedicated View: `educational_content_index`
       const { data: viewData, error: viewError } = await supabase
@@ -755,7 +774,31 @@ export async function getLessonContentBundle(
 
   let rawSectionRows: any[] = [];
 
-  if (supabase && isSupabaseConfigured()) {
+  // Trial path: fetch the exact immutable records from R2 by source ID.
+  if (recordIds.length > 0) {
+    try {
+      const cloudRecords = await Promise.all(
+        recordIds.map(async (id) => {
+          try {
+            return { id, content: await fetchCloudflareEducationalRecord(id) };
+          } catch {
+            return null;
+          }
+        })
+      );
+      rawSectionRows = cloudRecords
+        .filter((row): row is { id: string; content: any } => Boolean(row?.content))
+        .map((row) => {
+          const section = Object.entries(indexData?.files || {}).find(([, file]) => file.recordId === row.id)?.[0] || '';
+          const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
+          return { id: row.id, subject_id: context.subjectId, section_id: section, file_name: fileName, content: row.content };
+        });
+    } catch (err) {
+      console.warn('[getLessonContentBundle] Cloudflare R2 unavailable; using Supabase fallback:', err);
+    }
+  }
+
+  if (rawSectionRows.length === 0 && supabase && isSupabaseConfigured()) {
     try {
       if (recordIds.length > 0) {
         const { data, error } = await supabase
@@ -1171,4 +1214,3 @@ export function clearLessonsCache(): void {
   chapterLessonsCache.clear();
   lessonJsonCache.clear();
 }
-
