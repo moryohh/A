@@ -26,6 +26,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { fetchLessonGamesData, LessonGamesBundle } from '../services/gamesService';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
+import { OnlineChallengeModal } from './OnlineChallengeModal';
 
 interface LessonGamesModalProps {
   isOpen: boolean;
@@ -65,9 +66,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   playerId,
 }) => {
   const { theme } = useAppTheme();
-  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick'
+  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
   const [activeGameMode, setActiveGameMode] = useState<
-    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick'
+    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
   >('menu');
 
   // Dynamic Supabase Games Bundle (Lazy-loaded on demand only when modal opens)
@@ -211,6 +212,12 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   };
 
   const totalPointsAvailable = games.reduce((acc, g) => acc + g.points, 0);
+
+  if (activeGameMode === 'online') return <OnlineChallengeModal
+    onClose={() => setActiveGameMode('menu')}
+    questions={gamesBundle?.mcqConfig.questions || []}
+    lessonTitle={lessonTitle}
+  />;
 
   // Render Millionaire Modal (MCQ)
   if (activeGameMode === 'millionaire') {
@@ -368,6 +375,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
               ) : null}
 
               {/* 2x2 Grid (4 Quadrants / Square Sides) */}
+              {import.meta.env.VITE_ONLINE_CHALLENGE_API_URL && <button
+                onClick={() => setActiveGameMode('online')}
+                className="w-full rounded-2xl border border-sky-400/40 bg-sky-950/70 p-3 text-center font-bold text-sky-100 disabled:opacity-50"
+              >تحدّي مباشر مع صديق — نسخة تجريبية</button>}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 {/* 1. TOP RIGHT: امتحان يومي (الأول على اليمين) */}
                 <div className="bg-gradient-to-b from-[#25133d] via-[#1a0c2c] to-[#0e0719] border-2 border-purple-500/40 hover:border-purple-400 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center shadow-xl relative overflow-hidden group transition-all">
