@@ -126,16 +126,8 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
             ref={frameRef}
             key={`${chapterNumber}-${selectedDiagram}`}
             title={`رسومات الأحياء التفاعلية للفصل ${chapterName}`}
-            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html${chapterNumber === 1 ? '?embedded=1' : ''}`}
-            onLoad={(event) => {
-              setIsFrameLoading(false);
-              if (chapterNumber !== 1) return;
-              const selector = event.currentTarget.contentDocument?.querySelector('select[aria-label="اختر الرسمة العلمية"]') as HTMLSelectElement | null;
-              if (selector && selector.value !== selectedDiagram) {
-                selector.value = selectedDiagram;
-                selector.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }}
+            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html${chapterNumber === 1 ? `?embedded=1&diagram=${encodeURIComponent(selectedDiagram)}` : ''}`}
+            onLoad={() => setIsFrameLoading(false)}
             className="h-[70vh] min-h-[500px] w-full border-0 bg-slate-950"
           />
         </div>
