@@ -100,7 +100,7 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
               setIsFrameLoading(false);
               if (chapterNumber !== 1) return;
               const document = event.currentTarget.contentDocument;
-              const select = document?.querySelector<HTMLSelectElement>('select[aria-label="اختر الرسمة العلمية"]');
+              const select = document?.querySelector('select[aria-label="اختر الرسمة العلمية"]') as HTMLSelectElement | null;
               if (!select) return;
               setSelectedDiagram(select.value);
               select.addEventListener('change', () => { setImageFailed(false); setSelectedDiagram(select.value); });
