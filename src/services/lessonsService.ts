@@ -461,15 +461,20 @@ export async function getSubjectIndex(
   try {
     const cloudRows = await fetchCloudflareContentIndex(normKey);
     if (cloudRows.length > 0) {
-      rawRows = cloudRows.map((row) => ({
-        record_id: row.source_id,
-        subject_id: row.subject_id,
-        section_id: row.section_id,
-        file_name: row.file_name,
-        lesson_id: row.file_name?.split('/').pop()?.replace('.json', ''),
-        title: row.title,
-        has_content: true,
-      }));
+      rawRows = cloudRows.map((row) => {
+        const { chapter, segment } = extractChapterAndSegment(row.file_name || '');
+        return {
+          record_id: row.source_id,
+          subject_id: row.subject_id,
+          section_id: row.section_id,
+          file_name: row.file_name,
+          lesson_id: row.file_name?.split('/').pop()?.replace('.json', ''),
+          chapter_number: chapter || undefined,
+          lesson_number: segment || undefined,
+          title: row.title,
+          has_content: true,
+        };
+      });
     }
   } catch (err) {
     console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase fallback:', err);
