@@ -20,6 +20,35 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script type="module" crossorigin src="./assets/index-Bm6Yc4A0.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DkUg9OyJ.css">
+    <style>html.embedded #scientific-canvas-board > button:first-child { display: none !important; }</style>
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.has('embedded')) document.documentElement.classList.add('embedded');
+      const requestedDiagram = params.get('diagram');
+      const diagramIds = [
+        'phloem-tissue', 'simple-squamous-epithelium', 'simple-cuboidal-epithelium',
+        'simple-columnar-epithelium', 'pseudostratified-columnar-epithelium',
+        'stratified-squamous-epithelium', 'stratified-cuboidal-epithelium',
+        'stratified-columnar-epithelium', 'adipose-connective-tissue',
+        'reticular-connective-tissue', 'mucous-connective-tissue',
+        'dense-regular-connective-tissue', 'compact-bone', 'blood-cells-human',
+        'muscle-cells', 'multipolar-neuron', 'neuron-types',
+      ];
+      const diagramIndex = diagramIds.indexOf(requestedDiagram);
+      if (diagramIndex >= 0) {
+        const activateDiagram = () => {
+          const choices = document.querySelectorAll('#scientific-canvas-board > div:first-child > div.grid > button');
+          if (choices.length !== diagramIds.length) return false;
+          choices[diagramIndex].click();
+          return true;
+        };
+        const observer = new MutationObserver(() => {
+          if (activateDiagram()) observer.disconnect();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        window.addEventListener('load', activateDiagram);
+      }
+    </script>
   </head>
   <body class="bg-[#f8fafc] text-slate-900 antialiased font-['Cairo',sans-serif] selection:bg-emerald-100 selection:text-emerald-900">
     <div id="root"></div>
