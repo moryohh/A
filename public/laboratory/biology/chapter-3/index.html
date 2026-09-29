@@ -20,6 +20,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script type="module" crossorigin src="./assets/index-3NzglZ_B.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-n2QUMOxV.css">
+    <style>html.embedded #scientific-canvas-board > button:first-child { display: none !important; }</style>
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.has('embedded')) document.documentElement.classList.add('embedded');
+      const requestedDiagram = params.get('diagram');
+      const diagramIds = [
+        'spermatogenesis-mammals', 'oogenesis-mammals',
+        'virus-reproduction-bacteriophage', 'binary-fission-bacteria',
+        'conjugation-bacteria', 'chlamydomonas-sexual-reproduction',
+        'chlamydomonas-asexual-reproduction', 'paramecium-binary-fission',
+        'paramecium-conjugation', 'euglena-longitudinal-fission',
+        'alternation-of-generations', 'pistil-flower-structure',
+        'dicot-embryo-development', 'fruit-structure',
+        'male-reproductive-system-insect', 'female-reproductive-system-insect',
+        'male-reproductive-system-human', 'mature-sperm-human',
+        'ovarian-cycle-human-female',
+      ];
+      const diagramIndex = diagramIds.indexOf(requestedDiagram);
+      if (diagramIndex >= 0) {
+        const activateDiagram = () => {
+          const choices = document.querySelectorAll('#scientific-canvas-board > div:first-child > div.grid > button');
+          if (choices.length !== diagramIds.length) return false;
+          choices[diagramIndex].click();
+          return true;
+        };
+        const observer = new MutationObserver(() => {
+          if (activateDiagram()) observer.disconnect();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        window.addEventListener('load', activateDiagram);
+      }
+    </script>
   </head>
   <body class="bg-[#f8fafc] text-slate-900 antialiased font-['Cairo',sans-serif] selection:bg-emerald-100 selection:text-emerald-900">
     <div id="root"></div>
