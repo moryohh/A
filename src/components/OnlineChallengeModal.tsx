@@ -37,7 +37,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onmessage = (event) => {
       const payload = JSON.parse(event.data);
       if (payload.type === 'welcome') setMe(payload.userId);
-      if (payload.type === 'state') { setState(payload); setLastAnswer(null); }
+      if (payload.type === 'state') setState(payload);
       if (payload.type === 'round_result') setLastAnswer(payload.answer);
     };
     ws.onerror = () => setError('انقطع الاتصال بالغرفة. أعد الدخول بالرمز نفسه.');
