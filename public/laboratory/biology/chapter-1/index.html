@@ -15,7 +15,26 @@
     <script type="module" crossorigin src="./assets/index-CkvIHCeI.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DFh1N7IX.css">
     <style>html.embedded header, html.embedded main > section:first-child, html.embedded footer, html.embedded main > button { display: none !important; } html.embedded main { padding-top: 8px; }</style>
-    <script>if (new URLSearchParams(location.search).has('embedded')) document.documentElement.classList.add('embedded');</script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.has('embedded')) document.documentElement.classList.add('embedded');
+      const requestedDiagram = params.get('diagram');
+      if (requestedDiagram) {
+        const activateDiagram = () => {
+          const picker = document.querySelector('select[aria-label="اختر الرسمة العلمية"]');
+          if (!picker) return false;
+          if (![...picker.options].some(option => option.value === requestedDiagram)) return true;
+          picker.value = requestedDiagram;
+          picker.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        };
+        const observer = new MutationObserver(() => {
+          if (activateDiagram()) observer.disconnect();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        window.addEventListener('load', activateDiagram);
+      }
+    </script>
   </head>
   <body class="font-sans antialiased bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white">
     <div id="root"></div>
