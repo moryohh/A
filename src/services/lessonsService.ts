@@ -795,7 +795,9 @@ export async function getLessonContentBundle(
           const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
           return { id: row.id, subject_id: context.subjectId, section_id: section, file_name: fileName, content: row.content };
         });
-      if (rawSectionRows.length > 0) dataSource = 'cloudflare';
+      // A partial R2 bundle is not reported as Cloudflare: missing sections may
+      // be filled by Supabase below, so claiming a single source would be false.
+      if (recordIds.length > 0 && rawSectionRows.length === recordIds.length) dataSource = 'cloudflare';
     } catch (err) {
       console.warn('[getLessonContentBundle] Cloudflare R2 unavailable; using Supabase fallback:', err);
     }
