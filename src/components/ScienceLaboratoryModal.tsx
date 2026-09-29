@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlaskConical, X } from 'lucide-react';
 import { SubjectChapter } from '../types';
 
@@ -21,6 +21,18 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
   const [isFrameLoading, setIsFrameLoading] = useState(true);
   const [selectedDiagram, setSelectedDiagram] = useState('bacteria');
   const [imageFailed, setImageFailed] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const diagrams = [
+    ['bacteria', 'الخلية البكتيرية'], ['plasma-membrane', 'الغشاء البلازمي'],
+    ['mitochondria', 'الميتوكوندريا'], ['chloroplast', 'البلاستيدة الخضراء'],
+    ['lysosome', 'الجسيمات الحالة'], ['chromosome', 'تركيب الكروموسوم'],
+    ['plant-animal-cell', 'الخلية النباتية والحيوانية'], ['active-transport', 'النقل الفعال'],
+    ['phagocytosis', 'البلعمة'], ['pinocytosis', 'الشرب الخلوي'],
+    ['exocytosis', 'الإخراج الخلوي'], ['osmosis-cells', 'التناضح في الخلايا'],
+    ['diffusion-exp', 'تجربة الانتشار'], ['osmosis-exp', 'تجربة التناضح'],
+    ['glycolysis', 'التحلل السكري'], ['krebs-cycle', 'دورة كربس'],
+    ['mitosis', 'الانقسام الخيطي'], ['meiosis', 'الانقسام الاختزالي'],
+  ];
   const referenceImages: Record<string, string> = {
     'plasma-membrane': 'https://xutqrhwqrodzmbdlgqsg.supabase.co/storage/v1/object/public/biology-chapter-1-reference/plasma-membrane.jpg',
     'mitochondria': 'https://xutqrhwqrodzmbdlgqsg.supabase.co/storage/v1/object/public/biology-chapter-1-reference/mitochondria.jpg',
@@ -75,13 +87,31 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
         <select
           id="laboratory-chapter"
           value={chapterNumber}
-          onChange={(event) => { setChapterNumber(Number(event.target.value)); setIsFrameLoading(true); }}
+          onChange={(event) => { setChapterNumber(Number(event.target.value)); setSelectedDiagram('bacteria'); setImageFailed(false); setIsFrameLoading(true); }}
           className="w-full rounded-xl border border-sky-500/50 bg-[#142943] px-3 py-2 text-white"
         >
           {chapters.map((chapter) => (
             <option key={chapter.id} value={chapter.number}>{chapter.title}</option>
           ))}
         </select>
+        {subjectId === 'biology' && chapterNumber === 1 && (
+          <>
+            <label htmlFor="laboratory-diagram" className="block text-sm font-bold mt-3 mb-1">اختر الرسمة</label>
+            <select
+              id="laboratory-diagram"
+              value={selectedDiagram}
+              onChange={(event) => {
+                const diagramId = event.target.value;
+                setSelectedDiagram(diagramId);
+                setImageFailed(false);
+
+              }}
+              className="w-full rounded-xl border border-sky-500/50 bg-[#142943] px-3 py-2 text-white"
+            >
+              {diagrams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </>
+        )}
       </div>
       {available ? (
         <div className="relative flex-1 min-h-0 overflow-y-auto">
@@ -93,17 +123,18 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
             </div>
           )}
           <iframe
-            key={chapterNumber}
+            ref={frameRef}
+            key={`${chapterNumber}-${selectedDiagram}`}
             title={`رسومات الأحياء التفاعلية للفصل ${chapterName}`}
-            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html`}
+            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html${chapterNumber === 1 ? '?embedded=1' : ''}`}
             onLoad={(event) => {
               setIsFrameLoading(false);
               if (chapterNumber !== 1) return;
-              const document = event.currentTarget.contentDocument;
-              const select = document?.querySelector('select[aria-label="اختر الرسمة العلمية"]') as HTMLSelectElement | null;
-              if (!select) return;
-              setSelectedDiagram(select.value);
-              select.addEventListener('change', () => { setImageFailed(false); setSelectedDiagram(select.value); });
+              const selector = event.currentTarget.contentDocument?.querySelector('select[aria-label="اختر الرسمة العلمية"]') as HTMLSelectElement | null;
+              if (selector && selector.value !== selectedDiagram) {
+                selector.value = selectedDiagram;
+                selector.dispatchEvent(new Event('change', { bubbles: true }));
+              }
             }}
             className="h-[70vh] min-h-[500px] w-full border-0 bg-slate-950"
           />
