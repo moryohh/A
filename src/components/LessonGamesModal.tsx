@@ -433,7 +433,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <div className="mt-3 grid w-full grid-cols-2 gap-1.5"><button
+                  <p className="mt-3 text-[10px] font-bold text-amber-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenDailyExam) return;
                       gameAudio.playGameStart();
@@ -465,10 +465,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       setActiveGameMode('millionaire');
                     }}
                     disabled={!canOpenMillionaire}
-                    className="py-2 px-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-black rounded-xl text-[10px] shadow-md flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <User className="w-3.5 h-3.5"/><span>{hasMillionaireQuestions ? 'فردي' : 'غير متوفر'}</span>
-                  </button><button onClick={() => openOnlineGame('millionaire')} disabled={!canOpenMillionaire || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="py-2 px-1 bg-sky-600 text-white font-bold rounded-xl text-[10px] flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-40"><Users className="w-3.5 h-3.5"/><span>جماعي</span></button></div>
+                    <User className="w-4 h-4"/><span>{hasMillionaireQuestions ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('millionaire')} disabled={!canOpenMillionaire || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
 
                 {/* 3. BOTTOM RIGHT: صواب أم خطأ */}
@@ -482,17 +482,17 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <div className="mt-3 grid w-full grid-cols-2 gap-1.5"><button
+                  <p className="mt-3 text-[10px] font-bold text-emerald-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenTrueFalse) return;
                       gameAudio.playGameStart();
                       setActiveGameMode('true_false');
                     }}
                     disabled={!canOpenTrueFalse}
-                    className="py-2 px-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black rounded-xl text-[10px] shadow-md flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <User className="w-3.5 h-3.5"/><span>{hasTrueFalseQuestions ? 'فردي' : 'غير متوفر'}</span>
-                  </button><button onClick={() => openOnlineGame('true_false')} disabled={!canOpenTrueFalse || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="py-2 px-1 bg-sky-600 text-white font-bold rounded-xl text-[10px] flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-40"><Users className="w-3.5 h-3.5"/><span>جماعي</span></button></div>
+                    <User className="w-4 h-4"/><span>{hasTrueFalseQuestions ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('true_false')} disabled={!canOpenTrueFalse || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
 
                 {/* 4. BOTTOM LEFT: جبتها صح */}
@@ -506,17 +506,17 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <div className="mt-3 grid w-full grid-cols-2 gap-1.5"><button
+                  <p className="mt-3 text-[10px] font-bold text-cyan-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenGibhaSah) return;
                       gameAudio.playGameStart();
                       setActiveGameMode('gibha_sah');
                     }}
                     disabled={!canOpenGibhaSah}
-                    className="py-2 px-1 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-black font-black rounded-xl text-[10px] shadow-md flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <User className="w-3.5 h-3.5"/><span>{hasGibhaSahCards ? 'فردي' : 'غير متوفر'}</span>
-                  </button><button onClick={() => openOnlineGame('gibha_sah')} disabled={!canOpenGibhaSah || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="py-2 px-1 bg-sky-600 text-white font-bold rounded-xl text-[10px] flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-40"><Users className="w-3.5 h-3.5"/><span>جماعي</span></button></div>
+                    <User className="w-4 h-4"/><span>{hasGibhaSahCards ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('gibha_sah')} disabled={!canOpenGibhaSah || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
               </div>
             </div>
