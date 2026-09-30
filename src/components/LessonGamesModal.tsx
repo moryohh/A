@@ -229,11 +229,16 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
       const cards = gamesBundle?.gibhaSahConfig.cards || [];
       return {
         title: 'جبتها صح',
-        questions: (gamesBundle?.gibhaSahConfig.questions || []).slice(0, 10).map((question) => ({
-          question: question.question,
-          options: cards.map((card) => card.label),
-          correctAnswer: Math.max(0, cards.findIndex((card) => card.number === question.correctCardNumber)),
-        })).filter((question) => question.options.length >= 2),
+        questions: cards.length >= 2 && cards.length <= 12
+          ? (gamesBundle?.gibhaSahConfig.questions || []).slice(0, 10).flatMap((question) => {
+              const correctAnswer = cards.findIndex((card) => card.number === question.correctCardNumber);
+              return correctAnswer >= 0 ? [{
+                question: question.question,
+                options: cards.map((card) => card.label),
+                correctAnswer,
+              }] : [];
+            })
+          : [],
       };
     }
     return {
