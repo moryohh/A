@@ -34,15 +34,15 @@ function validQuestions(value) {
 }
 
 function allowedOrigin(request, env) {
-  var configured = env.ALLOWED_ORIGIN || 'https://a-1q1.pages.dev';
+  var configured = (env.ALLOWED_ORIGINS || env.ALLOWED_ORIGIN || 'https://a-1q1.pages.dev').split(',').map(function (item) { return item.trim(); });
   var origin = request.headers.get('Origin') || '';
-  return origin && origin !== configured ? null : configured;
+  return origin && !configured.includes(origin) ? null : (origin || configured[0]);
 }
 
 export default {
   async fetch(request, env) {
     var origin = allowedOrigin(request, env);
-    if (!origin) return json({ error: 'origin_not_allowed' }, 403, env.ALLOWED_ORIGIN || 'https://a-1q1.pages.dev');
+    if (!origin) return json({ error: 'origin_not_allowed' }, 403, 'null');
     if (request.method === 'OPTIONS') return json({}, 200, origin);
     var url = new URL(request.url);
 
