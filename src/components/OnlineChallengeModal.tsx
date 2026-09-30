@@ -5,6 +5,7 @@ export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah'
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type Player = { id: string; score: number; answered: boolean; connected: boolean };
 type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean };
+type RoundResult = { answer: number; scores: Array<{ id: string; score: number }> };
 
 interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; }
 
@@ -15,13 +16,18 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [me, setMe] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [lastAnswer, setLastAnswer] = useState<number | null>(null);
+  const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const [connected, setConnected] = useState(false);
   const [pendingAnswer, setPendingAnswer] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const roundRef = useRef<number | null>(null);
+  const resultUntilRef = useRef(0);
+  const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => socketRef.current?.close(), []);
+  useEffect(() => () => {
+    socketRef.current?.close();
+    if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
+  }, []);
 
   async function token() {
     const client = getSupabaseClient();
@@ -39,19 +45,29 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/rooms/${roomId}/ws?ticket=${encodeURIComponent(ticket)}`);
     socketRef.current = ws;
     ws.onopen = () => { setConnected(true); setError(''); };
+    const applyState = (payload: State) => {
+      if (roundRef.current !== payload.round) roundRef.current = payload.round;
+      setPendingAnswer(false);
+      setRoundResult(null);
+      setState(payload);
+    };
     ws.onmessage = (event) => {
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
       if (payload.type === 'welcome') setMe(payload.userId);
       if (payload.type === 'state') {
-        if (roundRef.current !== payload.round) {
-          roundRef.current = payload.round;
-          if (payload.status !== 'finished') setLastAnswer(null);
-          setPendingAnswer(false);
+        const remaining = resultUntilRef.current - Date.now();
+        if (remaining > 0) {
+          if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
+          stateTimerRef.current = setTimeout(() => applyState(payload), remaining);
+        } else {
+          applyState(payload);
         }
-        setState(payload);
       }
-      if (payload.type === 'round_result') setLastAnswer(payload.answer);
+      if (payload.type === 'round_result') {
+        resultUntilRef.current = Date.now() + 2200;
+        setRoundResult({ answer: payload.answer, scores: payload.scores || [] });
+      }
     };
     ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
     ws.onclose = () => {
@@ -112,9 +128,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="flex justify-between text-sm">{state?.players.map((p, i) => <span key={p.id}>{p.id === me ? 'أنت' : `اللاعب ${i + 1}`}: {p.score} {p.connected ? '🟢' : '⚪'}</span>)}</div>
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
-        {state?.status === 'playing' && state.question && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
-        {lastAnswer !== null && state?.status === 'finished' && <p>الإجابة الصحيحة في الجولة الأخيرة: الخيار {lastAnswer + 1}</p>}
-        {state?.status === 'finished' && <p className="text-center text-xl font-bold">{state.tie ? 'تعادل!' : state.winner === me ? 'فزت بالتحدّي!' : 'انتهى التحدّي'}</p>}
+        {state?.status === 'playing' && state.question && !roundResult && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
+        {roundResult && state?.question && <div className="rounded-2xl border border-emerald-400/50 bg-emerald-500/15 p-5 text-center"><p className="text-sm font-bold text-emerald-200">نتيجة الجولة</p><p className="mt-2 text-lg font-black">الإجابة الصحيحة</p><p className="mt-2 rounded-xl bg-white/10 p-3 font-bold text-emerald-100">{state.question.options[roundResult.answer]}</p><div className="mt-3 flex justify-center gap-4 text-sm">{roundResult.scores.map((player, index) => <span key={player.id}>{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}: <b>{player.score}</b></span>)}</div></div>}
+        {state?.status === 'finished' && <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-center"><p className="text-2xl font-black text-amber-200">{state.tie ? 'انتهت المباراة بالتعادل!' : state.winner === me ? 'فزت بالتحدّي! 🎉' : 'فاز اللاعب الآخر'}</p><div className="mt-4 grid grid-cols-2 gap-3">{state.players.map((player, index) => <div key={player.id} className={`rounded-xl border p-3 ${player.id === state.winner ? 'border-amber-300 bg-amber-400/15' : 'border-white/15 bg-white/5'}`}><p className="text-xs text-slate-300">{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}</p><p className="mt-1 text-2xl font-black">{player.score}</p></div>)}</div><button onClick={onClose} className="mt-4 w-full rounded-xl bg-sky-600 p-3 font-black">العودة إلى الألعاب</button></div>}
       </div>}
       {error && <p className="mt-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
     </div>
