@@ -40,6 +40,7 @@ import { CommunityProfileModal } from './components/CommunityProfileModal';
 import { CommunityAccountActionsModal } from './components/CommunityAccountActionsModal';
 import { MainHomeView } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
+import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
@@ -438,6 +439,7 @@ function AppContent() {
         return true;
       }
       if (state.activeTab === 'home' && state.homeSubView === 'learning_path') {
+        if (!window.dispatchEvent(new Event('duha-mathematics-back', { cancelable: true }))) return true;
         setHomeSubView('main_home');
         setOpenLessonContext(null);
         return true;
@@ -1211,7 +1213,7 @@ function AppContent() {
                 ? lesson.title
                 : homeSubView === 'learning_path'
                 ? selectedSubject
-                  ? `خارطة ${selectedSubject.name}`
+                  ? selectedSubject.id === 'mathematics' ? 'دروس الرياضيات' : `خارطة ${selectedSubject.name}`
                   : 'خارطة المنهج'
                 : 'الصفحة الرئيسية - السادس'
               : activeTab === 'community'
@@ -1265,6 +1267,7 @@ function AppContent() {
 
           {/* 2. Intermediate Subject Learning Path (خارطة المادة والتقدم) */}
           {activeTab === 'home' && homeSubView === 'learning_path' && selectedSubject && (
+            selectedSubject.id === 'mathematics' ? <MathematicsCoursesView onBack={() => setHomeSubView('main_home')} /> :
             <SubjectLearningPathView
               subject={selectedSubject}
               learningPosition={learningPosition}
