@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { FlaskConical, X } from 'lucide-react';
 import { SubjectChapter } from '../types';
 
+const PhysicsScientificCanvas = React.lazy(() =>
+  import('../physicsLab/components/InteractiveScientificCanvas').then(({ InteractiveScientificCanvas }) => ({ default: InteractiveScientificCanvas }))
+);
+
 interface ScienceLaboratoryModalProps {
   subjectId: string;
   subjectName: string;
@@ -142,7 +146,7 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
       : undefined;
   const available = subjectId === 'biology' && [1, 2, 3].includes(chapterNumber);
   const chapterName = ['الأول', 'الثاني', 'الثالث'][chapterNumber - 1] || String(chapterNumber);
-  const contentType = subjectId === 'biology' ? 'الرسومات' : 'التجارب';
+  const contentType = ['biology', 'physics'].includes(subjectId) ? 'الرسومات' : 'التجارب';
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
@@ -164,12 +168,12 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
           <FlaskConical className="w-6 h-6 text-cyan-300 shrink-0" />
           <div className="min-w-0">
             <h2 className="font-black text-base truncate">مختبر {subjectName}</h2>
-            <p className="text-xs text-sky-200">{contentType} بحسب الفصل</p>
+            <p className="text-xs text-sky-200">{contentType}{subjectId === 'physics' ? ' التفاعلية' : ' بحسب الفصل'}</p>
           </div>
         </div>
         <button type="button" onClick={onClose} aria-label="إغلاق المختبر" className="rounded-xl border border-white/30 p-2 hover:bg-white/10"><X className="w-5 h-5" /></button>
       </div>
-      <div className="border-b border-white/10 bg-[#0b192c] px-4 py-3">
+      {subjectId !== 'physics' && <div className="border-b border-white/10 bg-[#0b192c] px-4 py-3">
         <label htmlFor="laboratory-chapter" className="block text-sm font-bold mb-1">اختر الفصل</label>
         <select
           id="laboratory-chapter"
@@ -199,8 +203,14 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
             </select>
           </>
         )}
-      </div>
-      {available ? (
+      </div>}
+      {subjectId === 'physics' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-100 p-2 sm:p-4">
+          <React.Suspense fallback={<p className="p-6 text-center text-slate-700">جاري فتح رسومات الفيزياء…</p>}>
+            <PhysicsScientificCanvas />
+          </React.Suspense>
+        </div>
+      ) : available ? (
         <div className="relative flex-1 min-h-0 overflow-y-auto">
           {isFrameLoading && <p className="absolute inset-0 flex items-center justify-center text-sky-200">جاري فتح رسومات الفصل {chapterName}…</p>}
           {selectedImage && (
