@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
-import { MillionaireQuestion } from '../types';
-
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
+export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
+export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type Player = { id: string; score: number; answered: boolean; connected: boolean };
-type State = { type: 'state'; status: 'waiting' | 'playing' | 'finished'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean };
+type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean };
 
-interface Props { onClose: () => void; questions: MillionaireQuestion[]; lessonTitle: string; }
+interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; }
 
-export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle }) => {
+export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle }) => {
   const [room, setRoom] = useState('');
   const [entry, setEntry] = useState('');
   const [state, setState] = useState<State | null>(null);
@@ -83,7 +83,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     try {
       const selected = questions.slice(0, 10).map(q => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer }));
       if (!selected.length) throw new Error('لا توجد أسئلة لهذا الدرس.');
-      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ questions: selected }) });
+      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected }) });
       if (!response.ok) throw new Error('تعذر إنشاء غرفة التحدّي.');
       const { roomId } = await response.json();
       await connect(roomId);
@@ -104,7 +104,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const self = state?.players.find(p => p.id === me);
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4 text-white" dir="rtl">
     <div className="w-full max-w-xl rounded-3xl border border-sky-400/30 bg-[#0b1930] p-5 shadow-2xl">
-      <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black">تحدّي مباشر: {lessonTitle}</h2><button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
+      <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black">{gameTitle} — لعب جماعي</h2><p className="text-xs text-sky-200">{lessonTitle}</p></div><button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
       <p className="mb-4 text-sm text-sky-200">تجربة بين لاعبين، بلا نقاط للمستويات حالياً.</p>
       {!room && <div className="space-y-3"><button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
         <div className="flex gap-2"><input className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value)} placeholder="رمز غرفة صديقك"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div></div>}
@@ -112,7 +112,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="flex justify-between text-sm">{state?.players.map((p, i) => <span key={p.id}>{p.id === me ? 'أنت' : `اللاعب ${i + 1}`}: {p.score} {p.connected ? '🟢' : '⚪'}</span>)}</div>
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
-        {state?.status === 'playing' && state.question && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className="grid grid-cols-2 gap-2">{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
+        {state?.status === 'playing' && state.question && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
         {lastAnswer !== null && state?.status === 'finished' && <p>الإجابة الصحيحة في الجولة الأخيرة: الخيار {lastAnswer + 1}</p>}
         {state?.status === 'finished' && <p className="text-center text-xl font-bold">{state.tie ? 'تعادل!' : state.winner === me ? 'فزت بالتحدّي!' : 'انتهى التحدّي'}</p>}
       </div>}
