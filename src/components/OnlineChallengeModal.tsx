@@ -16,7 +16,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [lastAnswer, setLastAnswer] = useState<number | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [pendingAnswer, setPendingAnswer] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  const roundRef = useRef<number | null>(null);
 
   useEffect(() => () => socketRef.current?.close(), []);
 
@@ -32,17 +35,47 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (!response.ok) throw new Error(response.status === 409 ? 'هذه الغرفة ممتلئة.' : 'تعذر دخول الغرفة. تحقق من الرمز.');
     const { ticket } = await response.json();
     socketRef.current?.close();
+    setConnected(false);
     const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/rooms/${roomId}/ws?ticket=${encodeURIComponent(ticket)}`);
     socketRef.current = ws;
+    ws.onopen = () => { setConnected(true); setError(''); };
     ws.onmessage = (event) => {
-      const payload = JSON.parse(event.data);
+      let payload;
+      try { payload = JSON.parse(event.data); } catch { return; }
       if (payload.type === 'welcome') setMe(payload.userId);
-      if (payload.type === 'state') setState(payload);
+      if (payload.type === 'state') {
+        if (roundRef.current !== payload.round) {
+          roundRef.current = payload.round;
+          if (payload.status !== 'finished') setLastAnswer(null);
+          setPendingAnswer(false);
+        }
+        setState(payload);
+      }
       if (payload.type === 'round_result') setLastAnswer(payload.answer);
     };
-    ws.onerror = () => setError('انقطع الاتصال بالغرفة. أعد الدخول بالرمز نفسه.');
-    ws.onclose = () => { if (socketRef.current === ws) socketRef.current = null; };
+    ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
+    ws.onclose = () => {
+      if (socketRef.current === ws) {
+        socketRef.current = null;
+        setConnected(false);
+        setPendingAnswer(false);
+        setError('انقطع الاتصال بالغرفة. اضغط إعادة الاتصال.');
+      }
+    };
     setRoom(roomId);
+  }
+
+  async function reconnect() {
+    setBusy(true);
+    try { await connect(room); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر إعادة الاتصال.'); }
+    finally { setBusy(false); }
+  }
+
+  function answer(option: number) {
+    if (!connected || pendingAnswer || self?.answered || socketRef.current?.readyState !== WebSocket.OPEN) return;
+    setPendingAnswer(true);
+    socketRef.current.send(JSON.stringify({ type: 'answer', option }));
   }
 
   async function create() {
@@ -76,10 +109,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       {!room && <div className="space-y-3"><button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
         <div className="flex gap-2"><input className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value)} placeholder="رمز غرفة صديقك"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div></div>}
       {room && <div className="space-y-4"><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
+        {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="flex justify-between text-sm">{state?.players.map((p, i) => <span key={p.id}>{p.id === me ? 'أنت' : `اللاعب ${i + 1}`}: {p.score} {p.connected ? '🟢' : '⚪'}</span>)}</div>
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
-        {state?.status === 'playing' && state.question && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className="grid grid-cols-2 gap-2">{state.question.options.map((option, i) => <button key={i} disabled={self?.answered} onClick={() => socketRef.current?.send(JSON.stringify({ type: 'answer', option: i }))} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{self?.answered && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
-        {lastAnswer !== null && <p>الإجابة الصحيحة: الخيار {lastAnswer + 1}</p>}
+        {state?.status === 'playing' && state.question && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className="grid grid-cols-2 gap-2">{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
+        {lastAnswer !== null && state?.status === 'finished' && <p>الإجابة الصحيحة في الجولة الأخيرة: الخيار {lastAnswer + 1}</p>}
         {state?.status === 'finished' && <p className="text-center text-xl font-bold">{state.tie ? 'تعادل!' : state.winner === me ? 'فزت بالتحدّي!' : 'انتهى التحدّي'}</p>}
       </div>}
       {error && <p className="mt-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
