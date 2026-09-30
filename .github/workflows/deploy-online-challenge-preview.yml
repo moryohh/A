@@ -43,6 +43,18 @@ jobs:
           VITE_DEPLOY_TARGET: cloudflare
           VITE_ONLINE_CHALLENGE_API_URL: https://duha-online-challenge.rafos72171.workers.dev
 
+      - name: Deploy challenge Worker
+        run: npx wrangler@4 deploy --config cloudflare/online-challenge/wrangler.jsonc
+
+      - name: Verify Worker and preview CORS
+        run: |
+          curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
+            --header "Origin: https://duha-challenge-preview.pages.dev" \
+            https://duha-online-challenge.rafos72171.workers.dev/health \
+            --output /tmp/challenge-health.json
+          grep -i "^access-control-allow-origin: https://duha-challenge-preview.pages.dev" /tmp/challenge-headers.txt
+          grep -q '"ok":true' /tmp/challenge-health.json
+
       - name: Ensure isolated Pages project exists
         run: npx wrangler@4 pages project create duha-challenge-preview --production-branch preview-online-challenge || true
 
