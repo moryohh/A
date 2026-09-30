@@ -8,6 +8,6 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChallengeRoom"] }],
   "vars": {
     "SUPABASE_URL": "https://qlfleszoyujelygwzdgu.supabase.co",
-    "ALLOWED_ORIGIN": "https://a-1q1.pages.dev"
+    "ALLOWED_ORIGINS": "https://a-1q1.pages.dev,https://duha-challenge-preview.pages.dev"
   }
 }
