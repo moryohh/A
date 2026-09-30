@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ChallengeRoom } from '../src/worker.js';
+import worker, { ChallengeRoom } from '../src/worker.js';
+
+test('preview origin is allowed explicitly and unrelated origins are denied', async () => {
+  const env = { ALLOWED_ORIGINS: 'https://a-1q1.pages.dev,https://challenge-preview.a-1q1.pages.dev' };
+  const preview = await worker.fetch(new Request('https://worker/health', {
+    headers: { Origin: 'https://challenge-preview.a-1q1.pages.dev' },
+  }), env);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.headers.get('Access-Control-Allow-Origin'), 'https://challenge-preview.a-1q1.pages.dev');
+  const rejected = await worker.fetch(new Request('https://worker/health', {
+    headers: { Origin: 'https://unknown.example' },
+  }), env);
+  assert.equal(rejected.status, 403);
+});
 
 test('two players finish a match; duplicate answers and third player are rejected', async () => {
   const data = new Map();
