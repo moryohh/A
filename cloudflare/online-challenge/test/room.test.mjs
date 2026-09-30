@@ -34,10 +34,10 @@ test('two players finish a match; duplicate answers and third player are rejecte
     { question: 'Second?', options: ['a', 'b', 'c', 'd'], correctAnswer: 1 },
   ];
   const init = await room.fetch(new Request('https://room/internal/init', {
-    method: 'POST', body: JSON.stringify({ hostId: 'host', questions }),
+    method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'millionaire', questions }),
   }));
   assert.equal(init.status, 200);
-  data.set('game', { status: 'playing', round: 0, questions, players: [
+  data.set('game', { gameType: 'millionaire', status: 'playing', round: 0, questions, players: [
     { id: 'host', score: 0, answer: null }, { id: 'guest', score: 0, answer: null },
   ] });
 
