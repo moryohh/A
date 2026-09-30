@@ -27,10 +27,14 @@ function validQuestions(value) {
   if (!Array.isArray(value) || value.length < 1 || value.length > 10) return false;
   return value.every(function (q) {
     return q && typeof q.question === 'string' && q.question.length > 0 && q.question.length <= 600 &&
-      Array.isArray(q.options) && q.options.length === 4 && q.options.every(function (o) {
+      Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 12 && q.options.every(function (o) {
         return typeof o === 'string' && o.length > 0 && o.length <= 300;
-      }) && Number.isInteger(q.correctAnswer) && q.correctAnswer >= 0 && q.correctAnswer < 4;
+      }) && Number.isInteger(q.correctAnswer) && q.correctAnswer >= 0 && q.correctAnswer < q.options.length;
   });
+}
+
+function validGameType(value) {
+  return ['millionaire', 'true_false', 'gibha_sah'].includes(value);
 }
 
 function allowedOrigin(request, env) {
@@ -54,14 +58,14 @@ export default {
       var creator = await authenticate(request, env);
       if (!creator) return json({ error: 'unauthorized' }, 401, origin);
       var body = await request.json().catch(function () { return null; });
-      if (!body || !validQuestions(body.questions)) return json({ error: 'invalid_questions' }, 400, origin);
+      if (!body || !validGameType(body.gameType) || !validQuestions(body.questions)) return json({ error: 'invalid_game' }, 400, origin);
       var roomId = crypto.randomUUID();
       var stub = env.ROOMS.get(env.ROOMS.idFromName(roomId));
       var questions = body.questions.map(function (q) {
         return { question: q.question, options: q.options, correctAnswer: q.correctAnswer };
       });
       var created = await stub.fetch(new Request('https://room/internal/init', {
-        method: 'POST', body: JSON.stringify({ hostId: creator, questions: questions }),
+        method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: questions }),
       }));
       if (!created.ok) return json({ error: 'room_create_failed' }, 500, origin);
       return json({ roomId: roomId }, 201, origin);
@@ -110,7 +114,7 @@ export class ChallengeRoom {
         game.players[1].score > game.players[0].score ? game.players[1].id : null;
     }
     return {
-      type: 'state', status: game.status, round: game.round, total: game.questions.length,
+      type: 'state', gameType: game.gameType, status: game.status, round: game.round, total: game.questions.length,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
         return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id) };
@@ -125,8 +129,8 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/init' && request.method === 'POST') {
       if (game) return json({ error: 'already_initialized' }, 409, '');
       var init = await request.json();
-      if (!init || typeof init.hostId !== 'string' || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
-      await this.ctx.storage.put('game', { status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }] });
+      if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
+      await this.ctx.storage.put('game', { gameType: init.gameType, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }] });
       return json({ ok: true }, 200, '');
     }
     if (!game) return json({ error: 'room_not_found' }, 404, '');
@@ -170,7 +174,9 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
-    if (!game || game.status !== 'playing' || payload.option < 0 || payload.option > 3) return;
+    if (!game || game.status !== 'playing') return;
+    var currentQuestion = game.questions[game.round];
+    if (payload.option < 0 || payload.option >= currentQuestion.options.length) return;
     var attachment = socket.deserializeAttachment();
     var player = attachment && game.players.find(function (p) { return p.id === attachment.userId; });
     if (!player || player.answer !== null) return;
