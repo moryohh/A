@@ -15,6 +15,25 @@ test('preview origin is allowed explicitly and unrelated origins are denied', as
   assert.equal(rejected.status, 403);
 });
 
+test('room accepts the option counts used by true/false and card games', async () => {
+  for (const [gameType, optionCount] of [['true_false', 2], ['gibha_sah', 12]]) {
+    const data = new Map();
+    const room = new ChallengeRoom({
+      storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) },
+      getWebSockets: () => [],
+    });
+    const response = await room.fetch(new Request('https://room/internal/init', {
+      method: 'POST',
+      body: JSON.stringify({
+        hostId: 'host', gameType,
+        questions: [{ question: 'Question?', options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: optionCount - 1 }],
+      }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(data.get('game').gameType, gameType);
+  }
+});
+
 test('two players finish a match; duplicate answers and third player are rejected', async () => {
   const data = new Map();
   const messages = new Map([['host', []], ['guest', []]]);
