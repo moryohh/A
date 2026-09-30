@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { FlaskConical, X } from 'lucide-react';
 import { SubjectChapter } from '../types';
 
+const PhysicsScientificCanvas = React.lazy(() =>
+  import('../physicsLab/components/InteractiveScientificCanvas').then(({ InteractiveScientificCanvas }) => ({ default: InteractiveScientificCanvas }))
+);
+
 interface ScienceLaboratoryModalProps {
   subjectId: string;
   subjectName: string;
@@ -19,7 +23,7 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
 }) => {
   const [chapterNumber, setChapterNumber] = useState(initialChapterNumber);
   const [isFrameLoading, setIsFrameLoading] = useState(true);
-  const [selectedDiagram, setSelectedDiagram] = useState(initialChapterNumber === 2 ? 'phloem-tissue' : 'bacteria');
+  const [selectedDiagram, setSelectedDiagram] = useState(initialChapterNumber === 3 ? 'spermatogenesis-mammals' : initialChapterNumber === 2 ? 'phloem-tissue' : 'bacteria');
   const [imageFailed, setImageFailed] = useState(false);
   const diagrams = [
     ['bacteria', 'الخلية البكتيرية'], ['plasma-membrane', 'الغشاء البلازمي'],
@@ -50,6 +54,27 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
     ['muscle-cells', 'أنواع العضلات (الملساء والهيكلية والقلبية)'],
     ['multipolar-neuron', 'الخلية العصبية متعددة الأقطاب'],
     ['neuron-types', 'أنواع الخلايا العصبية (ثنائية وأحادية القطب)'],
+  ];
+  const chapterThreeDiagrams = [
+    ['spermatogenesis-mammals', 'مخطط تكوين النطف في الثدييات'],
+    ['oogenesis-mammals', 'مخطط تكوين البيوض في الثدييات'],
+    ['virus-reproduction-bacteriophage', 'التكاثر في الفايروسات (البلعم البكتيري)'],
+    ['binary-fission-bacteria', 'الانشطار الثنائي في البكتيريا'],
+    ['conjugation-bacteria', 'الاقتران في البكتيريا'],
+    ['chlamydomonas-sexual-reproduction', 'التكاثر الجنسي في الكلاميدوموناس'],
+    ['chlamydomonas-asexual-reproduction', 'التكاثر اللاجنسي في الكلاميدوموناس'],
+    ['paramecium-binary-fission', 'الانشطار المستعرض في البراميسيوم'],
+    ['paramecium-conjugation', 'الاقتران في البراميسيوم'],
+    ['euglena-longitudinal-fission', 'الانشطار الطولي في اليوغلينا'],
+    ['alternation-of-generations', 'تعاقب الأجيال في النباتات'],
+    ['pistil-flower-structure', 'تركيب المدقة'],
+    ['dicot-embryo-development', 'التكوين الجنيني لنبات ذي فلقتين'],
+    ['fruit-structure', 'تركيب الثمرة'],
+    ['male-reproductive-system-insect', 'الجهاز التناسلي الذكري في الحشرات'],
+    ['female-reproductive-system-insect', 'الجهاز التناسلي الأنثوي في الحشرات'],
+    ['male-reproductive-system-human', 'الجهاز التناسلي الذكري في الإنسان'],
+    ['mature-sperm-human', 'النطفة الناضجة في الإنسان'],
+    ['ovarian-cycle-human-female', 'الدورة المبيضية في أنثى الإنسان'],
   ];
   const referenceImages: Record<string, string> = {
     'plasma-membrane': 'https://xutqrhwqrodzmbdlgqsg.supabase.co/storage/v1/object/public/biology-chapter-1-reference/plasma-membrane.jpg',
@@ -90,14 +115,38 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
     'multipolar-neuron': 'neuron-types.jpg',
     'neuron-types': 'neuron-types.jpg',
   };
+  const chapterThreeImages: Record<string, string> = {
+    'spermatogenesis-mammals': 'spermatogenesis-mammals.jpg',
+    'oogenesis-mammals': 'oogenesis-mammals.jpg',
+    'virus-reproduction-bacteriophage': 'virus-reproduction-bacteriophage.jpg',
+    'binary-fission-bacteria': 'binary-fission-bacteria.jpg',
+    'conjugation-bacteria': 'conjugation-bacteria.jpg',
+    'chlamydomonas-sexual-reproduction': 'chlamydomonas-sexual-reproduction.jpg',
+    'chlamydomonas-asexual-reproduction': 'chlamydomonas-asexual-reproduction.jpg',
+    'paramecium-binary-fission': 'paramecium-binary-fission.jpg',
+    'paramecium-conjugation': 'paramecium-conjugation.jpg',
+    'euglena-longitudinal-fission': 'euglena-longitudinal-fission.jpg',
+    'alternation-of-generations': 'alternation-of-generations.jpg',
+    'pistil-flower-structure': 'pistil-flower-structure.jpg',
+    'dicot-embryo-development': 'dicot-embryo-development.jpg',
+    'fruit-structure': 'fruit-structure.jpg',
+    'male-reproductive-system-insect': 'male-reproductive-system-insect.jpg',
+    'female-reproductive-system-insect': 'female-reproductive-system-insect.jpg',
+    'male-reproductive-system-human': 'male-reproductive-system-human.jpg',
+    'mature-sperm-human': 'mature-sperm-human.jpg',
+    'ovarian-cycle-human-female': 'ovarian-cycle-human-female.jpg',
+  };
+  const activeDiagrams = chapterNumber === 1 ? diagrams : chapterNumber === 2 ? chapterTwoDiagrams : chapterThreeDiagrams;
   const selectedImage = chapterNumber === 1
     ? referenceImages[selectedDiagram]
     : chapterNumber === 2 && chapterTwoImages[selectedDiagram]
       ? `https://xutqrhwqrodzmbdlgqsg.supabase.co/storage/v1/object/public/biology-chapter-2-reference/${chapterTwoImages[selectedDiagram]}`
+      : chapterNumber === 3 && chapterThreeImages[selectedDiagram]
+        ? `https://xutqrhwqrodzmbdlgqsg.supabase.co/storage/v1/object/public/biology-chapter-3-reference/${chapterThreeImages[selectedDiagram]}`
       : undefined;
   const available = subjectId === 'biology' && [1, 2, 3].includes(chapterNumber);
   const chapterName = ['الأول', 'الثاني', 'الثالث'][chapterNumber - 1] || String(chapterNumber);
-  const contentType = subjectId === 'biology' ? 'الرسومات' : 'التجارب';
+  const contentType = ['biology', 'physics'].includes(subjectId) ? 'الرسومات' : 'التجارب';
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
@@ -119,24 +168,24 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
           <FlaskConical className="w-6 h-6 text-cyan-300 shrink-0" />
           <div className="min-w-0">
             <h2 className="font-black text-base truncate">مختبر {subjectName}</h2>
-            <p className="text-xs text-sky-200">{contentType} بحسب الفصل</p>
+            <p className="text-xs text-sky-200">{contentType}{subjectId === 'physics' ? ' التفاعلية' : ' بحسب الفصل'}</p>
           </div>
         </div>
         <button type="button" onClick={onClose} aria-label="إغلاق المختبر" className="rounded-xl border border-white/30 p-2 hover:bg-white/10"><X className="w-5 h-5" /></button>
       </div>
-      <div className="border-b border-white/10 bg-[#0b192c] px-4 py-3">
+      {subjectId !== 'physics' && <div className="border-b border-white/10 bg-[#0b192c] px-4 py-3">
         <label htmlFor="laboratory-chapter" className="block text-sm font-bold mb-1">اختر الفصل</label>
         <select
           id="laboratory-chapter"
           value={chapterNumber}
-          onChange={(event) => { const chapter = Number(event.target.value); setChapterNumber(chapter); setSelectedDiagram(chapter === 2 ? 'phloem-tissue' : 'bacteria'); setImageFailed(false); setIsFrameLoading(true); }}
+          onChange={(event) => { const chapter = Number(event.target.value); setChapterNumber(chapter); setSelectedDiagram(chapter === 3 ? 'spermatogenesis-mammals' : chapter === 2 ? 'phloem-tissue' : 'bacteria'); setImageFailed(false); setIsFrameLoading(true); }}
           className="w-full rounded-xl border border-sky-500/50 bg-[#142943] px-3 py-2 text-white"
         >
           {chapters.map((chapter) => (
             <option key={chapter.id} value={chapter.number}>{chapter.title}</option>
           ))}
         </select>
-        {subjectId === 'biology' && [1, 2].includes(chapterNumber) && (
+        {subjectId === 'biology' && [1, 2, 3].includes(chapterNumber) && (
           <>
             <label htmlFor="laboratory-diagram" className="block text-sm font-bold mt-3 mb-1">اختر الرسمة</label>
             <select
@@ -150,24 +199,30 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
               }}
               className="w-full rounded-xl border border-sky-500/50 bg-[#142943] px-3 py-2 text-white"
             >
-              {(chapterNumber === 1 ? diagrams : chapterTwoDiagrams).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              {activeDiagrams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
           </>
         )}
-      </div>
-      {available ? (
+      </div>}
+      {subjectId === 'physics' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-100 p-2 sm:p-4">
+          <React.Suspense fallback={<p className="p-6 text-center text-slate-700">جاري فتح رسومات الفيزياء…</p>}>
+            <PhysicsScientificCanvas />
+          </React.Suspense>
+        </div>
+      ) : available ? (
         <div className="relative flex-1 min-h-0 overflow-y-auto">
           {isFrameLoading && <p className="absolute inset-0 flex items-center justify-center text-sky-200">جاري فتح رسومات الفصل {chapterName}…</p>}
           {selectedImage && (
             <div className="border-b border-sky-500/30 bg-white text-slate-900 text-center">
               <p className="py-1 text-xs font-bold">الرسم الأصلي</p>
-              {imageFailed ? <p className="p-4">تعذر تحميل الصورة الأصلية. المجسم التفاعلي متاح بالأسفل.</p> : <img key={`${chapterNumber}-${selectedDiagram}`} src={selectedImage} onError={() => setImageFailed(true)} alt={`الرسم الأصلي: ${(chapterNumber === 1 ? diagrams : chapterTwoDiagrams).find(([id]) => id === selectedDiagram)?.[1] || selectedDiagram}`} className="mx-auto block h-auto w-full max-w-3xl" />}
+              {imageFailed ? <p className="p-4">تعذر تحميل الصورة الأصلية. المجسم التفاعلي متاح بالأسفل.</p> : <img key={`${chapterNumber}-${selectedDiagram}`} src={selectedImage} onError={() => setImageFailed(true)} alt={`الرسم الأصلي: ${activeDiagrams.find(([id]) => id === selectedDiagram)?.[1] || selectedDiagram}`} className="mx-auto block h-auto w-full max-w-3xl" />}
             </div>
           )}
           <iframe
             key={`${chapterNumber}-${selectedDiagram}`}
             title={`رسومات الأحياء التفاعلية للفصل ${chapterName}`}
-            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html${[1, 2].includes(chapterNumber) ? `?embedded=1&diagram=${encodeURIComponent(selectedDiagram)}` : ''}`}
+            src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${chapterNumber}/index.html?embedded=1&diagram=${encodeURIComponent(selectedDiagram)}`}
             onLoad={() => setIsFrameLoading(false)}
             className="h-[70vh] min-h-[500px] w-full border-0 bg-slate-950"
           />
