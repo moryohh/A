@@ -1,0 +1,50 @@
+name: Deploy online challenge preview
+
+on:
+  push:
+    branches: [preview-online-challenge]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages-online-challenge-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    name: Build and deploy isolated challenge preview
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check TypeScript
+        run: npm run lint
+
+      - name: Build preview
+        run: npm run build
+        env:
+          VITE_C_OCR_API_URL: ${{ vars.VITE_C_OCR_API_URL }}
+          VITE_DEPLOY_TARGET: cloudflare
+          VITE_ONLINE_CHALLENGE_API_URL: https://duha-online-challenge.rafos72171.workers.dev
+
+      - name: Ensure isolated Pages project exists
+        run: npx wrangler@4 pages project create duha-challenge-preview --production-branch preview-online-challenge || true
+
+      - name: Deploy isolated preview
+        run: npx wrangler@4 pages deploy dist --project-name duha-challenge-preview --branch preview-online-challenge --commit-dirty=true
