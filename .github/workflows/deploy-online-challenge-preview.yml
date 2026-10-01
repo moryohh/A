@@ -74,9 +74,19 @@ jobs:
       - name: Verify Worker and Preview CORS
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
-            --header "Origin: $PREVIEW_URL" \
-            https://duha-online-challenge.rafos72171.workers.dev/health \
-            --output /tmp/challenge-health.json
-          grep -i "^access-control-allow-origin: $PREVIEW_URL" /tmp/challenge-headers.txt
-          grep -q '"ok":true' /tmp/challenge-health.json
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
+              --header "Origin: $PREVIEW_URL" \
+              https://duha-online-challenge.rafos72171.workers.dev/health \
+              --output /tmp/challenge-health.json \
+              && grep -i "^access-control-allow-origin: $PREVIEW_URL" /tmp/challenge-headers.txt \
+              && grep -q '"ok":true' /tmp/challenge-health.json; then
+              exit 0
+            fi
+            echo "Worker propagation/CORS check attempt $attempt failed; retrying..."
+            sleep 5
+          done
+          echo "Worker health/CORS verification failed after retries"
+          cat /tmp/challenge-headers.txt || true
+          cat /tmp/challenge-health.json || true
+          exit 1
