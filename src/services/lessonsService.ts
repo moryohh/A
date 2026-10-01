@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { SUBJECTS_CURRICULUM_DATA } from '../data/mockCurriculums';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
-import { fetchCloudflareContentIndex, fetchCloudflareEducationalRecord } from './cloudflareContentService';
+import { fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
 // In-Memory Cache Store for Lazy-Loaded Data
 const subjectIndexCache = new Map<string, SubjectIndex>();
@@ -457,30 +457,11 @@ export async function getSubjectIndex(
   let rawRows: any[] = [];
   let fetchError: any = null;
 
-  // Trial path: use the Cloudflare D1 index first; retain Supabase as fallback.
-  try {
-    const cloudRows = await fetchCloudflareContentIndex(normKey);
-    if (cloudRows.length > 0) {
-      rawRows = cloudRows.map((row) => {
-        const { chapter, segment } = extractChapterAndSegment(row.file_name || '');
-        return {
-          record_id: row.source_id,
-          subject_id: row.subject_id,
-          section_id: row.section_id,
-          file_name: row.file_name,
-          lesson_id: row.file_name?.split('/').pop()?.replace('.json', ''),
-          chapter_number: chapter || undefined,
-          lesson_number: segment || undefined,
-          title: row.title,
-          has_content: true,
-        };
-      });
-    }
-  } catch (err) {
-    console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase fallback:', err);
-  }
-
-  if (rawRows.length === 0 && supabase && isSupabaseConfigured()) {
+  // The canonical lesson/chapter list must remain the lightweight Supabase
+  // index. Cloudflare is used only after a lesson is selected, for the exact
+  // record IDs supplied by this index. This prevents D1/R2 metadata from
+  // inventing lessons or changing the ordering shown to students.
+  if (supabase && isSupabaseConfigured()) {
     try {
       // 1. Try querying the dedicated View: `educational_content_index`
       const { data: viewData, error: viewError } = await supabase
@@ -501,31 +482,9 @@ export async function getSubjectIndex(
         if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
           rawRows = rpcData;
         } else {
-          // 3. Fallback: Query educational_data selecting metadata ONLY (no content column!)
-          const { data: metaData, error: metaError } = await supabase
-            .from('educational_data')
-            .select('id, subject_id, section_id, file_name')
-            .in('subject_id', dbSubjects)
-            .limit(2000);
-
-          if (!metaError && metaData && metaData.length > 0) {
-            rawRows = metaData.map((row) => {
-              const { chapter, segment } = extractChapterAndSegment(row.file_name || '');
-              return {
-                record_id: row.id,
-                subject_id: row.subject_id,
-                section_id: row.section_id,
-                file_name: row.file_name,
-                lesson_id: row.file_name?.split('/').pop()?.replace('.json', '') || `les-${chapter || 1}-${segment || 1}`,
-                chapter_number: chapter || 1,
-                lesson_number: segment || 1,
-                title: formatArabicLessonTitle(row.file_name),
-                has_content: true,
-              };
-            });
-          } else {
-            fetchError = viewError || rpcError || metaError;
-          }
+          // Do not derive the lesson list from educational_data metadata. It
+          // contains legacy/test files and is the source of phantom lessons.
+          fetchError = viewError || rpcError;
         }
       }
     } catch (err) {
@@ -544,8 +503,14 @@ export async function getSubjectIndex(
 
       const rawFileName = row.file_name || '';
       const parsedPath = extractChapterAndSegment(rawFileName);
-      const chNum = Number(row.chapter_number) || parsedPath.chapter || 1;
-      const lesNum = Number(row.lesson_number) || parsedPath.segment || 1;
+      const chNum = Number(row.chapter_number) || parsedPath.chapter || 0;
+      const lesNum = Number(row.lesson_number) || parsedPath.segment || 0;
+      // The canonical index contains a preparatory segment 0 and a few legacy
+      // imported records with file counters (for example 2026/10525). Neither
+      // is a real lesson number in the curriculum UI.
+      if (!Number.isInteger(chNum) || chNum < 1 || !Number.isInteger(lesNum) || lesNum < 1 || lesNum > 999) {
+        return;
+      }
       const rawSection = row.section_id || '';
       const normalizedSection = normalizeSectionId(rawSection);
 

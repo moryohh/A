@@ -575,7 +575,11 @@ export async function fetchLessonGamesData(
         const currentMcqConfig = exactMcqData
           ? parseMcqToMillionaire(exactMcqData, actualLessonId, actualLessonTitle, actualCategory)
           : getMillionaireGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
-        const mcqConfig = await getNearestMcqConfig(ctx, currentMcqConfig);
+        // Never substitute a neighbouring lesson's questions. If the exact
+        // R2 record is absent, fetchExactSectionContent already falls back to
+        // the exact Supabase record; otherwise leave this game's questions
+        // empty rather than mixing lessons.
+        const mcqConfig = currentMcqConfig;
 
         const trueFalseConfig = exactTrueFalseData
           ? parseTrueFalseConfig(exactTrueFalseData, actualLessonId, actualLessonTitle, actualCategory)
@@ -584,10 +588,7 @@ export async function fetchLessonGamesData(
         const currentGibhaSahConfig = exactPhData
           ? parsePhToGibhaSah(exactPhData, actualLessonId, actualLessonTitle, actualCategory)
           : getGibhaSahGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
-        const gibhaSahConfig = await getNearestLessonGibhaSahConfig(
-          ctx,
-          currentGibhaSahConfig
-        );
+        const gibhaSahConfig = currentGibhaSahConfig;
 
         return {
           mcqConfig,
@@ -662,12 +663,10 @@ export async function fetchLessonGamesData(
             lessonTitle: actualLessonTitle,
           }
         : null;
-    const mcqConfig = standardContext
-      ? await getNearestMcqConfig(standardContext, currentMcqConfig)
-      : currentMcqConfig;
-    const gibhaSahConfig = standardContext
-      ? await getNearestLessonGibhaSahConfig(standardContext, currentGibhaSahConfig)
-      : currentGibhaSahConfig;
+    // Exact section lookup already tries Cloudflare then the exact Supabase
+    // record. Do not use a nearest lesson as a substitute for missing data.
+    const mcqConfig = currentMcqConfig;
+    const gibhaSahConfig = currentGibhaSahConfig;
 
     const bundle: LessonGamesBundle = {
       mcqConfig,
