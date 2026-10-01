@@ -342,6 +342,7 @@ function AppContent() {
   };
 
   const openCommunityProfile = async (member: CommunityMember) => {
+    if (isGuestPreview) return;
     setCommunityProfileMember(member);
     if (!member.isDemoAccount) {
       const realProfile = await fetchCommunityMemberProfile(member);

@@ -30,17 +30,17 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
   }, []);
 
-  async function token() {
+  async function authorization(): Promise<string> {
     const guest = loadGuestSession();
     if (guest) return `Guest ${guest.id}`;
     const client = getSupabaseClient();
     const { data } = await client?.auth.getSession() || { data: { session: null } };
     if (!data.session?.access_token) throw new Error('سجّل الدخول أولاً لبدء التحدّي.');
-    return data.session.access_token;
+    return `Bearer ${data.session.access_token}`;
   }
 
   async function connect(roomId: string) {
-    const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}` } });
+    const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: await authorization() } });
     if (!response.ok) throw new Error(response.status === 409 ? 'هذه الغرفة ممتلئة.' : 'تعذر دخول الغرفة. تحقق من الرمز.');
     const { ticket } = await response.json();
     socketRef.current?.close();
@@ -102,7 +102,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     try {
       const selected = questions.slice(0, 10).map(q => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer }));
       if (!selected.length) throw new Error('لا توجد أسئلة لهذا الدرس.');
-      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected }) });
+      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected }) });
       if (!response.ok) throw new Error('تعذر إنشاء غرفة التحدّي.');
       const { roomId } = await response.json();
       await connect(roomId);
