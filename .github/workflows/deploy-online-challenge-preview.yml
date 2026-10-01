@@ -63,6 +63,7 @@ jobs:
           import json
           from pathlib import Path
           source = json.loads(Path('cloudflare/online-challenge/wrangler.jsonc').read_text())
+          source['main'] = str(Path.cwd() / 'cloudflare/online-challenge/src/worker.js')
           source['vars']['ALLOWED_ORIGINS'] = f"https://a-1q1.pages.dev,{__import__('os').environ['PREVIEW_URL']}"
           source['vars']['PREVIEW_GUEST_ORIGIN'] = __import__('os').environ['PREVIEW_URL']
           source['vars']['ALLOW_PREVIEW_GUESTS'] = 'true'
