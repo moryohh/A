@@ -73,6 +73,7 @@ import {
 } from './services/communityService';
 import { fetchUnreadMessageCount, markAllMessagesRead } from './services/messengerService';
 import { getSupabaseClient } from './lib/supabase';
+import { guestToUserProfile, isGuestPreviewEnabled, isGuestProfile, loadGuestSession, clearGuestSession } from './services/guestPreviewService';
 import { getLevelSnapshot } from './services/pointsService';
 import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
@@ -176,8 +177,12 @@ function AppContent() {
   const { theme } = useAppTheme();
 
   // Authentication state - Strictly driven by Supabase Auth sessions
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const guest = isGuestPreviewEnabled() ? loadGuestSession() : null;
+    return guest ? guestToUserProfile(guest) : null;
+  });
+  const [isAuthChecking, setIsAuthChecking] = useState(() => !isGuestPreviewEnabled() || !loadGuestSession());
+  const isGuestPreview = isGuestProfile(currentUser);
   const [growthSession, setGrowthSession] = useState({ points: 0, pendingPoints: 0 });
 
   // Main app state
@@ -224,6 +229,7 @@ function AppContent() {
   React.useEffect(() => {
     let isMounted = true;
     async function loadCommunity() {
+      if (isGuestPreview) return;
       try {
         const loadedPosts = await fetchCommunityPosts(currentUser?.id);
         if (isMounted) {
@@ -265,10 +271,10 @@ function AppContent() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   React.useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || isGuestPreview) return;
     const client = getSupabaseClient();
     if (!client) return;
     const channel = client
@@ -296,21 +302,21 @@ function AppContent() {
       })
       .subscribe();
     return () => { client.removeChannel(channel); };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!currentUser?.id || isGuestPreview) {
       setUnreadMessageCount(0);
       return;
     }
     fetchUnreadMessageCount(currentUser)
       .then(setUnreadMessageCount)
       .catch(() => setUnreadMessageCount(0));
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   // A message notification is created only from the real unread count returned by the messaging service.
   React.useEffect(() => {
-    if (!currentUser?.id || unreadMessageCount <= 0) return;
+    if (!currentUser?.id || isGuestPreview || unreadMessageCount <= 0) return;
     const messageNotification: AppNotification = {
       id: `unread-messages-${currentUser.id}`,
       title: 'لديك رسائل جديدة',
@@ -324,9 +330,10 @@ function AppContent() {
       messageNotification,
       ...previous.filter((item) => item.id !== messageNotification.id),
     ].slice(0, 50));
-  }, [currentUser?.id, unreadMessageCount]);
+  }, [currentUser?.id, unreadMessageCount, isGuestPreview]);
 
   const openMessenger = (member: CommunityMember | null = null) => {
+    if (isGuestPreview) return;
     setMessengerContact(member);
     setCommunityProfileMember(null);
     setIsMessengerOpen(true);
@@ -476,6 +483,11 @@ function AppContent() {
   // Initialize and listen to Auth state (Google OAuth, dev bypass, sessions)
   React.useEffect(() => {
     let isMounted = true;
+    if (isGuestPreview) {
+      setIsAuthChecking(false);
+      return () => { isMounted = false; };
+    }
+
     getInitialAuthState().then((user) => {
       if (isMounted) {
         if (user) setCurrentUser(user);
@@ -494,9 +506,17 @@ function AppContent() {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [isGuestPreview]);
 
   const handleSignOut = async () => {
+    if (isGuestPreview) {
+      clearGuestSession();
+      setCurrentUser(null);
+      setActiveTab('home');
+      setHomeSubView('main_home');
+      showToast('تم إنهاء جلسة الضيف');
+      return;
+    }
     resetGrowthSession(currentUser?.id);
     setGrowthSession({ points: 0, pendingPoints: 0 });
     await signOutUser();
@@ -726,6 +746,7 @@ function AppContent() {
   };
 
   const handleAssessmentResult = async (correctPoints: number, totalPoints: number) => {
+    if (isGuestPreview) return;
     const snapshot = await recordAssessmentResult(correctPoints, totalPoints);
     if (snapshot) applyCompetitionSnapshot(snapshot);
   };
@@ -739,6 +760,7 @@ function AppContent() {
     completedAt: string;
     answers?: NotificationExamAnswer[];
   }) => {
+    if (isGuestPreview) return;
     const completedDate = new Date(result.completedAt).toLocaleDateString('ar-IQ', {
       year: 'numeric',
       month: 'long',
@@ -812,7 +834,7 @@ function AppContent() {
 
   // Count only visible, recently active time. The database function enforces the 5-point daily cap.
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!currentUser?.id || isGuestPreview) {
       setCompetitionSnapshot(null);
       lastActivityPointsRef.current = null;
       activityBlockStartedAtRef.current = null;
@@ -867,12 +889,12 @@ function AppContent() {
       document.removeEventListener('visibilitychange', handleVisibility);
       activityRecordingRef.current = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   const lastRewardRef = React.useRef<{ points: number; at: number } | null>(null);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || isGuestPreview) return;
     const todayKey = new Date().toISOString().slice(0, 10);
     const activityKey = `nahnu_maak:activity-day:${currentUser.id}`;
     if (window.localStorage.getItem(activityKey) === todayKey) return;
@@ -881,10 +903,10 @@ function AppContent() {
     const updatedUser = { ...currentUser, streakDays: nextStreakDays };
     setCurrentUser(updatedUser);
     void updateUserProfileData(currentUser.id, { streakDays: nextStreakDays });
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   const handleScoreUpdate = async (points: number) => {
-    if (!currentUser || points <= 0) return;
+    if (!currentUser || isGuestPreview || points <= 0) return;
     const now = Date.now();
     const lastReward = lastRewardRef.current;
     if (lastReward && lastReward.points === points && now - lastReward.at < 5000) return;
@@ -894,7 +916,7 @@ function AppContent() {
   };
 
   const handleCollectGrowthPoints = () => {
-    if (!currentUser) return 0;
+    if (!currentUser || isGuestPreview) return 0;
     const collected = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? -1);
     if (collected.collected <= 0) return 0;
 
@@ -1088,6 +1110,7 @@ function AppContent() {
 
   // Community Handlers
   const handleCreatePost = async (newPostData: Omit<CommunityPost, 'id' | 'likesCount' | 'commentsCount' | 'isLiked' | 'comments'>) => {
+    if (isGuestPreview) return;
     try {
       const createdPost = await createCommunityPost(newPostData, currentUser?.id);
       setCommunityPosts((prev) => [createdPost, ...prev]);
@@ -1100,6 +1123,7 @@ function AppContent() {
   };
 
   const handleToggleLikeCommunityPost = async (postId: string) => {
+    if (isGuestPreview) return;
     try {
       const result = await toggleLikeCommunityPost(postId, currentUser?.id);
       setCommunityPosts((prev) => prev.map((post) => post.id === postId ? {
@@ -1121,6 +1145,7 @@ function AppContent() {
   };
 
   const handleReportCommunityPost = async (postId: string) => {
+    if (isGuestPreview) return;
     try {
       await reportCommunityPost(postId);
       showToast('تم إرسال البلاغ إلى الإدارة');
@@ -1130,6 +1155,7 @@ function AppContent() {
   };
 
   const handleAddCommunityComment = async (postId: string, text: string) => {
+    if (isGuestPreview) return;
     try {
       const newComment = await addCommunityComment(postId, text, currentUser);
       setCommunityPosts((prev) =>
@@ -1242,13 +1268,13 @@ function AppContent() {
               setHomeSubView('main_home');
             }
           }}
-          onOpenNotifications={() => {
+          onOpenNotifications={isGuestPreview ? undefined : () => {
             setNotifications((previous) => previous.map((item) => ({ ...item, isRead: true })));
             setIsNotificationsOpen(true);
           }}
           onOpenProfile={() => setActiveTab('profile')}
           onOpenGames={() => setIsGamesOpen(true)}
-          onOpenMessenger={() => openMessenger()}
+          onOpenMessenger={isGuestPreview ? undefined : () => openMessenger()}
           unreadMessagesCount={unreadMessageCount}
         />
 
@@ -1373,6 +1399,7 @@ function AppContent() {
         <BottomNav
           activeTab={activeTab}
           onSelectTab={(tab) => {
+            if (isGuestPreview && tab === 'community') return;
             if (tab === 'home') {
               setActiveTab('home');
               setHomeSubView('main_home');
@@ -1381,6 +1408,7 @@ function AppContent() {
             }
           }}
           communityUnreadCount={0}
+          hideCommunity={isGuestPreview}
           avatarUrl={currentUser?.avatarUrl}
         />
       </div>

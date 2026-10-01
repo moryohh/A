@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
+import { loadGuestSession } from '../services/guestPreviewService';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -30,6 +31,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, []);
 
   async function token() {
+    const guest = loadGuestSession();
+    if (guest) return `Guest ${guest.id}`;
     const client = getSupabaseClient();
     const { data } = await client?.auth.getSession() || { data: { session: null } };
     if (!data.session?.access_token) throw new Error('سجّل الدخول أولاً لبدء التحدّي.');

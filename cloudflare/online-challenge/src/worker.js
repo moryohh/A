@@ -11,8 +11,17 @@ function json(body, status, origin) {
   });
 }
 
-async function authenticate(request, env) {
+function validGuestId(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function authenticate(request, env, origin) {
   var header = request.headers.get('Authorization') || '';
+  var guestMatch = header.match(/^Guest ([0-9a-f-]{36})$/i);
+  if (guestMatch) {
+    if (env.ALLOW_PREVIEW_GUESTS !== 'true' || origin !== env.PREVIEW_GUEST_ORIGIN || !validGuestId(guestMatch[1])) return null;
+    return 'guest:' + guestMatch[1].toLowerCase();
+  }
   var match = header.match(/^Bearer (.+)$/i);
   if (!match || !env.SUPABASE_ANON_KEY) return null;
   var response = await fetch(env.SUPABASE_URL + '/auth/v1/user', {
@@ -55,7 +64,7 @@ export default {
     }
 
     if (url.pathname === '/rooms' && request.method === 'POST') {
-      var creator = await authenticate(request, env);
+      var creator = await authenticate(request, env, origin);
       if (!creator) return json({ error: 'unauthorized' }, 401, origin);
       var body = await request.json().catch(function () { return null; });
       if (!body || !validGameType(body.gameType) || !validQuestions(body.questions)) return json({ error: 'invalid_game' }, 400, origin);
@@ -73,7 +82,7 @@ export default {
 
     var connectMatch = url.pathname.match(/^\/rooms\/([0-9a-f-]{36})\/connect$/);
     if (connectMatch && request.method === 'POST') {
-      var joiner = await authenticate(request, env);
+      var joiner = await authenticate(request, env, origin);
       if (!joiner) return json({ error: 'unauthorized' }, 401, origin);
       var connectStub = env.ROOMS.get(env.ROOMS.idFromName(connectMatch[1]));
       var ticketResponse = await connectStub.fetch(new Request('https://room/internal/ticket', {

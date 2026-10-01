@@ -26,6 +26,7 @@ import {
   resendConfirmationEmail,
 } from '../services/authService';
 import { UserProfile } from '../types';
+import { createGuestSession, guestToUserProfile, isGuestPreviewEnabled } from '../services/guestPreviewService';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -161,6 +162,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   // 4. Open Gmail directly in a new tab
   const handleOpenGmail = () => {
     window.open('https://mail.google.com', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleGuestPreview = () => {
+    setErrorMessage(null);
+    onLoginSuccess(guestToUserProfile(createGuestSession()));
   };
 
   return (
@@ -353,6 +359,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             {/* 1. GOOGLE OAUTH ONE-CLICK LOGIN BUTTON */}
             {/* ======================================================== */}
             <div className="space-y-3 mb-5">
+              {isGuestPreviewEnabled() && (
+                <button
+                  type="button"
+                  onClick={handleGuestPreview}
+                  className="w-full rounded-2xl border border-amber-300/50 bg-amber-400/15 px-4 py-3.5 text-xs font-black text-amber-200 shadow-md transition-all hover:bg-amber-400/25 active:scale-[0.98]"
+                >
+                  دخول كضيف لتجربة اللعب الجماعي
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleGoogleLogin}

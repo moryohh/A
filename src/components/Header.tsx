@@ -7,7 +7,7 @@ interface HeaderProps {
   unreadCount: number;
   showBackButton?: boolean;
   onBack?: () => void;
-  onOpenNotifications: () => void;
+  onOpenNotifications?: () => void;
   onOpenProfile: () => void;
   onOpenGames?: () => void;
   onOpenMessenger?: () => void;
@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Left side: Icons (Notification & Profile Avatar) */}
       <div className="flex items-center gap-2.5 z-10">
         {/* Private Messenger shortcut */}
-        <button
+        {onOpenMessenger && <button
           onClick={onOpenMessenger}
           disabled={!onOpenMessenger}
           className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-sky-400/60 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-[0_4px_14px_rgba(14,165,233,0.35)] transition-all hover:from-sky-300 hover:to-blue-500 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
@@ -89,10 +89,10 @@ export const Header: React.FC<HeaderProps> = ({
               {unreadMessagesCount >= 9 ? '+9' : `+${unreadMessagesCount}`}
             </span>
           )}
-        </button>
+        </button>}
 
         {/* Notification Bell with Badge */}
-        <button
+        {onOpenNotifications && <button
           onClick={onOpenNotifications}
           className={`relative w-9 h-9 rounded-full ${theme.classes.cardBg} border ${theme.classes.cardBorder} flex items-center justify-center transition-all active:scale-95 ${theme.classes.textMuted} hover:${theme.classes.textMain} cursor-pointer`}
           aria-label="الإشعارات"
@@ -110,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
-        </button>
+        </button>}
 
       </div>
     </header>
