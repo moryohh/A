@@ -59,10 +59,16 @@ jobs:
 
       - name: Deploy challenge Worker with exact Preview CORS
         run: |
-          npx wrangler@4 deploy --config cloudflare/online-challenge/wrangler.jsonc \
-            --var "ALLOWED_ORIGINS:https://a-1q1.pages.dev,$PREVIEW_URL" \
-            --var "PREVIEW_GUEST_ORIGIN:$PREVIEW_URL" \
-            --var "ALLOW_PREVIEW_GUESTS:true"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source = json.loads(Path('cloudflare/online-challenge/wrangler.jsonc').read_text())
+          source['vars']['ALLOWED_ORIGINS'] = f"https://a-1q1.pages.dev,{__import__('os').environ['PREVIEW_URL']}"
+          source['vars']['PREVIEW_GUEST_ORIGIN'] = __import__('os').environ['PREVIEW_URL']
+          source['vars']['ALLOW_PREVIEW_GUESTS'] = 'true'
+          Path('/tmp/wrangler-preview.json').write_text(json.dumps(source))
+          PY
+          npx wrangler@4 deploy --config /tmp/wrangler-preview.json
 
       - name: Verify Worker and Preview CORS
         run: |
