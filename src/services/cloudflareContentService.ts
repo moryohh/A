@@ -30,7 +30,13 @@ export async function fetchCloudflareEducationalRecord(recordId: string): Promis
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) throw new Error(`Cloudflare content HTTP ${response.status}`);
-  return response.json();
+  const payload = await response.json();
+  // The R2 Worker returns the source row envelope, while Supabase fallback
+  // returns the content column directly. Normalize both paths here so the
+  // lesson/game parsers never inspect the envelope as if it were lesson data.
+  return payload && Object.prototype.hasOwnProperty.call(payload, 'content')
+    ? payload.content
+    : payload;
 }
 
 export async function fetchCloudflareExactSection(

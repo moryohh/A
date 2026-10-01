@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { EducationalLesson } from '../types';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 import { SubjectNeonIcon } from './SubjectNeonIcon';
 import { gameAudio } from '../utils/gameAudio';
+import { getSubjectIndex } from '../services/lessonsService';
 
 interface MainHomeViewProps {
   onSelectSubject: (subject: (typeof GRADE_6_SUBJECTS)[0]) => void;
@@ -14,6 +15,23 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
   onSelectSubject,
   onSelectLesson,
 }) => {
+  const [lessonCounts, setLessonCounts] = useState<Record<string, number | null>>({});
+
+  useEffect(() => {
+    let active = true;
+    Promise.all(GRADE_6_SUBJECTS.map(async (subject) => {
+      try {
+        const index = await getSubjectIndex(subject.id, subject.name);
+        return [subject.id, index.totalLessons] as const;
+      } catch (_) {
+        return [subject.id, null] as const;
+      }
+    })).then((entries) => {
+      if (active) setLessonCounts(Object.fromEntries(entries));
+    });
+    return () => { active = false; };
+  }, []);
+
   return (
     <div className="min-h-full px-3 py-3 pb-24 text-right animate-in fade-in duration-300 select-none" onClickCapture={() => gameAudio.playPrimaryNavigation()}>
       {/* 2-Column Grid of 8 Subjects matching the image exactly */}
@@ -48,7 +66,7 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
                   boxShadow: `0 0 12px ${subject.glowColor}`,
                 }}
               >
-                <span>{subject.lessonCountText}</span>
+                <span>{lessonCounts[subject.id] == null ? 'جارٍ التحقق…' : `${lessonCounts[subject.id]} درسًا`}</span>
               </div>
             </button>
           );

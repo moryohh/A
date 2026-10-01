@@ -11,7 +11,6 @@ import {
   LessonSectionType,
   TeacherStory,
 } from '../types';
-import { SUBJECTS_CURRICULUM_DATA } from '../data/mockCurriculums';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
 import { fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
@@ -491,7 +490,10 @@ function videoMatchesLesson(vid: any, context: OpenLessonContext, curriculumJson
     const videoWords = topicWords(metadata);
     let overlap = 0;
     videoWords.forEach((word) => { if (curriculumWords.has(word)) overlap += 1; });
-    if (matched || detected) return overlap >= 2;
+    // A curriculum-backed lesson must have topical evidence in the video
+    // metadata; never accept a generic or unrelated video merely because it
+    // belongs to the same teacher/chapter.
+    if (curriculumWords.size > 0) return overlap >= 2;
   }
   return true;
 }
@@ -560,13 +562,29 @@ export async function getSubjectIndex(
   const chapterGroups: Record<number, { chapterNumber: number; title: string; lessons: LessonIndex[] }> = {};
 
   if (rawRows.length > 0) {
+    // Some mathematics index rows are topic records with a real lesson_id and
+    // record_id but no numeric lesson_number. Give those records a deterministic
+    // display ordinal within their chapter; the immutable IDs remain the source
+    // of truth and are never replaced by a guessed filename/number.
+    const topicOrdinals = new Map<string, number>();
+    const topicCounters: Record<number, number> = {};
+    rawRows
+      .filter((row) => normalizeSectionId(row.section_id) === 'lessons' && row.lesson_number == null && row.chapter_number != null)
+      .sort((a, b) => String(a.record_id || '').localeCompare(String(b.record_id || '')))
+      .forEach((row) => {
+        const chapter = Number(row.chapter_number);
+        topicCounters[chapter] = (topicCounters[chapter] || 0) + 1;
+        topicOrdinals.set(String(row.record_id), topicCounters[chapter]);
+      });
+
     rawRows.forEach((row) => {
       if (row.file_name?.includes('organized_tree')) return;
 
       const rawFileName = row.file_name || '';
       const parsedPath = extractChapterAndSegment(rawFileName);
       const chNum = Number(row.chapter_number) || parsedPath.chapter || 0;
-      const lesNum = Number(row.lesson_number) || parsedPath.segment || 0;
+      const indexedTopicOrdinal = row.record_id ? topicOrdinals.get(String(row.record_id)) : undefined;
+      const lesNum = Number(row.lesson_number) || indexedTopicOrdinal || parsedPath.segment || 0;
       // The canonical index contains a preparatory segment 0 and a few legacy
       // imported records with file counters (for example 2026/10525). Neither
       // is a real lesson number in the curriculum UI.
@@ -596,7 +614,16 @@ export async function getSubjectIndex(
       }
 
       if (normalizedSection && rawRecordId) {
-        allLessonsMap[lessonKey].files[normalizedSection] = {
+        const existing = allLessonsMap[lessonKey].files[normalizedSection];
+        const candidatePriority = normalizedSection === 'lessons'
+          ? (rawFileName.includes('cleaned_json_files') ? 0 : rawFileName.includes('segment') ? 1 : 2)
+          : (rawFileName.includes(`_${normalizedSection}`) ? 0 : 1);
+        const existingPriority = existing
+          ? (normalizedSection === 'lessons'
+            ? (existing.fileName.includes('cleaned_json_files') ? 0 : existing.fileName.includes('segment') ? 1 : 2)
+            : (existing.fileName.includes(`_${normalizedSection}`) ? 0 : 1))
+          : Infinity;
+        if (!existing || candidatePriority < existingPriority) allLessonsMap[lessonKey].files[normalizedSection] = {
           recordId: String(rawRecordId),
           fileName: rawFileName,
         };
@@ -614,41 +641,6 @@ export async function getSubjectIndex(
         };
       }
       chapterGroups[chNum].lessons.push(lesson);
-    });
-  }
-
-  // 5. Fallback from local static mock curriculums if database has no records
-  if (Object.keys(chapterGroups).length === 0) {
-    const mockChapters = SUBJECTS_CURRICULUM_DATA[normKey] || [];
-    mockChapters.forEach((ch, chIdx) => {
-      const chNum = ch.number || chIdx + 1;
-      const lessonsList: LessonIndex[] = (ch.lessons || []).map((l, lIdx) => {
-        const lNum = l.number || lIdx + 1;
-        const lessonKey = buildLessonKey(normKey, chNum, lNum);
-        const lIndex: LessonIndex = {
-          lessonKey,
-          subjectId: normKey,
-          chapterNumber: chNum,
-          lessonNumber: lNum,
-          lessonId: l.id || `${normKey}-ch${chNum}-les${lNum}`,
-          title: formatArabicLessonTitle(l.title || `الدرس ${lNum}`),
-          files: {
-            lessons: { recordId: `mock-les-${l.id}`, fileName: `${l.id}.json` },
-            curriculum: { recordId: `mock-cur-${l.id}`, fileName: `curriculum_${l.id}.json` },
-            mcq: { recordId: `mock-mcq-${l.id}`, fileName: `mcq_${l.id}.json` },
-            true_false: { recordId: `mock-tf-${l.id}`, fileName: `tf_${l.id}.json` },
-            ph: { recordId: `mock-ph-${l.id}`, fileName: `ph_${l.id}.json` },
-          },
-        };
-        allLessonsMap[lessonKey] = lIndex;
-        return lIndex;
-      });
-
-      chapterGroups[chNum] = {
-        chapterNumber: chNum,
-        title: ch.title || getArabicChapterTitle(chNum),
-        lessons: lessonsList,
-      };
     });
   }
 
@@ -837,56 +829,20 @@ export async function getLessonContentBundle(
     }
   }
 
-  if (rawSectionRows.length === 0 && supabase && isSupabaseConfigured()) {
+  if (supabase && isSupabaseConfigured()) {
     try {
-      if (recordIds.length > 0) {
+      const loadedRecordIds = new Set(rawSectionRows.map((row) => String(row.id)));
+      const missingRecordIds = recordIds.filter((id) => !loadedRecordIds.has(String(id)));
+      if (missingRecordIds.length > 0) {
         const { data, error } = await supabase
           .from('educational_data')
           .select('id, subject_id, section_id, file_name, content')
-          .in('id', recordIds);
+          .in('id', missingRecordIds);
 
         if (!error && data) {
           // recordIds come from the exact lesson index entry. Trust this relation even
           // when file_name uses a legacy/path naming convention without ch/les tokens.
-          rawSectionRows = data;
-        }
-      }
-
-      // If recordIds was missing or did not prove the exact lesson, query only the chapter
-      // and select the row whose filename contains both the exact chapter and lesson tokens.
-      const loadedSections = new Set(rawSectionRows.map((r) => normalizeSectionId(r.section_id)));
-      const requiredSections: LessonSectionType[] = ['lessons', 'curriculum', 'mcq', 'true_false', 'ph'];
-      const missingSections = requiredSections.filter((sec) => !loadedSections.has(sec));
-
-      if (missingSections.length > 0) {
-        const dbSubjects = getDbSubjectIds(context.subjectId);
-        for (const sec of missingSections) {
-          if (signal?.aborted) break;
-          const sectionAliases = sec === 'true_false'
-            ? ['true_false', 'tf', 'صح_خطأ', 'صح_ام_خطا']
-            : sec === 'ph'
-              ? ['ph', 'فلاش_كاردز', 'بطاقات']
-              : sec === 'mcq'
-                ? ['mcq', 'MCQ', 'mcqs', 'اختيارات', 'اختيار_من_متعدد']
-                : [sec];
-          let sectionQuery = supabase
-            .from('educational_data')
-            .select('id, subject_id, section_id, file_name, content')
-            .in('subject_id', dbSubjects)
-            .in('section_id', sectionAliases);
-
-          sectionQuery = sectionQuery.or(
-            `file_name.ilike.%ch${context.chapterNumber}%,file_name.ilike.%chapter${context.chapterNumber}%,file_name.ilike.%فصل%${context.chapterNumber}%`
-          );
-
-          const { data: candidateRows } = await sectionQuery.limit(100);
-          const exactRow = candidateRows?.find((row) =>
-            fileNameMatchesLesson(row.file_name, context.chapterNumber, context.lessonNumber) && row.content
-          );
-
-          if (exactRow) {
-            rawSectionRows.push(exactRow);
-          }
+          rawSectionRows = [...rawSectionRows, ...data];
         }
       }
     } catch (err) {
