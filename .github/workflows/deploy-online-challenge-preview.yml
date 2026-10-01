@@ -44,20 +44,32 @@ jobs:
           VITE_ONLINE_CHALLENGE_API_URL: https://duha-online-challenge.rafos72171.workers.dev
           VITE_ENABLE_GUEST_PREVIEW: true
 
-      - name: Deploy challenge Worker
-        run: npx wrangler@4 deploy --config cloudflare/online-challenge/wrangler.jsonc
-
-      - name: Verify Worker and preview CORS
-        run: |
-          curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
-            --header "Origin: https://duha-challenge-preview.pages.dev" \
-            https://duha-online-challenge.rafos72171.workers.dev/health \
-            --output /tmp/challenge-health.json
-          grep -i "^access-control-allow-origin: https://duha-challenge-preview.pages.dev" /tmp/challenge-headers.txt
-          grep -q '"ok":true' /tmp/challenge-health.json
-
       - name: Ensure isolated Pages project exists
         run: npx wrangler@4 pages project create duha-challenge-preview --production-branch preview-online-challenge || true
 
-      - name: Deploy isolated preview
-        run: npx wrangler@4 pages deploy dist --project-name duha-challenge-preview --branch preview-online-challenge --commit-dirty=true
+      - name: Deploy isolated preview and capture URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler@4 pages deploy dist --project-name duha-challenge-preview --branch preview-online-challenge --commit-dirty=true | tee /tmp/pages-deploy.log
+          PREVIEW_URL="$(grep -oE 'https://[a-z0-9]+\.duha-challenge-preview\.pages\.dev' /tmp/pages-deploy.log | tail -1)"
+          test -n "$PREVIEW_URL"
+          echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+          echo "Preview URL: $PREVIEW_URL"
+
+      - name: Deploy challenge Worker with exact Preview CORS
+        run: |
+          npx wrangler@4 deploy --config cloudflare/online-challenge/wrangler.jsonc \
+            --var "ALLOWED_ORIGINS:https://a-1q1.pages.dev,$PREVIEW_URL" \
+            --var "PREVIEW_GUEST_ORIGIN:$PREVIEW_URL" \
+            --var "ALLOW_PREVIEW_GUESTS:true"
+
+      - name: Verify Worker and Preview CORS
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
+            --header "Origin: $PREVIEW_URL" \
+            https://duha-online-challenge.rafos72171.workers.dev/health \
+            --output /tmp/challenge-health.json
+          grep -i "^access-control-allow-origin: $PREVIEW_URL" /tmp/challenge-headers.txt
+          grep -q '"ok":true' /tmp/challenge-health.json
