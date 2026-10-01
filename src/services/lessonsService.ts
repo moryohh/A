@@ -434,6 +434,68 @@ export function getArabicChapterTitle(num: number, rawTitle?: string): string {
   return `الفصل ${ordinal}`;
 }
 
+function flattenContentText(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(flattenContentText).join(' ');
+  if (typeof value === 'object') return Object.values(value).map(flattenContentText).join(' ');
+  return '';
+}
+
+function normalizeTopicText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه');
+}
+
+function topicWords(value: string): Set<string> {
+  const stopWords = new Set(['من', 'في', 'على', 'عن', 'الى', 'و', 'او', 'مع', 'هذا', 'هذه', 'ذلك', 'تلك', 'الفصل', 'الدرس']);
+  return new Set(
+    normalizeTopicText(value)
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 3 && !stopWords.has(word))
+  );
+}
+
+function chapterNumberFromText(value: string): number | undefined {
+  const text = normalizeTopicText(value);
+  const ordinal: Record<string, number> = {
+    الاول: 1, الاولى: 1, الثاني: 2, الثانيه: 2, الثالث: 3, الثالثه: 3,
+    الرابع: 4, الرابعه: 4, الخامس: 5, الخامسه: 5, السادس: 6, السادسه: 6,
+  };
+  const numeric = text.match(/(?:الفصل|chapter|ch)[\s_-]*(\d+)/i);
+  if (numeric) return Number(numeric[1]);
+  const named = text.match(/الفصل\s+(الاولى?|الثانيه?|الثالثه?|الرابعه?|الخامسه?|السادسه?)/i);
+  return named ? ordinal[named[1]] : undefined;
+}
+
+function videoMatchesLesson(vid: any, context: OpenLessonContext, curriculumJson?: any): boolean {
+  const title = String(vid?.title || '');
+  const summary = String(vid?.content_summary || '');
+  const detected = Array.isArray(vid?.detected_topics) ? vid.detected_topics.join(' ') : '';
+  const matched = Array.isArray(vid?.matched_topics) ? vid.matched_topics.join(' ') : '';
+  const metadata = `${title} ${summary} ${detected} ${matched}`;
+
+  // A video explicitly labelled with another chapter must never leak into this lesson.
+  const explicitChapter = chapterNumberFromText(metadata);
+  if (explicitChapter !== undefined && explicitChapter !== context.chapterNumber) return false;
+
+  // When the source includes curriculum metadata, require at least two meaningful
+  // topic words in common. This removes contaminated recommendations while keeping
+  // valid lecture/review videos that describe the same lesson in different wording.
+  if (curriculumJson) {
+    const curriculumWords = topicWords(flattenContentText(curriculumJson));
+    const videoWords = topicWords(metadata);
+    let overlap = 0;
+    videoWords.forEach((word) => { if (curriculumWords.has(word)) overlap += 1; });
+    if (matched || detected) return overlap >= 2;
+  }
+  return true;
+}
+
 /**
  * ============================================================================
  * 1. getSubjectIndex (Stage 1: Subject Index & Metadata Only)
@@ -628,7 +690,8 @@ export async function getSubjectIndex(
 export function buildTeacherStoriesFromLessonJson(
   rawJson: any,
   context: OpenLessonContext,
-  subjectName = 'المادة'
+  subjectName = 'المادة',
+  curriculumJson?: any
 ): TeacherStory[] {
   let teachersList: any[] = [];
 
@@ -649,6 +712,7 @@ export function buildTeacherStoriesFromLessonJson(
     const videos: any[] = Array.isArray(t.videos) ? t.videos : [];
     for (const vid of videos) {
       if (!vid) continue;
+      if (!videoMatchesLesson(vid, context, curriculumJson)) continue;
       const rawVideoUrlOrId =
         vid.url ||
         vid.video_url ||
@@ -850,7 +914,7 @@ export async function getLessonContentBundle(
   // 3. Build teacher stories strictly for this lesson
   let teacherStories: TeacherStory[] = [];
   if (lessonsJson) {
-    teacherStories = buildTeacherStoriesFromLessonJson(lessonsJson, context);
+    teacherStories = buildTeacherStoriesFromLessonJson(lessonsJson, context, 'المادة', curriculumJson);
   }
 
   // 4. Construct EducationalLesson object
