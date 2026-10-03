@@ -498,6 +498,29 @@ function videoMatchesLesson(vid: any, context: OpenLessonContext, curriculumJson
   return true;
 }
 
+function collectMetadataValues(value: any, keyName: string, output = new Set<string>()): Set<string> {
+  if (!value || typeof value !== 'object') return output;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectMetadataValues(item, keyName, output));
+    return output;
+  }
+  Object.entries(value).forEach(([key, child]) => {
+    if (key.toLowerCase() === keyName && typeof child === 'string' && child.trim()) output.add(child.trim());
+    if (child && typeof child === 'object') collectMetadataValues(child, keyName, output);
+  });
+  return output;
+}
+
+function contentBelongsToLesson(content: any, context: OpenLessonContext): boolean {
+  const lessonIds = [...collectMetadataValues(content, 'lesson_id')];
+  if (!lessonIds.length) return true;
+  const expected = normalizeTopicText(context.lessonId);
+  return lessonIds.some((value) => {
+    const actual = normalizeTopicText(value);
+    return actual === expected || actual.startsWith(`${expected}_`) || expected.startsWith(`${actual}_`);
+  });
+}
+
 /**
  * ============================================================================
  * 1. getSubjectIndex (Stage 1: Subject Index & Metadata Only)
@@ -821,6 +844,11 @@ export async function getLessonContentBundle(
       );
       rawSectionRows = cloudRecords
         .filter((row): row is { id: string; content: any } => Boolean(row?.content))
+        .filter((row) => {
+          const matches = contentBelongsToLesson(row.content, context);
+          if (!matches) console.warn('[getLessonContentBundle] Ignoring content with mismatched lesson_id:', row.id);
+          return matches;
+        })
         .map((row) => {
           const section = Object.entries(indexData?.files || {}).find(([, file]) => file.recordId === row.id)?.[0] || '';
           const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
@@ -847,7 +875,11 @@ export async function getLessonContentBundle(
         if (!error && data) {
           // recordIds come from the exact lesson index entry. Trust this relation even
           // when file_name uses a legacy/path naming convention without ch/les tokens.
-          rawSectionRows = [...rawSectionRows, ...data];
+          rawSectionRows = [...rawSectionRows, ...data].filter((row) => {
+            const matches = contentBelongsToLesson(row.content, context);
+            if (!matches) console.warn('[getLessonContentBundle] Ignoring Supabase content with mismatched lesson_id:', row.id);
+            return matches;
+          });
         }
       }
     } catch (err) {

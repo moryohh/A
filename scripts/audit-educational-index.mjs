@@ -16,6 +16,15 @@ const sectionAliases = {
 };
 const normalizeSection = (value) => Object.entries(sectionAliases).find(([, aliases]) => aliases.has(String(value || '').toLowerCase().trim()))?.[0] || null;
 const isRealNumber = (value) => Number.isInteger(Number(value)) && Number(value) > 0 && Number(value) <= 999;
+const collectValues = (value, key, output = new Set()) => {
+  if (!value || typeof value !== 'object') return output;
+  if (Array.isArray(value)) { value.forEach((item) => collectValues(item, key, output)); return output; }
+  for (const [name, child] of Object.entries(value)) {
+    if (name.toLowerCase() === key && typeof child === 'string' && child.trim()) output.add(child.trim());
+    if (child && typeof child === 'object') collectValues(child, key, output);
+  }
+  return output;
+};
 
 async function fetchAll() {
   const rows = [];
@@ -81,12 +90,42 @@ const canonicalLessons = [...byLessonKey.values()];
 const r2Results = await mapLimit([...new Set(rows.filter((row) => row.record_id).map((row) => String(row.record_id)))], 8, async (recordId) => {
   try {
     const response = await fetch(`${r2Endpoint}/educational/${encodeURIComponent(recordId)}`, { headers: { Accept: 'application/json' } });
-    return { recordId, ok: response.ok, status: response.status };
+    if (!response.ok) return { recordId, ok: false, status: response.status };
+    const envelope = await response.json();
+    const content = envelope?.content ?? envelope;
+    return {
+      recordId,
+      ok: true,
+      status: response.status,
+      lessonIds: [...collectValues(content, 'lesson_id')],
+      pageIds: [...collectValues(content, 'page_id')],
+    };
   } catch (error) {
     return { recordId, ok: false, status: 'network_error', error: String(error) };
   }
 });
 const r2ById = new Map(r2Results.map((item) => [item.recordId, item]));
+const metadataMismatches = rows.filter((row) => row.record_id).flatMap((row) => {
+  const result = r2ById.get(String(row.record_id));
+  if (!result?.ok || !result.lessonIds?.length || !row.lesson_id) return [];
+  const expected = String(row.lesson_id).toLowerCase();
+  const matches = result.lessonIds.some((value) => {
+    const actual = String(value).toLowerCase();
+    return actual === expected || actual.startsWith(`${expected}_`) || expected.startsWith(`${actual}_`);
+  });
+  return matches ? [] : [{ record_id: row.record_id, index_lesson_id: row.lesson_id, content_lesson_ids: result.lessonIds }];
+});
+const pageKinds = {};
+for (const result of r2Results) {
+  for (const pageId of result.pageIds || []) {
+    const kind = /(?:_tf|true[_-]?false|صح[_-]?خطا)/i.test(pageId) ? 'true_false'
+      : /(?:_mcq|multiple|اختيار)/i.test(pageId) ? 'mcq'
+      : /(?:_ph|flash|بطاقات)/i.test(pageId) ? 'ph'
+      : /(?:curriculum|منهج)/i.test(pageId) ? 'curriculum'
+      : 'lesson_or_other';
+    pageKinds[kind] = (pageKinds[kind] || 0) + 1;
+  }
+}
 const sectionMissing = canonicalLessons.map((lesson) => ({
   ...lesson,
   missing: ['lessons', 'curriculum', 'mcq', 'true_false', 'ph'].filter((section) => !lesson.sections[section]?.length),
@@ -110,6 +149,8 @@ const report = {
   missingRecordIds,
   topicRowsWithoutLessonNumber,
   sectionMissing,
+  metadataMismatches,
+  pageKinds,
   r2: {
     uniqueRecordIdsChecked: allRecordIds.length,
     exactMatches: r2Results.filter((item) => item.ok).length,
