@@ -600,7 +600,16 @@ export async function getSubjectIndex(
         topicOrdinals.set(String(row.record_id), topicCounters[chapter]);
       });
 
-    rawRows.forEach((row) => {
+    // The index view can return curriculum/game rows before the video's
+    // lessons row. Process lessons first so those rows attach to an existing
+    // canonical lesson instead of being silently discarded by the guard below.
+    const orderedRows = [...rawRows].sort((a, b) => {
+      const aIsLesson = normalizeSectionId(a.section_id || '') === 'lessons' ? 0 : 1;
+      const bIsLesson = normalizeSectionId(b.section_id || '') === 'lessons' ? 0 : 1;
+      return aIsLesson - bIsLesson;
+    });
+
+    orderedRows.forEach((row) => {
       if (row.file_name?.includes('organized_tree')) return;
 
       const rawFileName = row.file_name || '';
