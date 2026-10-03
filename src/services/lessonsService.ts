@@ -582,17 +582,20 @@ export async function getSubjectIndex(
 
       const rawFileName = row.file_name || '';
       const parsedPath = extractChapterAndSegment(rawFileName);
-      const chNum = Number(row.chapter_number) || parsedPath.chapter || 0;
+      const normalizedSection = normalizeSectionId(row.section_id || '');
+      const isLessonRow = normalizedSection === 'lessons';
+      // Only lesson-section rows are allowed to create an item in the lesson
+      // list. MCQ/TF/PH/curriculum rows may attach files to an existing lesson,
+      // but must never create a phantom lesson from a legacy filename counter.
+      const chNum = row.chapter_number != null ? Number(row.chapter_number) : parsedPath.chapter || 0;
       const indexedTopicOrdinal = row.record_id ? topicOrdinals.get(String(row.record_id)) : undefined;
-      const lesNum = Number(row.lesson_number) || indexedTopicOrdinal || parsedPath.segment || 0;
+      const lesNum = row.lesson_number != null ? Number(row.lesson_number) : indexedTopicOrdinal || 0;
       // The canonical index contains a preparatory segment 0 and a few legacy
       // imported records with file counters (for example 2026/10525). Neither
       // is a real lesson number in the curriculum UI.
       if (!Number.isInteger(chNum) || chNum < 1 || !Number.isInteger(lesNum) || lesNum < 1 || lesNum > 999) {
         return;
       }
-      const rawSection = row.section_id || '';
-      const normalizedSection = normalizeSectionId(rawSection);
 
       const lessonKey = buildLessonKey(normKey, chNum, lesNum);
       const rawRecordId = row.record_id || row.id;
@@ -600,6 +603,8 @@ export async function getSubjectIndex(
         row.lesson_id ||
         rawFileName.split('/').pop()?.replace('.json', '') ||
         `${normKey}-ch${chNum}-les${lesNum}`;
+
+      if (!allLessonsMap[lessonKey] && !isLessonRow) return;
 
       if (!allLessonsMap[lessonKey]) {
         allLessonsMap[lessonKey] = {
