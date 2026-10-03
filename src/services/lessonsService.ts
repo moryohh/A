@@ -844,15 +844,19 @@ export async function getLessonContentBundle(
       );
       rawSectionRows = cloudRecords
         .filter((row): row is { id: string; content: any } => Boolean(row?.content))
-        .filter((row) => {
-          const matches = contentBelongsToLesson(row.content, context);
-          if (!matches) console.warn('[getLessonContentBundle] Ignoring content with mismatched lesson_id:', row.id);
-          return matches;
-        })
         .map((row) => {
           const section = Object.entries(indexData?.files || {}).find(([, file]) => file.recordId === row.id)?.[0] || '';
           const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
           return { id: row.id, subject_id: context.subjectId, section_id: section, file_name: fileName, content: row.content };
+        })
+        .filter((row) => {
+          // The lessons/video record is already selected by the immutable
+          // Supabase record_id. Its own lesson_id is the video-source mapping
+          // and must not be compared with a UI-generated fallback ID.
+          if (normalizeSectionId(row.section_id) === 'lessons') return true;
+          const matches = contentBelongsToLesson(row.content, context);
+          if (!matches) console.warn('[getLessonContentBundle] Ignoring non-video content with mismatched lesson_id:', row.id);
+          return matches;
         });
       // A partial R2 bundle is not reported as Cloudflare: missing sections may
       // be filled by Supabase below, so claiming a single source would be false.
@@ -876,8 +880,9 @@ export async function getLessonContentBundle(
           // recordIds come from the exact lesson index entry. Trust this relation even
           // when file_name uses a legacy/path naming convention without ch/les tokens.
           rawSectionRows = [...rawSectionRows, ...data].filter((row) => {
+            if (normalizeSectionId(row.section_id) === 'lessons') return true;
             const matches = contentBelongsToLesson(row.content, context);
-            if (!matches) console.warn('[getLessonContentBundle] Ignoring Supabase content with mismatched lesson_id:', row.id);
+            if (!matches) console.warn('[getLessonContentBundle] Ignoring non-video Supabase content with mismatched lesson_id:', row.id);
             return matches;
           });
         }

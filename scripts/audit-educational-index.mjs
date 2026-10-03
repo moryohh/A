@@ -25,6 +25,11 @@ const collectValues = (value, key, output = new Set()) => {
   }
   return output;
 };
+const videoTitles = (content) => (Array.isArray(content?.lessons) ? content.lessons : [])
+  .flatMap((lesson) => Array.isArray(lesson?.teachers) ? lesson.teachers : [])
+  .flatMap((teacher) => Array.isArray(teacher?.videos) ? teacher.videos : [])
+  .map((video) => String(video?.title || '').trim())
+  .filter(Boolean);
 
 async function fetchAll() {
   const rows = [];
@@ -99,6 +104,7 @@ const r2Results = await mapLimit([...new Set(rows.filter((row) => row.record_id)
       status: response.status,
       lessonIds: [...collectValues(content, 'lesson_id')],
       pageIds: [...collectValues(content, 'page_id')],
+      videoTitles: videoTitles(content),
     };
   } catch (error) {
     return { recordId, ok: false, status: 'network_error', error: String(error) };
@@ -115,6 +121,30 @@ const metadataMismatches = rows.filter((row) => row.record_id).flatMap((row) => 
   });
   return matches ? [] : [{ record_id: row.record_id, index_lesson_id: row.lesson_id, content_lesson_ids: result.lessonIds }];
 });
+const videoRows = rows.filter((row) => normalizeSection(row.section_id) === 'lessons' && row.record_id && isRealNumber(row.chapter_number) && isRealNumber(row.lesson_number));
+const videoMapping = videoRows.map((row) => {
+  const result = r2ById.get(String(row.record_id));
+  const contentIds = result?.lessonIds || [];
+  const expected = String(row.lesson_id || '').toLowerCase();
+  const lessonIdMatches = !contentIds.length || !expected || contentIds.some((value) => {
+    const actual = String(value).toLowerCase();
+    return actual === expected || actual.startsWith(`${expected}_`) || expected.startsWith(`${actual}_`);
+  });
+  return {
+    subject_id: row.subject_id,
+    chapter_number: Number(row.chapter_number),
+    lesson_number: Number(row.lesson_number),
+    record_id: String(row.record_id),
+    index_lesson_id: row.lesson_id,
+    content_lesson_ids: contentIds,
+    lesson_id_matches: lessonIdMatches,
+    has_videos: Boolean(result?.ok && result.videoTitles?.length),
+    video_titles: result?.videoTitles || [],
+  };
+});
+const lessonsWithVideos = videoMapping.filter((item) => item.has_videos);
+const lessonsWithoutVideos = videoMapping.filter((item) => !item.has_videos);
+const videoLessonIdMismatches = videoMapping.filter((item) => !item.lesson_id_matches);
 const pageKinds = {};
 for (const result of r2Results) {
   for (const pageId of result.pageIds || []) {
@@ -151,6 +181,10 @@ const report = {
   sectionMissing,
   metadataMismatches,
   pageKinds,
+  videoMapping,
+  lessonsWithVideos,
+  lessonsWithoutVideos,
+  videoLessonIdMismatches,
   r2: {
     uniqueRecordIdsChecked: allRecordIds.length,
     exactMatches: r2Results.filter((item) => item.ok).length,
@@ -166,4 +200,4 @@ const report = {
 };
 const output = process.env.AUDIT_OUTPUT || 'audit-educational-index.json';
 await writeFile(output, JSON.stringify(report, null, 2));
-console.log(JSON.stringify({ output, rowsRead: report.rowsRead, lessonsScanned: report.lessonsScanned, summary: report.summary, invalid: invalid.length, duplicates: duplicateRecordIds.length, missingRecordIds: missingRecordIds.length, exactR2: report.r2.exactMatches, supabaseFallbacks: report.r2.returnedToSupabase, sectionMissing: sectionMissing.length }, null, 2));
+console.log(JSON.stringify({ output, rowsRead: report.rowsRead, lessonsScanned: report.lessonsScanned, summary: report.summary, invalid: invalid.length, duplicates: duplicateRecordIds.length, missingRecordIds: missingRecordIds.length, exactR2: report.r2.exactMatches, supabaseFallbacks: report.r2.returnedToSupabase, sectionMissing: sectionMissing.length, videoRows: videoMapping.length, lessonsWithVideos: lessonsWithVideos.length, lessonsWithoutVideos: lessonsWithoutVideos.length, videoLessonIdMismatches: videoLessonIdMismatches.length }, null, 2));
