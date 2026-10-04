@@ -253,6 +253,19 @@ export class ChallengeRoom {
   async webSocketMessage(socket, message) {
     var payload;
     try { payload = JSON.parse(message); } catch (_) { return; }
+    var sender = socket.deserializeAttachment();
+    if (payload && payload.type === 'audio_state' && sender && typeof payload.enabled === 'boolean') {
+      this.sockets().forEach(function (peer) {
+        if (peer !== socket) this.send(peer, { type: 'audio_state', from: sender.userId, enabled: payload.enabled });
+      }, this);
+      return;
+    }
+    if (payload && payload.type === 'audio_signal' && sender && payload.signal && typeof payload.signal === 'object') {
+      this.sockets().forEach(function (peer) {
+        if (peer !== socket) this.send(peer, { type: 'audio_signal', from: sender.userId, signal: payload.signal });
+      }, this);
+      return;
+    }
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
     if (!game || game.status !== 'playing') return;

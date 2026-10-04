@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Volume2, VolumeX, UserRound } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
@@ -27,13 +28,90 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const [connected, setConnected] = useState(false);
   const [pendingAnswer, setPendingAnswer] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
+  const [remoteTalking, setRemoteTalking] = useState(false);
+  const [audioBusy, setAudioBusy] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const roundRef = useRef<number | null>(null);
   const resultUntilRef = useRef(0);
   const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function sendSocket(payload: unknown) {
+    if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
+  }
+
+  function closePeer() {
+    peerRef.current?.close();
+    peerRef.current = null;
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    localStreamRef.current = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    pendingCandidatesRef.current = [];
+  }
+
+  async function ensurePeer() {
+    if (peerRef.current) return peerRef.current;
+    const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    peerRef.current = peer;
+    localStreamRef.current?.getTracks().forEach(track => peer.addTrack(track, localStreamRef.current as MediaStream));
+    peer.onicecandidate = event => { if (event.candidate) sendSocket({ type: 'audio_signal', signal: { candidate: event.candidate.toJSON() } }); };
+    peer.ontrack = event => {
+      if (remoteAudioRef.current && event.streams[0]) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+        remoteAudioRef.current.muted = !remoteAudioEnabled;
+        void remoteAudioRef.current.play().catch(() => undefined);
+      }
+    };
+    return peer;
+  }
+
+  async function toggleMicrophone() {
+    if (!audioEnabled) {
+      setAudioBusy(true);
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح لا يدعم الميكروفون.');
+        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = true; });
+        setAudioEnabled(true);
+        sendSocket({ type: 'audio_state', enabled: true });
+        await ensurePeer();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'تعذر تشغيل الميكروفون.');
+      } finally { setAudioBusy(false); }
+    } else {
+      localStreamRef.current?.getAudioTracks().forEach(track => { track.enabled = false; });
+      setAudioEnabled(false);
+      sendSocket({ type: 'audio_state', enabled: false });
+    }
+  }
+
+  function toggleRemoteAudio() {
+    setRemoteAudioEnabled(value => {
+      const next = !value;
+      if (remoteAudioRef.current) remoteAudioRef.current.muted = !next;
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!audioEnabled || !connected || state?.players.length !== 2) return;
+    void (async () => {
+      const peer = await ensurePeer();
+      if (peer.signalingState !== 'stable') return;
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      sendSocket({ type: 'audio_signal', signal: { description: peer.localDescription } });
+    })();
+  }, [audioEnabled, connected, state?.players.length]);
+
   useEffect(() => () => {
     socketRef.current?.close();
+    closePeer();
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
   }, []);
 
@@ -81,7 +159,32 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
       if (payload.type === 'welcome') setMe(payload.userId);
+      if (payload.type === 'audio_state') setRemoteTalking(Boolean(payload.enabled));
+      if (payload.type === 'audio_signal') {
+        void (async () => {
+          const peer = await ensurePeer();
+          try {
+            if (payload.signal?.description) {
+              await peer.setRemoteDescription(payload.signal.description);
+              for (const candidate of pendingCandidatesRef.current) await peer.addIceCandidate(candidate);
+              pendingCandidatesRef.current = [];
+              if (payload.signal.description.type === 'offer') {
+                const answer = await peer.createAnswer();
+                await peer.setLocalDescription(answer);
+                sendSocket({ type: 'audio_signal', signal: { description: peer.localDescription } });
+              }
+            }
+            if (payload.signal?.candidate) {
+              if (peer.remoteDescription) await peer.addIceCandidate(payload.signal.candidate);
+              else pendingCandidatesRef.current.push(payload.signal.candidate);
+            }
+          } catch (_) { setError('تعذر الاتصال الصوتي، حاول إيقاف الميكروفون وتشغيله مرة أخرى.'); }
+        })();
+      }
       if (payload.type === 'room_closed') {
+        closePeer();
+        setAudioEnabled(false);
+        setRemoteTalking(false);
         setConnected(false);
         setPendingAnswer(false);
         setState(null);
@@ -105,6 +208,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
     ws.onclose = () => {
       if (socketRef.current === ws) {
+        closePeer();
+        setAudioEnabled(false);
+        setRemoteTalking(false);
         socketRef.current = null;
         setConnected(false);
         setPendingAnswer(false);
@@ -190,9 +296,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         <button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
         <div className="flex gap-2"><input inputMode="numeric" maxLength={4} className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="رمز من 4 أرقام"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div>
       </div>}
-      {room && <div className="space-y-4"><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
+      {room && <div className="space-y-4"><audio ref={remoteAudioRef} autoPlay playsInline /><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
-        <div className="flex justify-between text-sm">{state?.players.map((p, i) => <span key={p.id}>{p.id === me ? 'أنت' : `اللاعب ${i + 1}`}: {p.score} {p.connected ? '🟢' : '⚪'}</span>)}</div>
+        <div className="grid grid-cols-2 gap-2">{state?.players.map((p, i) => <div key={p.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3"><span className="flex items-center gap-2 text-sm"><UserRound className="h-5 w-5 text-sky-300" />{p.id === me ? 'أنت' : `اللاعب ${i + 1}`} <span className={p.connected ? 'text-emerald-300' : 'text-slate-400'}>{p.connected ? 'متصل' : 'غير متصل'}</span></span>{p.id === me ? <button type="button" disabled={audioBusy} onClick={() => void toggleMicrophone()} aria-label={audioEnabled ? 'إغلاق الميكروفون' : 'فتح الميكروفون'} className={`rounded-lg p-2 ${audioEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'} disabled:opacity-50`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button> : <button type="button" onClick={toggleRemoteAudio} aria-label={remoteAudioEnabled ? 'كتم صوت اللاعب المقابل' : 'فتح صوت اللاعب المقابل'} className={`rounded-lg p-2 ${remoteAudioEnabled && remoteTalking ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}</div>)}</div>
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
         {state?.status === 'playing' && state.question && !roundResult && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
         {roundResult && state?.question && <div className="rounded-2xl border border-emerald-400/50 bg-emerald-500/15 p-5 text-center"><p className="text-sm font-bold text-emerald-200">نتيجة الجولة</p><p className="mt-2 text-lg font-black">الإجابة الصحيحة</p><p className="mt-2 rounded-xl bg-white/10 p-3 font-bold text-emerald-100">{state.question.options[roundResult.answer]}</p><div className="mt-3 flex justify-center gap-4 text-sm">{roundResult.scores.map((player, index) => <span key={player.id}>{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}: <b>{player.score}</b></span>)}</div></div>}
