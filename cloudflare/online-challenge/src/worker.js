@@ -47,6 +47,7 @@ function validGameType(value) {
 }
 
 var BOT_ID = 'bot:duha-challenge';
+var BOT_ANSWER_DELAY_MS = 2000;
 var BOT_PROFILES = [
   { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
   { id: 'opp-2', name: 'فاطمة العبيدي', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', city: 'الموصل - نينوى', school: 'ثانوية المتفوقات', badge: 'عالمة المستقبل 🔬', level: 14 },
@@ -212,7 +213,7 @@ export class ChallengeRoom {
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
     if (game.status === 'playing' && bot && bot.answer === null && !game.botAnswerAt) {
-      game.botAnswerAt = Date.now() + randomDelay(3000, 6000);
+      game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
     }
     await this.scheduleNextAlarm(game);
   }
@@ -225,7 +226,7 @@ export class ChallengeRoom {
     delete game.disconnectUserId;
     delete game.disconnectDeadline;
     game.status = 'playing';
-    game.botAnswerAt = Date.now() + randomDelay(3000, 6000);
+    game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
     this.broadcast({ type: 'bot_joined', replacedUserId: userId });
@@ -403,7 +404,7 @@ export class ChallengeRoom {
       game.players.push({ id: BOT_ID, score: 0, answer: null });
       game.status = 'playing';
       delete game.botJoinAt;
-      game.botAnswerAt = now + randomDelay(3000, 6000);
+      game.botAnswerAt = now + BOT_ANSWER_DELAY_MS;
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
