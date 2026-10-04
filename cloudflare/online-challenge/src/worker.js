@@ -255,7 +255,7 @@ export class ChallengeRoom {
     } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
   view(game) {
-    var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+    var currentIndex = game.round;
     var current = game.status === 'playing' ? game.questions[currentIndex] : null;
     var winner = game.winner || null;
     if (game.status === 'finished' && game.players.length === 2) {
@@ -374,7 +374,7 @@ export class ChallengeRoom {
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
     if (!game || game.status !== 'playing') return;
-    var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+    var currentIndex = game.round;
     var currentQuestion = game.questions[currentIndex];
     if (payload.option < 0 || payload.option >= currentQuestion.options.length) return;
     var attachment = socket.deserializeAttachment();
@@ -383,19 +383,11 @@ export class ChallengeRoom {
     if (game.turn && attachment.userId !== game.turn) return;
     player.answer = payload.option;
     if (game.players.some(this.isBot.bind(this))) {
-      var correct = currentQuestion.correctAnswer;
-      if (player.answer === correct) player.score += 1;
-      game.round = currentIndex + 1;
-      game.questionIndex = currentIndex + 1;
-      game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
-      game.players.forEach(function (item) { item.answer = null; });
-      if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
-      this.broadcast({ type: 'round_result', answer: correct, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
+      game.turn = BOT_ID;
+      game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));
-      if (game.status === 'finished') await this.updateRegistry('ended', game);
-      else await this.scheduleNextAlarm(game);
+      await this.scheduleNextAlarm(game);
       return;
     }
     await this.completeRoundIfReady(game);
@@ -449,16 +441,17 @@ export class ChallengeRoom {
     if (game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
       var bot = game.players.find(this.isBot.bind(this));
       if (bot && bot.answer === null && game.turn === BOT_ID) {
-        var botQuestion = game.questions[Number.isInteger(game.questionIndex) ? game.questionIndex : game.round];
+        var botQuestion = game.questions[game.round];
         bot.answer = this.chooseBotAnswer(game);
         var botCorrect = botQuestion.correctAnswer;
-        if (bot.answer === botCorrect) bot.score += 1;
-        game.round = (Number.isInteger(game.questionIndex) ? game.questionIndex : game.round) + 1;
+        var answerSnapshot = game.players.map(function (item) { return { id: item.id, answer: item.answer, correct: item.answer === botCorrect }; });
+        game.players.forEach(function (item) { if (item.answer === botCorrect) item.score += 1; });
+        this.broadcast({ type: 'round_result', answer: botCorrect, answers: answerSnapshot, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }) });
+        game.round += 1;
         game.questionIndex = game.round;
         game.turn = game.players.find(function (item) { return item.id !== BOT_ID; })?.id || null;
         game.players.forEach(function (item) { item.answer = null; });
-        if (game.questionIndex >= game.questions.length) game.status = 'finished';
-        this.broadcast({ type: 'round_result', answer: botCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: BOT_ID });
+        if (game.round >= game.questions.length) game.status = 'finished';
       }
       delete game.botAnswerAt;
       if (game.status === 'finished') await this.updateRegistry('ended', game);
