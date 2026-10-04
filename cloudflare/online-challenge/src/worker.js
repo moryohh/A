@@ -212,7 +212,7 @@ export class ChallengeRoom {
   }
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
-    if (game.status === 'playing' && bot && bot.answer === null && !game.botAnswerAt) {
+    if (game.status === 'playing' && game.turn === BOT_ID && bot && bot.answer === null && !game.botAnswerAt) {
       game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
     }
     await this.scheduleNextAlarm(game);
@@ -255,14 +255,15 @@ export class ChallengeRoom {
     } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
   view(game) {
-    var current = game.status === 'playing' ? game.questions[game.round] : null;
+    var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+    var current = game.status === 'playing' ? game.questions[currentIndex] : null;
     var winner = game.winner || null;
     if (game.status === 'finished' && game.players.length === 2) {
       winner = game.players[0].score > game.players[1].score ? game.players[0].id :
         game.players[1].score > game.players[0].score ? game.players[1].id : null;
     }
     return {
-      type: 'state', gameType: game.gameType, status: game.status, round: game.round, total: game.questions.length,
+      type: 'state', gameType: game.gameType, status: game.status, round: currentIndex, total: game.questions.length, turn: game.turn || null,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
         var profile = this.isBot(p) ? game.botProfile : null;
@@ -284,7 +285,7 @@ export class ChallengeRoom {
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
       // Preview behaviour: start the bot after exactly five seconds so the
       // single-player test can verify every game without a long wait.
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + 5000 };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + 5000 };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -327,6 +328,8 @@ export class ChallengeRoom {
         if (game.players.length !== 1 || game.status !== 'waiting') return json({ error: 'room_full' }, 409, '');
         game.players.push({ id: userId, score: 0, answer: null });
         game.status = 'playing';
+        game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
+        game.turn = game.players[0].id;
         delete game.botJoinAt;
       }
       if (game.disconnectUserId === userId) {
@@ -371,12 +374,30 @@ export class ChallengeRoom {
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
     if (!game || game.status !== 'playing') return;
-    var currentQuestion = game.questions[game.round];
+    var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+    var currentQuestion = game.questions[currentIndex];
     if (payload.option < 0 || payload.option >= currentQuestion.options.length) return;
     var attachment = socket.deserializeAttachment();
     var player = attachment && game.players.find(function (p) { return p.id === attachment.userId; });
     if (!player || player.answer !== null) return;
+    if (game.turn && attachment.userId !== game.turn) return;
     player.answer = payload.option;
+    if (game.players.some(this.isBot.bind(this))) {
+      var correct = currentQuestion.correctAnswer;
+      if (player.answer === correct) player.score += 1;
+      game.round = currentIndex + 1;
+      game.questionIndex = currentIndex + 1;
+      game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
+      game.players.forEach(function (item) { item.answer = null; });
+      if (game.questionIndex >= game.questions.length) game.status = 'finished';
+      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
+      this.broadcast({ type: 'round_result', answer: correct, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
+      await this.ctx.storage.put('game', game);
+      this.broadcast(this.view(game));
+      if (game.status === 'finished') await this.updateRegistry('ended', game);
+      else await this.scheduleNextAlarm(game);
+      return;
+    }
     await this.completeRoundIfReady(game);
     await this.ctx.storage.put('game', game);
     this.broadcast(this.view(game));
@@ -427,9 +448,19 @@ export class ChallengeRoom {
     }
     if (game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
       var bot = game.players.find(this.isBot.bind(this));
-      if (bot && bot.answer === null) bot.answer = this.chooseBotAnswer(game);
+      if (bot && bot.answer === null && game.turn === BOT_ID) {
+        var botQuestion = game.questions[Number.isInteger(game.questionIndex) ? game.questionIndex : game.round];
+        bot.answer = this.chooseBotAnswer(game);
+        var botCorrect = botQuestion.correctAnswer;
+        if (bot.answer === botCorrect) bot.score += 1;
+        game.round = (Number.isInteger(game.questionIndex) ? game.questionIndex : game.round) + 1;
+        game.questionIndex = game.round;
+        game.turn = game.players.find(function (item) { return item.id !== BOT_ID; })?.id || null;
+        game.players.forEach(function (item) { item.answer = null; });
+        if (game.questionIndex >= game.questions.length) game.status = 'finished';
+        this.broadcast({ type: 'round_result', answer: botCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: BOT_ID });
+      }
       delete game.botAnswerAt;
-      await this.completeRoundIfReady(game);
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
       await this.scheduleBotAnswer(game);

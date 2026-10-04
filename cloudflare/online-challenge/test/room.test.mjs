@@ -166,14 +166,15 @@ test('bot answers after its delay and completes every supported game type', asyn
     const questions = [0, 1, 2].map((round) => ({ question: `Question ${round + 1}?`, options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: round % optionCount }));
     const now = Date.now();
     data.set('game', {
-      gameType, roomCode: '1111', hostId: 'host', status: 'playing', round: 0, questions,
+      gameType, roomCode: '1111', hostId: 'host', status: 'playing', round: 0, questionIndex: 0, turn: 'bot:duha-challenge', questions,
       players: [{ id: 'host', score: 0, answer: 0 }, { id: 'bot:duha-challenge', score: 0, answer: null }],
       botAnswerAt: now + 3000,
     });
     for (let round = 0; round < questions.length; round += 1) {
       const ready = data.get('game');
+      ready.turn = 'bot:duha-challenge';
+      ready.players[0].answer = round % optionCount;
       ready.botAnswerAt = Date.now() - 1;
-      if (round > 0) ready.players[0].answer = round % optionCount;
       data.set('game', ready);
       await room.alarm();
     }
