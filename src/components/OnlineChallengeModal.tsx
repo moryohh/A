@@ -6,16 +6,14 @@ const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/,
 export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type Player = { id: string; score: number; answered: boolean; connected: boolean };
-type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null };
+type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null };
 type RoundResult = { answer: number; scores: Array<{ id: string; score: number }> };
-type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; players: number; createdAt: number };
 
 interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; }
 
 export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1, initialRoomCode }) => {
   const [room, setRoom] = useState('');
   const [entry, setEntry] = useState('');
-  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [state, setState] = useState<State | null>(null);
   const [me, setMe] = useState('');
   const [error, setError] = useState('');
@@ -110,22 +108,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     closePeer();
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    if (room) return;
-    let cancelled = false;
-    const loadRooms = async () => {
-      try {
-        const response = await fetch(`${API}/rooms`);
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (!cancelled) setActiveRooms(Array.isArray(payload.rooms) ? payload.rooms : []);
-      } catch (_) { /* The create/join controls still work when the list is unavailable. */ }
-    };
-    loadRooms();
-    const timer = window.setInterval(loadRooms, 3000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [room]);
 
   useEffect(() => {
     if (!initialRoomCode || room || busy) return;
@@ -275,8 +257,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }
 
   const self = state?.players.find(p => p.id === me);
-  const filteredRooms = activeRooms;
-  const gameNames: Record<OnlineChallengeGameType, string> = { millionaire: 'من سيربح المليون', true_false: 'صواب أم خطأ', gibha_sah: 'جبتها صح' };
   async function closeModal() {
     if (room) {
       try { await fetch(`${API}/rooms/${room}/leave`, { method: 'POST', headers: { Authorization: await authorization() }, keepalive: true }); } catch (_) { /* socket close still notifies the room */ }
@@ -289,18 +269,13 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black">{gameTitle} — لعب جماعي</h2><p className="text-xs text-sky-200">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
       <p className="mb-4 text-sm text-sky-200">تجربة بين لاعبين، بلا نقاط للمستويات حالياً.</p>
       {!room && <div className="space-y-4">
-        <div className="rounded-2xl border border-sky-400/20 bg-white/5 p-3">
-          <div className="mb-2 flex items-center justify-between"><p className="text-sm font-black text-sky-100">الغرف النشطة المتاحة للانضمام</p><span className="text-[10px] text-slate-400">اختر الغرفة من شاشة التحدي</span></div>
-          <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
-            {filteredRooms.length === 0 ? <p className="rounded-xl bg-black/20 p-3 text-center text-xs text-slate-300">لا توجد غرفة مطابقة حالياً.</p> : filteredRooms.map(active => <button key={active.code} disabled={busy} onClick={() => { setEntry(active.code); void (async () => { setBusy(true); try { await connect(active.code); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر الانضمام.'); } finally { setBusy(false); } })(); }} className="w-full rounded-xl bg-slate-800 p-3 text-right transition hover:bg-slate-700 disabled:opacity-50"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{active.code}</b><span className="text-xs text-emerald-300">{active.players}/2 لاعبين</span></span><span className="mt-1 block text-xs text-slate-200">{active.subject} — الفصل {active.chapter} — الدرس {active.lesson}</span><span className="block text-xs text-slate-400">{gameNames[active.gameType]} · {active.lessonTitle}</span></button>)}
-          </div>
-        </div>
         <button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
         <div className="flex gap-2"><input inputMode="numeric" maxLength={4} className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="رمز من 4 أرقام"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div>
       </div>}
       {room && <div className="space-y-4"><audio ref={remoteAudioRef} autoPlay playsInline /><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="grid grid-cols-2 gap-2">{state?.players.map((p, i) => <div key={p.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3"><span className="flex items-center gap-2 text-sm"><UserRound className="h-5 w-5 text-sky-300" />{p.id === me ? 'أنت' : `اللاعب ${i + 1}`} <span className={p.connected ? 'text-emerald-300' : 'text-slate-400'}>{p.connected ? 'متصل' : 'غير متصل'}</span></span>{p.id === me ? <button type="button" disabled={audioBusy} onClick={() => void toggleMicrophone()} aria-label={audioEnabled ? 'إغلاق الميكروفون' : 'فتح الميكروفون'} className={`rounded-lg p-2 ${audioEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'} disabled:opacity-50`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button> : <button type="button" onClick={toggleRemoteAudio} aria-label={remoteAudioEnabled ? 'كتم صوت اللاعب المقابل' : 'فتح صوت اللاعب المقابل'} className={`rounded-lg p-2 ${remoteAudioEnabled && remoteTalking ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}</div>)}</div>
+        {state?.status === 'playing' && state.reconnectDeadline && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-sm text-amber-100">انقطع اتصال اللاعب الآخر. ننتظر عودته لمدة 30 ثانية…</p>}
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
         {state?.status === 'playing' && state.question && !roundResult && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
         {roundResult && state?.question && <div className="rounded-2xl border border-emerald-400/50 bg-emerald-500/15 p-5 text-center"><p className="text-sm font-bold text-emerald-200">نتيجة الجولة</p><p className="mt-2 text-lg font-black">الإجابة الصحيحة</p><p className="mt-2 rounded-xl bg-white/10 p-3 font-bold text-emerald-100">{state.question.options[roundResult.answer]}</p><div className="mt-3 flex justify-center gap-4 text-sm">{roundResult.scores.map((player, index) => <span key={player.id}>{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}: <b>{player.score}</b></span>)}</div></div>}

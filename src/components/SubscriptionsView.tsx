@@ -29,7 +29,8 @@ import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 type ChallengeGame = 'millionaire' | 'true_false' | 'gibha_sah';
 type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
-type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; players: number; createdAt: number };
+type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
@@ -135,13 +136,20 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [challengeSubject, setChallengeSubject] = useState('');
   const [challengeChapter, setChallengeChapter] = useState('');
   const [challengeChapters, setChallengeChapters] = useState<Array<{ number: number; title: string }>>([]);
-  const [challengeGame, setChallengeGame] = useState<ChallengeGame>('true_false');
+  const [challengeGame, setChallengeGame] = useState<ChallengeGame | ''>('');
   const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | RoomStatus>('all');
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [challengeMessage, setChallengeMessage] = useState('');
 
   const selectedChallengeSubject = GRADE_6_SUBJECTS.find((subject) => subject.id === challengeSubject);
+  const visibleRooms = activeRooms.filter((room) =>
+    (!challengeSubject || room.subject === selectedChallengeSubject?.name || room.subject === challengeSubject) &&
+    (!challengeChapter || room.chapter === Number(challengeChapter)) &&
+    (!challengeGame || room.gameType === challengeGame) &&
+    (roomStatusFilter === 'all' || (room.status || 'waiting') === roomStatusFilter)
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -154,7 +162,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       } catch (_) { if (!cancelled) setActiveRooms([]); }
     };
     loadRooms();
-    const timer = window.setInterval(loadRooms, 3000);
+    const timer = window.setInterval(loadRooms, 2000);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
@@ -172,7 +180,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   }, [challengeSubject, challengeChapter, selectedChallengeSubject?.name]);
 
   const createRandomChallenge = async () => {
-    if (!challengeSubject || !challengeChapter || !challengeLessons.length || !onCreateChallenge) return;
+    if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
     setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
     try {
       const selectedLesson = challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
@@ -279,16 +287,24 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             <div className="grid gap-2 sm:grid-cols-3">
               <select value={challengeSubject} onChange={(event) => { setChallengeSubject(event.target.value); setChallengeChapter(''); }} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
               <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
-              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame)} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
+              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame | '')} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">كل الألعاب / اختر للإنشاء</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
             </div>
-            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50">{challengeBusy ? 'جارٍ تجهيز الدرس…' : 'أنشئ غرفة من درس عشوائي'}</button>
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50">{challengeBusy ? 'جارٍ تجهيز الدرس…' : 'أنشئ غرفة من درس عشوائي'}</button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
+          </div>
+          <div className="relative mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="فلترة حالات الغرف">
+            {([['all', 'الكل'], ['waiting', 'بانتظار لاعب'], ['playing', 'جارية'], ['ended', 'منتهية']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setRoomStatusFilter(value)} className={`rounded-xl px-2 py-2 text-xs font-black transition ${roomStatusFilter === value ? 'bg-sky-500 text-white' : 'bg-slate-800/80 text-slate-300'}`}>{label}</button>)}
           </div>
         </section>
         <section className={`rounded-3xl border p-4 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
           <div className="mb-3 flex items-center justify-between"><span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black text-emerald-300">تتحدث تلقائياً</span><h2 className={`text-base font-black ${theme.classes.textMain}`}>الغرف المتاحة للدخول</h2></div>
           <div className="space-y-2">
-            {activeRooms.length === 0 ? <p className={`rounded-2xl bg-black/15 p-4 text-center text-xs ${theme.classes.textMuted}`}>لا توجد غرف متاحة حالياً.</p> : activeRooms.map((room) => <button key={room.code} type="button" onClick={() => onJoinChallenge?.(room.code)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className="text-xs text-emerald-300">{room.players}/2 لاعبين</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle}</span></button>)}
+            {visibleRooms.length === 0 ? <p className={`rounded-2xl bg-black/15 p-4 text-center text-xs ${theme.classes.textMuted}`}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
+              const status = room.status || 'waiting';
+              const ended = status === 'ended';
+              const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
+              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room.code)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-65"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-200' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-200'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle} · {room.players}/2 لاعبين</span></button>;
+            })}
           </div>
         </section>
         </div>

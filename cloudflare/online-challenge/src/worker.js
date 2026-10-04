@@ -121,9 +121,6 @@ export default {
       if (ticketResponse.ok && /^\d{1,4}$/.test(publicCode)) {
         var ticketPayload = await ticketResponse.json();
         ticketPayload.roomId = roomId;
-        if (ticketPayload.joined === true) {
-          await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: roomId }) }));
-        }
         return json(ticketPayload, ticketResponse.status, origin);
       }
       return json(await ticketResponse.json(), ticketResponse.status, origin);
@@ -145,9 +142,6 @@ export default {
       var leaveStub = env.ROOMS.get(env.ROOMS.idFromName(leaveRoomId));
       var leaveResponse = await leaveStub.fetch(new Request('https://room/internal/leave', { method: 'POST', body: JSON.stringify({ userId: leaver }) }));
       var leavePayload = await leaveResponse.json();
-      if (leaveResponse.ok && leavePayload.closed) {
-        await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: leaveRoomId }) }));
-      }
       return json(leavePayload, leaveResponse.status, origin);
     }
 
@@ -164,7 +158,7 @@ export default {
 };
 
 export class ChallengeRoom {
-  constructor(ctx) { this.ctx = ctx; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; }
   async read() { return this.ctx.storage.get('game'); }
   sockets() { return this.ctx.getWebSockets(); }
   send(socket, payload) { try { socket.send(JSON.stringify(payload)); } catch (_) {} }
@@ -174,6 +168,15 @@ export class ChallengeRoom {
       var attachment = socket.deserializeAttachment();
       return attachment && attachment.userId === userId;
     });
+  }
+  async updateRegistry(status, game) {
+    if (!this.env || !this.env.REGISTRY || !game || !game.roomCode) return;
+    try {
+      await this.env.REGISTRY.get(this.env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/update', {
+        method: 'POST',
+        body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: game.players.length }),
+      }));
+    } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
   view(game) {
     var current = game.status === 'playing' ? game.questions[game.round] : null;
@@ -192,6 +195,7 @@ export class ChallengeRoom {
       tie: game.status === 'finished' && game.players.length === 2 && game.players[0].score === game.players[1].score,
       endedReason: game.endedReason || null,
       leftPlayerId: game.leftPlayerId || null,
+      reconnectDeadline: game.disconnectDeadline || null,
     };
   }
   async fetch(request) {
@@ -221,6 +225,7 @@ export class ChallengeRoom {
         game.endedReason = 'host_left';
         game.leftPlayerId = leaveBody.userId;
         await this.ctx.storage.put('game', game);
+        await this.updateRegistry('ended', game);
         this.broadcast({ type: 'room_closed', reason: 'host_left' });
         this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
         return json({ ok: true, closed: true }, 200, '');
@@ -232,6 +237,7 @@ export class ChallengeRoom {
         game.leftPlayerId = leaveBody.userId;
         game.winner = host && host.id !== leaveBody.userId ? host.id : null;
         await this.ctx.storage.put('game', game);
+        await this.updateRegistry('ended', game);
         this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: leaveBody.userId, winnerId: game.winner });
         this.broadcast(this.view(game));
         return json({ ok: true, closed: true }, 200, '');
@@ -248,8 +254,13 @@ export class ChallengeRoom {
         if (game.players.length !== 1 || game.status !== 'waiting') return json({ error: 'room_full' }, 409, '');
         game.players.push({ id: userId, score: 0, answer: null });
         game.status = 'playing';
-        await this.ctx.storage.put('game', game);
       }
+      if (game.disconnectUserId === userId) {
+        delete game.disconnectUserId;
+        delete game.disconnectDeadline;
+        await this.ctx.storage.deleteAlarm();
+      }
+      await this.ctx.storage.put('game', game);
       this.sockets().forEach(function (old) {
         var attachment = old.deserializeAttachment();
         if (attachment && attachment.userId === userId) old.close(4000, 'reconnected');
@@ -261,6 +272,7 @@ export class ChallengeRoom {
       server.serializeAttachment({ userId: userId });
       this.send(server, { type: 'welcome', userId: userId });
       this.broadcast(this.view(game));
+      await this.updateRegistry(game.status === 'waiting' ? 'waiting' : 'playing', game);
       return new Response(null, { status: 101, webSocket: client });
     }
     return json({ error: 'not_found' }, 404, '');
@@ -300,6 +312,7 @@ export class ChallengeRoom {
     }
     await this.ctx.storage.put('game', game);
     this.broadcast(this.view(game));
+    if (game.status === 'finished') await this.updateRegistry('ended', game);
   }
   async handleDisconnect(socket) {
     var game = await this.read();
@@ -307,23 +320,38 @@ export class ChallengeRoom {
     var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
     var userId = attachment && attachment.userId;
     if (!userId || this.connected(userId)) return;
-    var opponent = game.players.find(function (player) { return player.id !== userId; });
-    if (!opponent) {
-      game.status = 'closed';
-      game.endedReason = 'host_left';
-      game.leftPlayerId = userId;
-    } else {
-      game.status = 'abandoned';
-      game.endedReason = 'opponent_left';
-      game.leftPlayerId = userId;
-      game.winner = opponent.id;
-    }
+    game.disconnectUserId = userId;
+    game.disconnectDeadline = Date.now() + 30000;
     await this.ctx.storage.put('game', game);
+    this.broadcast(this.view(game));
+    await this.updateRegistry('reconnecting', game);
+    await this.ctx.storage.setAlarm(game.disconnectDeadline);
+  }
+  async alarm() {
+    var game = await this.read();
+    if (!game || !game.disconnectUserId || !game.disconnectDeadline || Date.now() < game.disconnectDeadline) return;
+    var userId = game.disconnectUserId;
+    if (this.connected(userId)) {
+      delete game.disconnectUserId;
+      delete game.disconnectDeadline;
+      await this.ctx.storage.put('game', game);
+      await this.updateRegistry(game.status === 'waiting' ? 'waiting' : 'playing', game);
+      return;
+    }
+    var opponent = game.players.find(function (player) { return player.id !== userId; });
+    game.status = opponent ? 'abandoned' : 'closed';
+    game.endedReason = opponent ? 'opponent_disconnected' : 'host_disconnected';
+    game.leftPlayerId = userId;
+    game.winner = opponent ? opponent.id : null;
+    delete game.disconnectUserId;
+    delete game.disconnectDeadline;
+    await this.ctx.storage.put('game', game);
+    await this.updateRegistry('ended', game);
     this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: userId, winnerId: game.winner || null });
     this.broadcast(this.view(game));
   }
-  webSocketClose(socket) { setTimeout(function () { this.handleDisconnect(socket); }.bind(this), 250); }
-  webSocketError(socket) { setTimeout(function () { this.handleDisconnect(socket); }.bind(this), 250); }
+  webSocketClose(socket) { this.ctx.waitUntil(this.handleDisconnect(socket)); }
+  webSocketError(socket) { this.ctx.waitUntil(this.handleDisconnect(socket)); }
 }
 
 export class ChallengeRegistry {
@@ -341,7 +369,7 @@ export class ChallengeRegistry {
         if (!rooms[candidate]) { code = candidate; break; }
       }
       if (!code) return json({ error: 'no_room_code' }, 503, '');
-      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, players: 1, createdAt: Date.now() };
+      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, players: 1, status: 'waiting', createdAt: Date.now() };
       await this.ctx.storage.put('rooms', rooms);
       return json({ code: code }, 201, '');
     }
@@ -355,8 +383,24 @@ export class ChallengeRegistry {
       await this.ctx.storage.put('rooms', rooms);
       return json({ ok: true }, 200, '');
     }
+    if (url.pathname === '/internal/update' && request.method === 'POST') {
+      var updateBody = await request.json().catch(function () { return null; });
+      var roomKey = updateBody && (updateBody.roomCode || Object.keys(rooms).find(function (key) { return rooms[key].roomId === updateBody.roomId; }));
+      if (!roomKey || !rooms[roomKey] || !['waiting', 'playing', 'reconnecting', 'ended'].includes(updateBody.status)) return json({ error: 'room_not_found' }, 404, '');
+      rooms[roomKey].status = updateBody.status;
+      rooms[roomKey].players = Number.isInteger(updateBody.players) ? updateBody.players : rooms[roomKey].players;
+      if (updateBody.status === 'ended') rooms[roomKey].endedAt = Date.now();
+      await this.ctx.storage.put('rooms', rooms);
+      return json({ ok: true }, 200, '');
+    }
     if (url.pathname === '/internal/list' && request.method === 'GET') {
-      var list = Object.values(rooms).filter(function (room) { return Date.now() - room.createdAt < 2 * 60 * 60 * 1000; });
+      var now = Date.now();
+      Object.keys(rooms).forEach(function (key) {
+        var room = rooms[key];
+        if (now - room.createdAt >= 2 * 60 * 60 * 1000 || (room.status === 'ended' && now - (room.endedAt || now) >= 15000)) delete rooms[key];
+      });
+      await this.ctx.storage.put('rooms', rooms);
+      var list = Object.values(rooms);
       return json({ rooms: list }, 200, '');
     }
     return json({ error: 'not_found' }, 404, '');
