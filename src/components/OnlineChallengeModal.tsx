@@ -7,12 +7,17 @@ export type OnlineChallengeQuestion = { question: string; options: string[]; cor
 type Player = { id: string; score: number; answered: boolean; connected: boolean };
 type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean };
 type RoundResult = { answer: number; scores: Array<{ id: string; score: number }> };
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; players: number; createdAt: number };
 
-interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; }
+interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; }
 
-export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle }) => {
+export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1 }) => {
   const [room, setRoom] = useState('');
   const [entry, setEntry] = useState('');
+  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [roomSubject, setRoomSubject] = useState('all');
+  const [roomChapter, setRoomChapter] = useState('all');
+  const [roomGame, setRoomGame] = useState<OnlineChallengeGameType | 'all'>('all');
   const [state, setState] = useState<State | null>(null);
   const [me, setMe] = useState('');
   const [error, setError] = useState('');
@@ -30,6 +35,22 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (room) return;
+    let cancelled = false;
+    const loadRooms = async () => {
+      try {
+        const response = await fetch(`${API}/rooms`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!cancelled) setActiveRooms(Array.isArray(payload.rooms) ? payload.rooms : []);
+      } catch (_) { /* The create/join controls still work when the list is unavailable. */ }
+    };
+    loadRooms();
+    const timer = window.setInterval(loadRooms, 10000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [room]);
+
   async function authorization(): Promise<string> {
     const guest = loadGuestSession();
     if (guest) return `Guest ${guest.id}`;
@@ -42,10 +63,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   async function connect(roomId: string) {
     const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: await authorization() } });
     if (!response.ok) throw new Error(response.status === 409 ? 'هذه الغرفة ممتلئة.' : 'تعذر دخول الغرفة. تحقق من الرمز.');
-    const { ticket } = await response.json();
+    const { ticket, roomId: internalRoomId } = await response.json();
     socketRef.current?.close();
     setConnected(false);
-    const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/rooms/${roomId}/ws?ticket=${encodeURIComponent(ticket)}`);
+    const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/rooms/${internalRoomId || roomId}/ws?ticket=${encodeURIComponent(ticket)}`);
     socketRef.current = ws;
     ws.onopen = () => { setConnected(true); setError(''); };
     const applyState = (payload: State) => {
@@ -102,10 +123,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     try {
       const selected = questions.slice(0, 10).map(q => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer }));
       if (!selected.length) throw new Error('لا توجد أسئلة لهذا الدرس.');
-      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected }) });
+      const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected, subject, chapter: chapterNumber, lesson: lessonNumber, lessonTitle, gameTitle }) });
       if (!response.ok) throw new Error('تعذر إنشاء غرفة التحدّي.');
-      const { roomId } = await response.json();
-      await connect(roomId);
+      const { roomCode } = await response.json();
+      await connect(roomCode);
     } catch (e) { setError(e instanceof Error ? e.message : 'حدث خطأ.'); }
     finally { setBusy(false); }
   }
@@ -113,20 +134,41 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   async function join() {
     setError(''); setBusy(true);
     try {
-      const roomId = entry.trim().toLowerCase();
-      if (!/^[0-9a-f-]{36}$/.test(roomId)) throw new Error('رمز الغرفة غير صالح.');
-      await connect(roomId);
+      const roomCode = entry.trim();
+      if (!/^\d{1,4}$/.test(roomCode)) throw new Error('رمز الغرفة يجب أن يكون من 1 إلى 4 أرقام.');
+      await connect(roomCode);
     } catch (e) { setError(e instanceof Error ? e.message : 'حدث خطأ.'); }
     finally { setBusy(false); }
   }
 
   const self = state?.players.find(p => p.id === me);
+  const filteredRooms = activeRooms.filter((active) =>
+    (roomSubject === 'all' || active.subject === roomSubject) &&
+    (roomChapter === 'all' || String(active.chapter) === roomChapter) &&
+    (roomGame === 'all' || active.gameType === roomGame)
+  );
+  const subjects = Array.from(new Set(activeRooms.map((active) => active.subject))).sort();
+  const chapters = Array.from(new Set(activeRooms.map((active) => active.chapter))).sort((a, b) => Number(a) - Number(b));
+  const gameNames: Record<OnlineChallengeGameType, string> = { millionaire: 'من سيربح المليون', true_false: 'صواب أم خطأ', gibha_sah: 'جبتها صح' };
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4 text-white" dir="rtl">
     <div className="w-full max-w-xl rounded-3xl border border-sky-400/30 bg-[#0b1930] p-5 shadow-2xl">
       <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black">{gameTitle} — لعب جماعي</h2><p className="text-xs text-sky-200">{lessonTitle}</p></div><button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
       <p className="mb-4 text-sm text-sky-200">تجربة بين لاعبين، بلا نقاط للمستويات حالياً.</p>
-      {!room && <div className="space-y-3"><button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
-        <div className="flex gap-2"><input className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value)} placeholder="رمز غرفة صديقك"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div></div>}
+      {!room && <div className="space-y-4">
+        <div className="rounded-2xl border border-sky-400/20 bg-white/5 p-3">
+          <p className="mb-2 text-sm font-black text-sky-100">الغرف النشطة المتاحة للانضمام</p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <select value={roomSubject} onChange={e => setRoomSubject(e.target.value)} className="rounded-lg bg-slate-800 p-2"><option value="all">كل المواد</option>{subjects.map(value => <option key={value} value={value}>{value}</option>)}</select>
+            <select value={roomChapter} onChange={e => setRoomChapter(e.target.value)} className="rounded-lg bg-slate-800 p-2"><option value="all">كل الفصول</option>{chapters.map(value => <option key={value} value={value}>الفصل {value}</option>)}</select>
+            <select value={roomGame} onChange={e => setRoomGame(e.target.value as OnlineChallengeGameType | 'all')} className="rounded-lg bg-slate-800 p-2"><option value="all">كل الألعاب</option>{Object.entries(gameNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          </div>
+          <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+            {filteredRooms.length === 0 ? <p className="rounded-xl bg-black/20 p-3 text-center text-xs text-slate-300">لا توجد غرفة مطابقة حالياً.</p> : filteredRooms.map(active => <button key={active.code} disabled={busy} onClick={() => { setEntry(active.code); void (async () => { setBusy(true); try { await connect(active.code); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر الانضمام.'); } finally { setBusy(false); } })(); }} className="w-full rounded-xl bg-slate-800 p-3 text-right transition hover:bg-slate-700 disabled:opacity-50"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{active.code}</b><span className="text-xs text-emerald-300">{active.players}/2 لاعبين</span></span><span className="mt-1 block text-xs text-slate-200">{active.subject} — الفصل {active.chapter} — الدرس {active.lesson}</span><span className="block text-xs text-slate-400">{gameNames[active.gameType]} · {active.lessonTitle}</span></button>)}
+          </div>
+        </div>
+        <button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
+        <div className="flex gap-2"><input inputMode="numeric" maxLength={4} className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="رمز من 4 أرقام"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div>
+      </div>}
       {room && <div className="space-y-4"><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="flex justify-between text-sm">{state?.players.map((p, i) => <span key={p.id}>{p.id === me ? 'أنت' : `اللاعب ${i + 1}`}: {p.score} {p.connected ? '🟢' : '⚪'}</span>)}</div>

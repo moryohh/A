@@ -263,6 +263,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     lessonTitle={lessonTitle}
     gameType={onlineGameType}
     gameTitle={onlineGame.title}
+    subject={openLessonContext?.subjectId || category}
+    chapterNumber={openLessonContext?.chapterNumber || 1}
+    lessonNumber={openLessonContext?.lessonNumber || 1}
   />;
 
   // Render Millionaire Modal (MCQ)
