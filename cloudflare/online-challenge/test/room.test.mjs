@@ -179,6 +179,20 @@ test('bot answers in 3 to 6 seconds and completes every supported game type', as
   }
 });
 
+test('gibha sah keeps its original exceptional probability sequence', () => {
+  const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0;
+    assert.equal(room.botAccuracy({ gameType: 'gibha_sah', round: 0 }), 0.25);
+    Math.random = () => 0.999;
+    assert.equal(room.botAccuracy({ gameType: 'gibha_sah', round: 0 }), 1);
+    assert.equal(room.botAccuracy({ gameType: 'millionaire', round: 0 }), 1);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test('registry exposes room lifecycle states for the challenge center', async () => {
   const data = new Map();
   const registry = new ChallengeRegistry({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) } });

@@ -47,6 +47,13 @@ function validGameType(value) {
 }
 
 var BOT_ID = 'bot:duha-challenge';
+var BOT_PROFILES = [
+  { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
+  { id: 'opp-2', name: 'فاطمة العبيدي', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', city: 'الموصل - نينوى', school: 'ثانوية المتفوقات', badge: 'عالمة المستقبل 🔬', level: 14 },
+  { id: 'opp-3', name: 'علي التميمي', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', city: 'البصرة - العشار', school: 'إعدادية المعقل', badge: 'فارس الأوائل 🏆', level: 11 },
+  { id: 'opp-4', name: 'زينب الكرخي', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80', city: 'بابل - الحلة', school: 'ثانوية الإسراء', badge: 'شعلة الذكاء 💡', level: 13 },
+  { id: 'opp-5', name: 'حيدر الكعبي', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', city: 'النجف الأشرف', school: 'إعدادية الكوفة', badge: 'صائد المليون 🎯', level: 15 },
+];
 function randomDelay(minimum, maximum) {
   return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
 }
@@ -184,6 +191,11 @@ export class ChallengeRoom {
     else if (this.ctx.storage.deleteAlarm) await this.ctx.storage.deleteAlarm();
   }
   botAccuracy(game) {
+    if (game.gameType === 'gibha_sah') {
+      // Keep Jبتها صح's original exceptional rules exactly as designed.
+      var gibhaProbabilities = [0.25, 0.5, 0.75, 1, 0, 0.5, 1, 1];
+      return gibhaProbabilities[Math.floor(Math.random() * gibhaProbabilities.length)] ?? 0.5;
+    }
     // The Millionaire opponent has the clearest progressive rule: strong early,
     // then its error rate grows by 5% from question eight onward.
     return Math.max(0.6, 1 - (game.round >= 7 ? (game.round - 6) * 0.05 : 0));
@@ -252,7 +264,8 @@ export class ChallengeRoom {
       type: 'state', gameType: game.gameType, status: game.status, round: game.round, total: game.questions.length,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
-        return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p) };
+        var profile = this.isBot(p) ? game.botProfile : null;
+        return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length === 2 && game.players[0].score === game.players[1].score,
@@ -268,7 +281,7 @@ export class ChallengeRoom {
       if (game) return json({ error: 'already_initialized' }, 409, '');
       var init = await request.json();
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botJoinAt: Date.now() + randomDelay(3 * 60 * 1000, 5 * 60 * 1000) };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + randomDelay(3 * 60 * 1000, 5 * 60 * 1000) };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
