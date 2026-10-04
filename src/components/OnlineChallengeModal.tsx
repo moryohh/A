@@ -6,7 +6,7 @@ const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/,
 export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type Player = { id: string; score: number; answered: boolean; connected: boolean };
-type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean };
+type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null };
 type RoundResult = { answer: number; scores: Array<{ id: string; score: number }> };
 type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; players: number; createdAt: number };
 
@@ -32,6 +32,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
   const [remoteTalking, setRemoteTalking] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
+  const suppressCloseMessageRef = useRef(false);
   const socketRef = useRef<WebSocket | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -189,6 +190,18 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         setPendingAnswer(false);
         setState(null);
         setError('أغلق المضيف الغرفة. يمكنك العودة واختيار غرفة أخرى.');
+        suppressCloseMessageRef.current = true;
+        ws.close();
+      }
+      if (payload.type === 'challenge_ended') {
+        closePeer();
+        setAudioEnabled(false);
+        setRemoteTalking(false);
+        setConnected(false);
+        setPendingAnswer(false);
+        setRoundResult(null);
+        setError('انسحب اللاعب الآخر. انتهى التحدّي ويمكنك العودة إلى قائمة الغرف.');
+        suppressCloseMessageRef.current = true;
         ws.close();
       }
       if (payload.type === 'state') {
@@ -214,7 +227,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         socketRef.current = null;
         setConnected(false);
         setPendingAnswer(false);
-        setError('انقطع الاتصال بالغرفة. اضغط إعادة الاتصال.');
+        if (!suppressCloseMessageRef.current) setError('انقطع الاتصال بالغرفة. اضغط إعادة الاتصال.');
+        suppressCloseMessageRef.current = false;
       }
     };
     setRoom(roomId);
@@ -302,6 +316,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {state?.status === 'waiting' && <p className="text-center text-amber-200">بانتظار انضمام اللاعب الثاني…</p>}
         {state?.status === 'playing' && state.question && !roundResult && <div><p className="mb-3 font-bold">السؤال {state.round + 1} من {state.total}: {state.question.question}</p><div className={`grid gap-2 ${state.question.options.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>{state.question.options.map((option, i) => <button key={i} disabled={!connected || pendingAnswer || self?.answered} onClick={() => answer(i)} className="min-h-16 rounded-xl bg-slate-700 p-2 text-sm disabled:opacity-50">{option}</button>)}</div>{(pendingAnswer || self?.answered) && <p className="mt-3 text-center text-sky-200">بانتظار إجابة اللاعب الآخر…</p>}</div>}
         {roundResult && state?.question && <div className="rounded-2xl border border-emerald-400/50 bg-emerald-500/15 p-5 text-center"><p className="text-sm font-bold text-emerald-200">نتيجة الجولة</p><p className="mt-2 text-lg font-black">الإجابة الصحيحة</p><p className="mt-2 rounded-xl bg-white/10 p-3 font-bold text-emerald-100">{state.question.options[roundResult.answer]}</p><div className="mt-3 flex justify-center gap-4 text-sm">{roundResult.scores.map((player, index) => <span key={player.id}>{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}: <b>{player.score}</b></span>)}</div></div>}
+        {state?.status === 'abandoned' && <div className="rounded-2xl border border-rose-400/50 bg-rose-500/15 p-5 text-center"><p className="text-2xl font-black text-rose-200">انتهى التحدّي</p><p className="mt-3 text-sm leading-7 text-rose-100">انسحب اللاعب الآخر من الغرفة، لذلك توقفت المباراة ولن تبقى عالقاً في السؤال السابق.</p><button onClick={() => void closeModal()} className="mt-4 w-full rounded-xl bg-sky-600 p-3 font-black">العودة إلى قائمة الغرف</button></div>}
+        {state?.status === 'closed' && <div className="rounded-2xl border border-rose-400/50 bg-rose-500/15 p-5 text-center"><p className="text-2xl font-black text-rose-200">أُغلقت الغرفة</p><p className="mt-3 text-sm leading-7 text-rose-100">غادر المضيف، وانتهى هذا التحدّي.</p><button onClick={() => void closeModal()} className="mt-4 w-full rounded-xl bg-sky-600 p-3 font-black">العودة إلى قائمة الغرف</button></div>}
         {state?.status === 'finished' && <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-center"><p className="text-2xl font-black text-amber-200">{state.tie ? 'انتهت المباراة بالتعادل!' : state.winner === me ? 'فزت بالتحدّي! 🎉' : 'فاز اللاعب الآخر'}</p><div className="mt-4 grid grid-cols-2 gap-3">{state.players.map((player, index) => <div key={player.id} className={`rounded-xl border p-3 ${player.id === state.winner ? 'border-amber-300 bg-amber-400/15' : 'border-white/15 bg-white/5'}`}><p className="text-xs text-slate-300">{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}</p><p className="mt-1 text-2xl font-black">{player.score}</p></div>)}</div><button onClick={() => void closeModal()} className="mt-4 w-full rounded-xl bg-sky-600 p-3 font-black">العودة إلى الألعاب</button></div>}
       </div>}
       {error && <p className="mt-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}

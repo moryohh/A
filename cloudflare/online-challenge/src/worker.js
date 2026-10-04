@@ -177,7 +177,7 @@ export class ChallengeRoom {
   }
   view(game) {
     var current = game.status === 'playing' ? game.questions[game.round] : null;
-    var winner = null;
+    var winner = game.winner || null;
     if (game.status === 'finished' && game.players.length === 2) {
       winner = game.players[0].score > game.players[1].score ? game.players[0].id :
         game.players[1].score > game.players[0].score ? game.players[1].id : null;
@@ -190,6 +190,8 @@ export class ChallengeRoom {
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length === 2 && game.players[0].score === game.players[1].score,
+      endedReason: game.endedReason || null,
+      leftPlayerId: game.leftPlayerId || null,
     };
   }
   async fetch(request) {
@@ -216,9 +218,22 @@ export class ChallengeRoom {
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       if (leaveBody.userId === (game.hostId || (game.players[0] && game.players[0].id))) {
         game.status = 'closed';
+        game.endedReason = 'host_left';
+        game.leftPlayerId = leaveBody.userId;
         await this.ctx.storage.put('game', game);
         this.broadcast({ type: 'room_closed', reason: 'host_left' });
         this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
+        return json({ ok: true, closed: true }, 200, '');
+      }
+      if (game.players.some(function (player) { return player.id === leaveBody.userId; })) {
+        var host = game.players.find(function (player) { return player.id === (game.hostId || game.players[0].id); });
+        game.status = 'abandoned';
+        game.endedReason = 'opponent_left';
+        game.leftPlayerId = leaveBody.userId;
+        game.winner = host && host.id !== leaveBody.userId ? host.id : null;
+        await this.ctx.storage.put('game', game);
+        this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: leaveBody.userId, winnerId: game.winner });
+        this.broadcast(this.view(game));
         return json({ ok: true, closed: true }, 200, '');
       }
       return json({ ok: true, closed: false }, 200, '');
@@ -286,7 +301,29 @@ export class ChallengeRoom {
     await this.ctx.storage.put('game', game);
     this.broadcast(this.view(game));
   }
-  webSocketClose() { this.read().then(function (game) { if (game) this.broadcast(this.view(game)); }.bind(this)); }
+  async handleDisconnect(socket) {
+    var game = await this.read();
+    if (!game || game.status === 'closed' || game.status === 'finished' || game.status === 'abandoned') return;
+    var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
+    var userId = attachment && attachment.userId;
+    if (!userId || this.connected(userId)) return;
+    var opponent = game.players.find(function (player) { return player.id !== userId; });
+    if (!opponent) {
+      game.status = 'closed';
+      game.endedReason = 'host_left';
+      game.leftPlayerId = userId;
+    } else {
+      game.status = 'abandoned';
+      game.endedReason = 'opponent_left';
+      game.leftPlayerId = userId;
+      game.winner = opponent.id;
+    }
+    await this.ctx.storage.put('game', game);
+    this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: userId, winnerId: game.winner || null });
+    this.broadcast(this.view(game));
+  }
+  webSocketClose(socket) { setTimeout(function () { this.handleDisconnect(socket); }.bind(this), 250); }
+  webSocketError(socket) { setTimeout(function () { this.handleDisconnect(socket); }.bind(this), 250); }
 }
 
 export class ChallengeRegistry {
