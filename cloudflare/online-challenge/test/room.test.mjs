@@ -80,7 +80,7 @@ test('two players finish a match; duplicate answers and third player are rejecte
   assert.deepEqual(data.get('game').players.map(player => player.score), [1, 1]);
 });
 
-test('temporary disconnect gets a 30 second reconnect grace period before the match ends', async () => {
+test('temporary disconnect gets a 30 second grace period then a bot continues the match', async () => {
   const data = new Map();
   let alarmAt = null;
   const messages = [];
@@ -111,9 +111,72 @@ test('temporary disconnect gets a 30 second reconnect grace period before the ma
   expired.disconnectDeadline = Date.now() - 1;
   data.set('game', expired);
   await room.alarm();
-  assert.equal(data.get('game').status, 'abandoned');
-  assert.equal(data.get('game').winner, 'host');
-  assert.equal(messages.some(message => message.type === 'challenge_ended'), true);
+  assert.equal(data.get('game').status, 'playing');
+  assert.equal(data.get('game').players[1].id, 'bot:duha-challenge');
+  assert.ok(data.get('game').botAnswerAt > Date.now());
+  assert.equal(messages.some(message => message.type === 'bot_joined'), true);
+  assert.equal(messages.some(message => message.type === 'challenge_ended'), false);
+});
+
+test('a bot joins a waiting host after the randomized waiting deadline', async () => {
+  const data = new Map();
+  let alarmAt = null;
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async value => { alarmAt = value; },
+      deleteAlarm: async () => { alarmAt = null; },
+    },
+    getWebSockets: () => [hostSocket],
+  });
+  const questions = [{ question: 'Question?', options: ['a', 'b'], correctAnswer: 0 }];
+  const startedAt = Date.now();
+  await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'true_false', roomCode: '4321', questions }),
+  }));
+  assert.ok(alarmAt >= startedAt + 3 * 60 * 1000);
+  assert.ok(alarmAt <= Date.now() + 5 * 60 * 1000);
+  const waiting = data.get('game');
+  waiting.botJoinAt = Date.now() - 1;
+  data.set('game', waiting);
+  await room.alarm();
+  assert.equal(data.get('game').status, 'playing');
+  assert.equal(data.get('game').players[1].id, 'bot:duha-challenge');
+  assert.ok(data.get('game').botAnswerAt > Date.now());
+  assert.equal(messages.some(message => message.type === 'bot_joined'), true);
+});
+
+test('bot answers in 3 to 6 seconds and completes every supported game type', async () => {
+  for (const gameType of ['millionaire', 'true_false', 'gibha_sah']) {
+    const data = new Map();
+    const messages = [];
+    const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+    const room = new ChallengeRoom({
+      storage: {
+        get: async key => data.get(key),
+        put: async (key, value) => data.set(key, structuredClone(value)),
+        setAlarm: async () => {}, deleteAlarm: async () => {},
+      },
+      getWebSockets: () => [hostSocket],
+    });
+    const optionCount = gameType === 'true_false' ? 2 : gameType === 'gibha_sah' ? 10 : 4;
+    const questions = [{ question: 'Question?', options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: 0 }];
+    const now = Date.now();
+    data.set('game', {
+      gameType, roomCode: '1111', hostId: 'host', status: 'playing', round: 0, questions,
+      players: [{ id: 'host', score: 0, answer: 0 }, { id: 'bot:duha-challenge', score: 0, answer: null }],
+      botAnswerAt: now + 3000,
+    });
+    const ready = data.get('game');
+    ready.botAnswerAt = Date.now() - 1;
+    data.set('game', ready);
+    await room.alarm();
+    assert.equal(data.get('game').status, 'finished');
+    assert.equal(messages.some(message => message.type === 'round_result'), true);
+  }
 });
 
 test('registry exposes room lifecycle states for the challenge center', async () => {

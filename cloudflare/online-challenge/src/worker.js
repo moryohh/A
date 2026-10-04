@@ -46,6 +46,11 @@ function validGameType(value) {
   return ['millionaire', 'true_false', 'gibha_sah'].includes(value);
 }
 
+var BOT_ID = 'bot:duha-challenge';
+function randomDelay(minimum, maximum) {
+  return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+}
+
 function validRoomMetadata(body) {
   return body && typeof body.subject === 'string' && body.subject.length <= 120 &&
     Number.isInteger(body.chapter) && body.chapter > 0 && body.chapter < 100 &&
@@ -164,10 +169,68 @@ export class ChallengeRoom {
   send(socket, payload) { try { socket.send(JSON.stringify(payload)); } catch (_) {} }
   broadcast(payload) { this.sockets().forEach(function (socket) { this.send(socket, payload); }, this); }
   connected(userId) {
+    if (userId === BOT_ID) return true;
     return this.sockets().some(function (socket) {
       var attachment = socket.deserializeAttachment();
       return attachment && attachment.userId === userId;
     });
+  }
+  isBot(player) { return Boolean(player && player.id === BOT_ID); }
+  async scheduleNextAlarm(game) {
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botAnswerAt].filter(function (value) {
+      return Number.isFinite(value);
+    });
+    if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
+    else if (this.ctx.storage.deleteAlarm) await this.ctx.storage.deleteAlarm();
+  }
+  botAccuracy(game) {
+    // The Millionaire opponent has the clearest progressive rule: strong early,
+    // then its error rate grows by 5% from question eight onward.
+    return Math.max(0.6, 1 - (game.round >= 7 ? (game.round - 6) * 0.05 : 0));
+  }
+  chooseBotAnswer(game) {
+    var question = game.questions[game.round];
+    if (!question) return null;
+    if (Math.random() < this.botAccuracy(game)) return question.correctAnswer;
+    var wrong = question.options.map(function (_, index) { return index; }).filter(function (index) {
+      return index !== question.correctAnswer;
+    });
+    return wrong.length ? wrong[Math.floor(Math.random() * wrong.length)] : question.correctAnswer;
+  }
+  async scheduleBotAnswer(game) {
+    var bot = game.players.find(this.isBot.bind(this));
+    if (game.status === 'playing' && bot && bot.answer === null && !game.botAnswerAt) {
+      game.botAnswerAt = Date.now() + randomDelay(3000, 6000);
+    }
+    await this.scheduleNextAlarm(game);
+  }
+  async replacePlayerWithBot(game, userId) {
+    var player = game.players.find(function (item) { return item.id === userId; });
+    if (!player || this.isBot(player)) return false;
+    player.id = BOT_ID;
+    player.answer = null;
+    game.botReplacedUserId = userId;
+    delete game.disconnectUserId;
+    delete game.disconnectDeadline;
+    game.status = 'playing';
+    game.botAnswerAt = Date.now() + randomDelay(3000, 6000);
+    await this.ctx.storage.put('game', game);
+    await this.updateRegistry('playing', game);
+    this.broadcast({ type: 'bot_joined', replacedUserId: userId });
+    this.broadcast(this.view(game));
+    await this.scheduleNextAlarm(game);
+    return true;
+  }
+  async completeRoundIfReady(game) {
+    if (!game.players.every(function (player) { return player.answer !== null; })) return false;
+    var answer = game.questions[game.round].correctAnswer;
+    game.players.forEach(function (player) { if (player.answer === answer) player.score += 1; });
+    this.broadcast({ type: 'round_result', answer: answer, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }) });
+    game.round += 1;
+    delete game.botAnswerAt;
+    if (game.round >= game.questions.length) game.status = 'finished';
+    else game.players.forEach(function (player) { player.answer = null; });
+    return true;
   }
   async updateRegistry(status, game) {
     if (!this.env || !this.env.REGISTRY || !game || !game.roomCode) return;
@@ -189,7 +252,7 @@ export class ChallengeRoom {
       type: 'state', gameType: game.gameType, status: game.status, round: game.round, total: game.questions.length,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
-        return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id) };
+        return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p) };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length === 2 && game.players[0].score === game.players[1].score,
@@ -205,7 +268,9 @@ export class ChallengeRoom {
       if (game) return json({ error: 'already_initialized' }, 409, '');
       var init = await request.json();
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
-      await this.ctx.storage.put('game', { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }] });
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botJoinAt: Date.now() + randomDelay(3 * 60 * 1000, 5 * 60 * 1000) };
+      await this.ctx.storage.put('game', initialGame);
+      await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
     }
     if (!game) return json({ error: 'room_not_found' }, 404, '');
@@ -220,6 +285,10 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/leave' && request.method === 'POST') {
       var leaveBody = await request.json().catch(function () { return null; });
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
+      if (game.status === 'playing' && game.players.length === 2 && game.players.some(function (player) { return player.id === leaveBody.userId; })) {
+        await this.replacePlayerWithBot(game, leaveBody.userId);
+        return json({ ok: true, botContinues: true }, 200, '');
+      }
       if (leaveBody.userId === (game.hostId || (game.players[0] && game.players[0].id))) {
         game.status = 'closed';
         game.endedReason = 'host_left';
@@ -228,18 +297,6 @@ export class ChallengeRoom {
         await this.updateRegistry('ended', game);
         this.broadcast({ type: 'room_closed', reason: 'host_left' });
         this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
-        return json({ ok: true, closed: true }, 200, '');
-      }
-      if (game.players.some(function (player) { return player.id === leaveBody.userId; })) {
-        var host = game.players.find(function (player) { return player.id === (game.hostId || game.players[0].id); });
-        game.status = 'abandoned';
-        game.endedReason = 'opponent_left';
-        game.leftPlayerId = leaveBody.userId;
-        game.winner = host && host.id !== leaveBody.userId ? host.id : null;
-        await this.ctx.storage.put('game', game);
-        await this.updateRegistry('ended', game);
-        this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: leaveBody.userId, winnerId: game.winner });
-        this.broadcast(this.view(game));
         return json({ ok: true, closed: true }, 200, '');
       }
       return json({ ok: true, closed: false }, 200, '');
@@ -254,13 +311,15 @@ export class ChallengeRoom {
         if (game.players.length !== 1 || game.status !== 'waiting') return json({ error: 'room_full' }, 409, '');
         game.players.push({ id: userId, score: 0, answer: null });
         game.status = 'playing';
+        delete game.botJoinAt;
       }
       if (game.disconnectUserId === userId) {
         delete game.disconnectUserId;
         delete game.disconnectDeadline;
-        await this.ctx.storage.deleteAlarm();
+        await this.scheduleNextAlarm(game);
       }
       await this.ctx.storage.put('game', game);
+      await this.scheduleBotAnswer(game);
       this.sockets().forEach(function (old) {
         var attachment = old.deserializeAttachment();
         if (attachment && attachment.userId === userId) old.close(4000, 'reconnected');
@@ -302,24 +361,18 @@ export class ChallengeRoom {
     var player = attachment && game.players.find(function (p) { return p.id === attachment.userId; });
     if (!player || player.answer !== null) return;
     player.answer = payload.option;
-    if (game.players.every(function (p) { return p.answer !== null; })) {
-      var answer = game.questions[game.round].correctAnswer;
-      game.players.forEach(function (p) { if (p.answer === answer) p.score += 1; });
-      this.broadcast({ type: 'round_result', answer: answer, scores: game.players.map(function (p) { return { id: p.id, score: p.score }; }) });
-      game.round += 1;
-      if (game.round >= game.questions.length) game.status = 'finished';
-      else game.players.forEach(function (p) { p.answer = null; });
-    }
+    await this.completeRoundIfReady(game);
     await this.ctx.storage.put('game', game);
     this.broadcast(this.view(game));
     if (game.status === 'finished') await this.updateRegistry('ended', game);
+    else await this.scheduleBotAnswer(game);
   }
   async handleDisconnect(socket) {
     var game = await this.read();
     if (!game || game.status === 'closed' || game.status === 'finished' || game.status === 'abandoned') return;
     var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
     var userId = attachment && attachment.userId;
-    if (!userId || this.connected(userId)) return;
+    if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId)) return;
     game.disconnectUserId = userId;
     game.disconnectDeadline = Date.now() + 30000;
     await this.ctx.storage.put('game', game);
@@ -329,26 +382,44 @@ export class ChallengeRoom {
   }
   async alarm() {
     var game = await this.read();
-    if (!game || !game.disconnectUserId || !game.disconnectDeadline || Date.now() < game.disconnectDeadline) return;
-    var userId = game.disconnectUserId;
-    if (this.connected(userId)) {
-      delete game.disconnectUserId;
-      delete game.disconnectDeadline;
-      await this.ctx.storage.put('game', game);
-      await this.updateRegistry(game.status === 'waiting' ? 'waiting' : 'playing', game);
-      return;
+    if (!game || ['closed', 'finished', 'abandoned'].includes(game.status)) return;
+    var now = Date.now();
+    if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && game.players.length === 1 && this.connected(game.players[0].id)) {
+      game.players.push({ id: BOT_ID, score: 0, answer: null });
+      game.status = 'playing';
+      delete game.botJoinAt;
+      game.botAnswerAt = now + randomDelay(3000, 6000);
+      await this.updateRegistry('playing', game);
+      this.broadcast({ type: 'bot_joined', replacedUserId: null });
+      this.broadcast(this.view(game));
     }
-    var opponent = game.players.find(function (player) { return player.id !== userId; });
-    game.status = opponent ? 'abandoned' : 'closed';
-    game.endedReason = opponent ? 'opponent_disconnected' : 'host_disconnected';
-    game.leftPlayerId = userId;
-    game.winner = opponent ? opponent.id : null;
-    delete game.disconnectUserId;
-    delete game.disconnectDeadline;
+    if (game.disconnectUserId && game.disconnectDeadline && now >= game.disconnectDeadline) {
+      var disconnectedId = game.disconnectUserId;
+      if (this.connected(disconnectedId)) {
+        delete game.disconnectUserId;
+        delete game.disconnectDeadline;
+      } else if (game.status === 'playing') {
+        await this.replacePlayerWithBot(game, disconnectedId);
+        return;
+      } else {
+        game.status = 'closed';
+        game.endedReason = 'host_disconnected';
+        delete game.disconnectUserId;
+        delete game.disconnectDeadline;
+        await this.updateRegistry('ended', game);
+      }
+    }
+    if (game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
+      var bot = game.players.find(this.isBot.bind(this));
+      if (bot && bot.answer === null) bot.answer = this.chooseBotAnswer(game);
+      delete game.botAnswerAt;
+      await this.completeRoundIfReady(game);
+      if (game.status === 'finished') await this.updateRegistry('ended', game);
+      this.broadcast(this.view(game));
+      await this.scheduleBotAnswer(game);
+    }
     await this.ctx.storage.put('game', game);
-    await this.updateRegistry('ended', game);
-    this.broadcast({ type: 'challenge_ended', reason: game.endedReason, leftPlayerId: userId, winnerId: game.winner || null });
-    this.broadcast(this.view(game));
+    await this.scheduleNextAlarm(game);
   }
   webSocketClose(socket) { this.ctx.waitUntil(this.handleDisconnect(socket)); }
   webSocketError(socket) { this.ctx.waitUntil(this.handleDisconnect(socket)); }
