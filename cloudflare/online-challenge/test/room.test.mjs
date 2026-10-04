@@ -118,7 +118,7 @@ test('temporary disconnect gets a 30 second grace period then a bot continues th
   assert.equal(messages.some(message => message.type === 'challenge_ended'), false);
 });
 
-test('a bot joins a waiting host after the randomized waiting deadline', async () => {
+test('a bot joins a waiting host after the five-second preview deadline', async () => {
   const data = new Map();
   let alarmAt = null;
   const messages = [];
@@ -137,8 +137,8 @@ test('a bot joins a waiting host after the randomized waiting deadline', async (
   await room.fetch(new Request('https://room/internal/init', {
     method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'true_false', roomCode: '4321', questions }),
   }));
-  assert.ok(alarmAt >= startedAt + 3 * 60 * 1000);
-  assert.ok(alarmAt <= Date.now() + 5 * 60 * 1000);
+  assert.ok(alarmAt >= startedAt + 4500);
+  assert.ok(alarmAt <= Date.now() + 5500);
   const waiting = data.get('game');
   waiting.botJoinAt = Date.now() - 1;
   data.set('game', waiting);
@@ -149,7 +149,7 @@ test('a bot joins a waiting host after the randomized waiting deadline', async (
   assert.equal(messages.some(message => message.type === 'bot_joined'), true);
 });
 
-test('bot answers in 3 to 6 seconds and completes every supported game type', async () => {
+test('bot answers after its delay and completes every supported game type', async () => {
   for (const gameType of ['millionaire', 'true_false', 'gibha_sah']) {
     const data = new Map();
     const messages = [];
@@ -163,19 +163,22 @@ test('bot answers in 3 to 6 seconds and completes every supported game type', as
       getWebSockets: () => [hostSocket],
     });
     const optionCount = gameType === 'true_false' ? 2 : gameType === 'gibha_sah' ? 10 : 4;
-    const questions = [{ question: 'Question?', options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: 0 }];
+    const questions = [0, 1, 2].map((round) => ({ question: `Question ${round + 1}?`, options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: round % optionCount }));
     const now = Date.now();
     data.set('game', {
       gameType, roomCode: '1111', hostId: 'host', status: 'playing', round: 0, questions,
       players: [{ id: 'host', score: 0, answer: 0 }, { id: 'bot:duha-challenge', score: 0, answer: null }],
       botAnswerAt: now + 3000,
     });
-    const ready = data.get('game');
-    ready.botAnswerAt = Date.now() - 1;
-    data.set('game', ready);
-    await room.alarm();
+    for (let round = 0; round < questions.length; round += 1) {
+      const ready = data.get('game');
+      ready.botAnswerAt = Date.now() - 1;
+      if (round > 0) ready.players[0].answer = round % optionCount;
+      data.set('game', ready);
+      await room.alarm();
+    }
     assert.equal(data.get('game').status, 'finished');
-    assert.equal(messages.some(message => message.type === 'round_result'), true);
+    assert.equal(messages.filter(message => message.type === 'round_result').length, questions.length);
   }
 });
 
