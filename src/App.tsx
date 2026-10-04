@@ -41,6 +41,7 @@ import { CommunityAccountActionsModal } from './components/CommunityAccountActio
 import { MainHomeView } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
+import { OnlineChallengeModal } from './components/OnlineChallengeModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
@@ -358,6 +359,7 @@ function AppContent() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isTeacherInfoOpen, setIsTeacherInfoOpen] = useState(false);
   const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const [isChallengeHubOpen, setIsChallengeHubOpen] = useState(false);
   const [isDailyExamOpen, setIsDailyExamOpen] = useState(false);
 
 
@@ -1246,7 +1248,7 @@ function AppContent() {
               : activeTab === 'community'
               ? 'المجتمع الطلابي'
               : activeTab === 'subscriptions'
-              ? 'الاشتراكات والدروس'
+              ? 'التحدّي ودوراتي'
               : activeTab === 'profile'
               ? 'الملف الشخصي'
               : 'الإعدادات'
@@ -1348,6 +1350,7 @@ function AppContent() {
                 setHomeSubView('main_home');
               }}
               competitionSnapshot={competitionSnapshot}
+              onOpenChallenge={() => setIsChallengeHubOpen(true)}
             />
           )}
 
@@ -1545,6 +1548,16 @@ function AppContent() {
           />
         </React.Suspense>
       </GamesLoadBoundary>
+
+      {isChallengeHubOpen && (
+        <OnlineChallengeModal
+          onClose={() => setIsChallengeHubOpen(false)}
+          questions={[]}
+          lessonTitle="مركز الغرف النشطة"
+          gameType="true_false"
+          gameTitle="التحدّي الجماعي"
+        />
+      )}
 
       <DailyExamModal
         isOpen={isDailyExamOpen}

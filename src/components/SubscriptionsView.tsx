@@ -11,6 +11,7 @@ import {
   MapPin,
   MonitorCheck,
   UsersRound,
+  Swords,
 } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { registerCourseReminder } from '../services/communityService';
@@ -26,6 +27,7 @@ interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
   onBack?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
+  onOpenChallenge?: () => void;
 }
 
 const STATUS_STYLES: Record<CourseStatus, { text: string; background: string; border: string }> = {
@@ -117,8 +119,9 @@ const getStatusMessage = (course: MockCourse) => {
   };
 };
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot }) => {
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge }) => {
   const { theme } = useAppTheme();
+  const [activeSection, setActiveSection] = useState<'challenge' | 'courses'>('challenge');
   const [selectedCourse, setSelectedCourse] = useState<MockCourse | null>(null);
   const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [reminderMessage, setReminderMessage] = useState('');
@@ -181,6 +184,35 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
   return (
     <div className="space-y-4 p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] text-right select-none sm:p-4 animate-in fade-in duration-200">
+      <section className={`rounded-3xl border p-2 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="دوراتي والتحدي">
+          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => setActiveSection('challenge')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'challenge' ? 'bg-sky-500 text-white shadow-lg' : theme.classes.textMuted}`}>
+            <Swords className="h-5 w-5" /> التحدّي
+          </button>
+          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => setActiveSection('courses')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'courses' ? 'bg-sky-500 text-white shadow-lg' : theme.classes.textMuted}`}>
+            <BookOpen className="h-5 w-5" /> دوراتي
+          </button>
+        </div>
+      </section>
+
+      {activeSection === 'challenge' && (
+        <section className={`relative overflow-hidden rounded-3xl border p-5 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+          <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-sky-400/20 blur-3xl" />
+          <div className="relative flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300"><Swords className="h-6 w-6" /></div>
+            <div>
+              <h1 className={`text-xl font-black ${theme.classes.textMain}`}>مركز التحدّي الجماعي</h1>
+              <p className={`mt-1 text-xs leading-6 ${theme.classes.textMuted}`}>استعرض الغرف النشطة، استخدم الفلتر، وانضم إلى تحدّي مناسب لك.</p>
+            </div>
+          </div>
+          <button type="button" onClick={onOpenChallenge} className="relative mt-5 w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-[0.99]">
+            فتح الغرف النشطة والتحدّي
+          </button>
+          <p className={`mt-3 text-center text-[11px] leading-5 ${theme.classes.textMuted}`}>لإنشاء غرفة جديدة بأسئلة صحيحة، افتح أي درس ثم اضغط أيقونة الألعاب واختر «جماعي».</p>
+        </section>
+      )}
+
+      {activeSection === 'courses' && <>
       <section
         className={`relative overflow-hidden rounded-3xl border p-4 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
         style={{ boxShadow: `0 8px 28px ${theme.colors.glow}` }}
@@ -482,6 +514,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };
