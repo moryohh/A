@@ -22,12 +22,22 @@ import {
   MockCourse,
 } from '../data/mockCourses';
 import { CompetitionSnapshot, EducationalLesson } from '../types';
+import { getSubjectIndex } from '../services/lessonsService';
+import { fetchLessonGamesData } from '../services/gamesService';
+import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
+
+const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
+type ChallengeGame = 'millionaire' | 'true_false' | 'gibha_sah';
+type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; players: number; createdAt: number };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
   onBack?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
   onOpenChallenge?: () => void;
+  onJoinChallenge?: (roomCode: string) => void;
+  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number }) => void;
 }
 
 const STATUS_STYLES: Record<CourseStatus, { text: string; background: string; border: string }> = {
@@ -119,9 +129,67 @@ const getStatusMessage = (course: MockCourse) => {
   };
 };
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge }) => {
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge, onJoinChallenge, onCreateChallenge }) => {
   const { theme } = useAppTheme();
   const [activeSection, setActiveSection] = useState<'challenge' | 'courses'>('challenge');
+  const [challengeSubject, setChallengeSubject] = useState('');
+  const [challengeChapter, setChallengeChapter] = useState('');
+  const [challengeChapters, setChallengeChapters] = useState<Array<{ number: number; title: string }>>([]);
+  const [challengeGame, setChallengeGame] = useState<ChallengeGame>('true_false');
+  const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
+  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [challengeBusy, setChallengeBusy] = useState(false);
+  const [challengeMessage, setChallengeMessage] = useState('');
+
+  const selectedChallengeSubject = GRADE_6_SUBJECTS.find((subject) => subject.id === challengeSubject);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadRooms = async () => {
+      if (!CHALLENGE_API) return;
+      try {
+        const response = await fetch(`${CHALLENGE_API}/rooms`);
+        const payload = await response.json();
+        if (!cancelled) setActiveRooms(Array.isArray(payload.rooms) ? payload.rooms : []);
+      } catch (_) { if (!cancelled) setActiveRooms([]); }
+    };
+    loadRooms();
+    const timer = window.setInterval(loadRooms, 3000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!challengeSubject) { setChallengeLessons([]); setChallengeChapters([]); setChallengeChapter(''); return; }
+    getSubjectIndex(challengeSubject, selectedChallengeSubject?.name || 'المادة').then((index) => {
+      if (cancelled) return;
+      setChallengeChapters(index.chapters.map((item) => ({ number: item.chapterNumber, title: item.title })));
+      const chapter = index.chapters.find((item) => item.chapterNumber === Number(challengeChapter)) || index.chapters[0];
+      setChallengeChapter(chapter ? String(chapter.chapterNumber) : '');
+      setChallengeLessons(chapter?.lessons.map((lesson) => ({ number: lesson.lessonNumber, title: lesson.title, id: lesson.lessonId })) || []);
+    }).catch(() => { if (!cancelled) setChallengeLessons([]); });
+    return () => { cancelled = true; };
+  }, [challengeSubject, challengeChapter, selectedChallengeSubject?.name]);
+
+  const createRandomChallenge = async () => {
+    if (!challengeSubject || !challengeChapter || !challengeLessons.length || !onCreateChallenge) return;
+    setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
+    try {
+      const selectedLesson = challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
+      const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
+      const bundle = await fetchLessonGamesData(context);
+      const config: any = challengeGame === 'millionaire' ? bundle.mcqConfig : challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
+      const questions: ChallengeQuestion[] = challengeGame === 'millionaire'
+        ? config.questions.map((item: any) => ({ question: item.question, options: item.options, correctAnswer: item.correctAnswer }))
+        : challengeGame === 'true_false'
+          ? config.questions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
+          : config.questions.map((item: any) => ({ question: item.question, options: config.cards.map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
+      if (questions.length < 1) throw new Error('لا توجد أسئلة لهذا الدرس. اختر مادة أو فصلاً آخر.');
+      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: selectedLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number });
+      setChallengeMessage('');
+    } catch (error) { setChallengeMessage(error instanceof Error ? error.message : 'تعذر تجهيز الغرفة.'); }
+    finally { setChallengeBusy(false); }
+  };
   const [selectedCourse, setSelectedCourse] = useState<MockCourse | null>(null);
   const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [reminderMessage, setReminderMessage] = useState('');
@@ -196,6 +264,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       </section>
 
       {activeSection === 'challenge' && (
+        <div className="space-y-4">
         <section className={`relative overflow-hidden rounded-3xl border p-5 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
           <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-sky-400/20 blur-3xl" />
           <div className="relative flex items-start gap-3">
@@ -205,11 +274,24 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               <p className={`mt-1 text-xs leading-6 ${theme.classes.textMuted}`}>استعرض الغرف النشطة، استخدم الفلتر، وانضم إلى تحدّي مناسب لك.</p>
             </div>
           </div>
-          <button type="button" onClick={onOpenChallenge} className="relative mt-5 w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-[0.99]">
-            فتح الغرف النشطة والتحدّي
-          </button>
-          <p className={`mt-3 text-center text-[11px] leading-5 ${theme.classes.textMuted}`}>لإنشاء غرفة جديدة بأسئلة صحيحة، افتح أي درس ثم اضغط أيقونة الألعاب واختر «جماعي».</p>
+          <div className="relative mt-5 space-y-3 rounded-2xl border border-sky-400/20 bg-slate-900/35 p-3">
+            <p className="text-sm font-black text-sky-100">إنشاء غرفة تحدّي</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <select value={challengeSubject} onChange={(event) => { setChallengeSubject(event.target.value); setChallengeChapter(''); }} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
+              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame)} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
+            </div>
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50">{challengeBusy ? 'جارٍ تجهيز الدرس…' : 'أنشئ غرفة من درس عشوائي'}</button>
+            {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
+          </div>
         </section>
+        <section className={`rounded-3xl border p-4 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+          <div className="mb-3 flex items-center justify-between"><span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black text-emerald-300">تتحدث تلقائياً</span><h2 className={`text-base font-black ${theme.classes.textMain}`}>الغرف المتاحة للدخول</h2></div>
+          <div className="space-y-2">
+            {activeRooms.length === 0 ? <p className={`rounded-2xl bg-black/15 p-4 text-center text-xs ${theme.classes.textMuted}`}>لا توجد غرف متاحة حالياً.</p> : activeRooms.map((room) => <button key={room.code} type="button" onClick={() => onJoinChallenge?.(room.code)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className="text-xs text-emerald-300">{room.players}/2 لاعبين</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle}</span></button>)}
+          </div>
+        </section>
+        </div>
       )}
 
       {activeSection === 'courses' && <>

@@ -360,6 +360,8 @@ function AppContent() {
   const [isTeacherInfoOpen, setIsTeacherInfoOpen] = useState(false);
   const [isGamesOpen, setIsGamesOpen] = useState(false);
   const [isChallengeHubOpen, setIsChallengeHubOpen] = useState(false);
+  const [challengeRoomCode, setChallengeRoomCode] = useState<string | undefined>();
+  const [challengeConfig, setChallengeConfig] = useState<any | null>(null);
   const [isDailyExamOpen, setIsDailyExamOpen] = useState(false);
 
 
@@ -1350,7 +1352,9 @@ function AppContent() {
                 setHomeSubView('main_home');
               }}
               competitionSnapshot={competitionSnapshot}
-              onOpenChallenge={() => setIsChallengeHubOpen(true)}
+              onOpenChallenge={() => { setChallengeRoomCode(undefined); setChallengeConfig(null); setIsChallengeHubOpen(true); }}
+              onJoinChallenge={(roomCode) => { setChallengeRoomCode(roomCode); setChallengeConfig(null); setIsChallengeHubOpen(true); }}
+              onCreateChallenge={(config) => { setChallengeRoomCode(undefined); setChallengeConfig(config); setIsChallengeHubOpen(true); }}
             />
           )}
 
@@ -1552,10 +1556,14 @@ function AppContent() {
       {isChallengeHubOpen && (
         <OnlineChallengeModal
           onClose={() => setIsChallengeHubOpen(false)}
-          questions={[]}
-          lessonTitle="مركز الغرف النشطة"
-          gameType="true_false"
-          gameTitle="التحدّي الجماعي"
+          questions={challengeConfig?.questions || []}
+          lessonTitle={challengeConfig?.lessonTitle || 'مركز الغرف النشطة'}
+          gameType={challengeConfig?.gameType || 'true_false'}
+          gameTitle={challengeConfig?.gameTitle || 'التحدّي الجماعي'}
+          subject={challengeConfig?.subject}
+          chapterNumber={challengeConfig?.chapterNumber}
+          lessonNumber={challengeConfig?.lessonNumber}
+          initialRoomCode={challengeRoomCode}
         />
       )}
 
