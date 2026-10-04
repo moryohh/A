@@ -129,6 +129,28 @@ export default {
       return json(await ticketResponse.json(), ticketResponse.status, origin);
     }
 
+    var leaveMatch = url.pathname.match(/^\/rooms\/([^/]+)\/leave$/);
+    if (leaveMatch && request.method === 'POST') {
+      var leaver = await authenticate(request, env, origin);
+      if (!leaver) return json({ error: 'unauthorized' }, 401, origin);
+      var leaveCode = leaveMatch[1];
+      var leaveRoomId = leaveCode;
+      if (/^\d{1,4}$/.test(leaveCode)) {
+        var leaveResolved = await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(leaveCode)));
+        if (!leaveResolved.ok) return json({ ok: true }, 200, origin);
+        leaveRoomId = (await leaveResolved.json()).roomId;
+      } else if (!/^[0-9a-f-]{36}$/i.test(leaveCode)) {
+        return json({ error: 'invalid_room_code' }, 400, origin);
+      }
+      var leaveStub = env.ROOMS.get(env.ROOMS.idFromName(leaveRoomId));
+      var leaveResponse = await leaveStub.fetch(new Request('https://room/internal/leave', { method: 'POST', body: JSON.stringify({ userId: leaver }) }));
+      var leavePayload = await leaveResponse.json();
+      if (leaveResponse.ok && leavePayload.closed) {
+        await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: leaveRoomId }) }));
+      }
+      return json(leavePayload, leaveResponse.status, origin);
+    }
+
     var socketMatch = url.pathname.match(/^\/rooms\/([0-9a-f-]{36})\/ws$/);
     if (socketMatch && request.method === 'GET' && (request.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       var ticket = url.searchParams.get('ticket');
@@ -177,7 +199,7 @@ export class ChallengeRoom {
       if (game) return json({ error: 'already_initialized' }, 409, '');
       var init = await request.json();
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
-      await this.ctx.storage.put('game', { gameType: init.gameType, roomCode: init.roomCode, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }] });
+      await this.ctx.storage.put('game', { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }] });
       return json({ ok: true }, 200, '');
     }
     if (!game) return json({ error: 'room_not_found' }, 404, '');
@@ -188,6 +210,18 @@ export class ChallengeRoom {
       var ticket = crypto.randomUUID();
       await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, expires: Date.now() + 60000 });
       return json({ ticket: ticket, joined: game.players.some(function (p) { return p.id !== ticketBody.userId; }) }, 200, '');
+    }
+    if (url.pathname === '/internal/leave' && request.method === 'POST') {
+      var leaveBody = await request.json().catch(function () { return null; });
+      if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
+      if (leaveBody.userId === (game.hostId || (game.players[0] && game.players[0].id))) {
+        game.status = 'closed';
+        await this.ctx.storage.put('game', game);
+        this.broadcast({ type: 'room_closed', reason: 'host_left' });
+        this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
+        return json({ ok: true, closed: true }, 200, '');
+      }
+      return json({ ok: true, closed: false }, 200, '');
     }
     if (url.pathname === '/internal/ws' && (request.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       var ticketId = url.searchParams.get('ticket');
