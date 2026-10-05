@@ -213,3 +213,15 @@ test('registry exposes room lifecycle states for the challenge center', async ()
   assert.equal(payload.rooms[0].status, 'playing');
   assert.equal(payload.rooms[0].players, 2);
 });
+
+test('room relays a trimmed chat message to both players', async () => {
+  const received = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => received.push(JSON.parse(message)) };
+  const guestSocket = { deserializeAttachment: () => ({ userId: 'guest' }), send: message => received.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [hostSocket, guestSocket] });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'chat', text: '  مرحباً بالمنافس  ' }));
+  const chatMessages = received.filter(message => message.type === 'chat');
+  assert.equal(chatMessages.length, 2);
+  assert.equal(chatMessages[0].from, 'host');
+  assert.equal(chatMessages[0].text, 'مرحباً بالمنافس');
+});

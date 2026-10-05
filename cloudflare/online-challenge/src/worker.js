@@ -118,6 +118,7 @@ export default {
     if (connectMatch && request.method === 'POST') {
       var joiner = await authenticate(request, env, origin);
       if (!joiner) return json({ error: 'unauthorized' }, 401, origin);
+      var connectBody = await request.json().catch(function () { return {}; });
       var publicCode = connectMatch[1];
       var roomId = publicCode;
       if (/^\d{1,4}$/.test(publicCode)) {
@@ -129,7 +130,7 @@ export default {
       }
       var connectStub = env.ROOMS.get(env.ROOMS.idFromName(roomId));
       var ticketResponse = await connectStub.fetch(new Request('https://room/internal/ticket', {
-        method: 'POST', body: JSON.stringify({ userId: joiner }),
+        method: 'POST', body: JSON.stringify({ userId: joiner, profile: connectBody.profile || null }),
       }));
       if (ticketResponse.ok && /^\d{1,4}$/.test(publicCode)) {
         var ticketPayload = await ticketResponse.json();
@@ -266,7 +267,7 @@ export class ChallengeRoom {
       type: 'state', gameType: game.gameType, status: game.status, round: currentIndex, total: game.questions.length, turn: game.turn || null,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
-        var profile = this.isBot(p) ? game.botProfile : null;
+        var profile = this.isBot(p) ? game.botProfile : p.profile;
         return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
       }, this),
       winner: winner,
@@ -296,7 +297,11 @@ export class ChallengeRoom {
       if (!ticketBody || typeof ticketBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       if (game.players.length >= 2 && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
       var ticket = crypto.randomUUID();
-      await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, expires: Date.now() + 60000 });
+      var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
+        name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
+        avatar: typeof ticketBody.profile.avatar === 'string' && ticketBody.profile.avatar.length <= 800 ? ticketBody.profile.avatar : '',
+      } : null;
+      await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, profile: profile, expires: Date.now() + 60000 });
       return json({ ticket: ticket, joined: game.players.some(function (p) { return p.id !== ticketBody.userId; }) }, 200, '');
     }
     if (url.pathname === '/internal/leave' && request.method === 'POST') {
@@ -326,12 +331,14 @@ export class ChallengeRoom {
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
         if (game.players.length !== 1 || game.status !== 'waiting') return json({ error: 'room_full' }, 409, '');
-        game.players.push({ id: userId, score: 0, answer: null });
+        game.players.push({ id: userId, score: 0, answer: null, profile: ticketRecord.profile || null });
         game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
         game.turn = game.players[0].id;
         delete game.botJoinAt;
       }
+      var currentPlayer = game.players.find(function (player) { return player.id === userId; });
+      if (currentPlayer && ticketRecord.profile) currentPlayer.profile = ticketRecord.profile;
       if (game.disconnectUserId === userId) {
         delete game.disconnectUserId;
         delete game.disconnectDeadline;
@@ -359,6 +366,12 @@ export class ChallengeRoom {
     var payload;
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
+    if (payload && payload.type === 'chat' && sender && typeof payload.text === 'string') {
+      var chatText = payload.text.trim().slice(0, 300);
+      if (!chatText) return;
+      this.broadcast({ type: 'chat', from: sender.userId, text: chatText, sentAt: Date.now() });
+      return;
+    }
     if (payload && payload.type === 'audio_state' && sender && typeof payload.enabled === 'boolean') {
       this.sockets().forEach(function (peer) {
         if (peer !== socket) this.send(peer, { type: 'audio_state', from: sender.userId, enabled: payload.enabled });

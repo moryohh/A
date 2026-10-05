@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, UserRound } from 'lucide-react';
+import { MessageCircle, Mic, MicOff, Send, Trophy, Volume2, VolumeX, UserRound, X } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
@@ -8,6 +8,7 @@ export type OnlineChallengeQuestion = { question: string; options: string[]; cor
 type Player = { id: string; score: number; answered: boolean; connected: boolean; bot?: boolean; name?: string; avatar?: string; city?: string; school?: string; badge?: string; level?: number };
 type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; turn?: string | null; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null };
 type RoundResult = { question?: { question: string; options: string[] }; answer: number; scores: Array<{ id: string; score: number }> };
+type ChatMessage = { id: string; from: string; text: string; sentAt: number };
 
 interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; }
 
@@ -25,7 +26,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
   const [remoteTalking, setRemoteTalking] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [unreadChat, setUnreadChat] = useState(0);
   const suppressCloseMessageRef = useRef(false);
+  const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -127,8 +133,20 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     return `Bearer ${data.session.access_token}`;
   }
 
+  async function challengeProfile(): Promise<{ name: string; avatar: string }> {
+    const guest = loadGuestSession();
+    if (guest) return { name: guest.name, avatar: '' };
+    const client = getSupabaseClient();
+    const { data } = await client?.auth.getSession() || { data: { session: null } };
+    const metadata = data.session?.user?.user_metadata || {};
+    return {
+      name: String(metadata.full_name || metadata.name || data.session?.user?.email?.split('@')[0] || 'طالب'),
+      avatar: String(metadata.avatar_url || metadata.picture || ''),
+    };
+  }
+
   async function connect(roomId: string) {
-    const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: await authorization() } });
+    const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: await challengeProfile() }) });
     if (!response.ok) throw new Error(response.status === 404 ? 'أُغلقت هذه الغرفة أو لم تعد متاحة. حدّث القائمة واختر غرفة أخرى.' : response.status === 409 ? 'هذه الغرفة ممتلئة.' : 'تعذر دخول الغرفة. تحقق من الرمز.');
     const { ticket, roomId: internalRoomId } = await response.json();
     socketRef.current?.close();
@@ -145,7 +163,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onmessage = (event) => {
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
-      if (payload.type === 'welcome') setMe(payload.userId);
+      if (payload.type === 'welcome') { meRef.current = payload.userId; setMe(payload.userId); }
       if (payload.type === 'audio_state') setRemoteTalking(Boolean(payload.enabled));
       if (payload.type === 'audio_signal') {
         void (async () => {
@@ -191,6 +209,13 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         ws.close();
       }
       if (payload.type === 'bot_joined') setError('');
+      if (payload.type === 'chat' && typeof payload.text === 'string') {
+        setChatMessages(previous => [...previous, { id: `${payload.from}-${payload.sentAt}-${Math.random()}`, from: payload.from, text: payload.text, sentAt: payload.sentAt || Date.now() }]);
+        if (payload.from !== meRef.current) {
+          setUnreadChat(previous => previous + 1);
+          setChatOpen(true);
+        }
+      }
       if (payload.type === 'state') {
         const remaining = resultUntilRef.current - Date.now();
         if (remaining > 0) {
@@ -234,6 +259,13 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     socketRef.current.send(JSON.stringify({ type: 'answer', option }));
   }
 
+  function sendChat() {
+    const text = chatInput.trim().slice(0, 300);
+    if (!text || !connected) return;
+    sendSocket({ type: 'chat', text });
+    setChatInput('');
+  }
+
   async function create() {
     setError(''); setBusy(true);
     try {
@@ -258,6 +290,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }
 
   const self = state?.players.find(p => p.id === me);
+  const opponent = state?.players.find(p => p.id !== me);
+  const isMillionaire = gameType === 'millionaire';
   async function closeModal() {
     if (room) {
       try { await fetch(`${API}/rooms/${room}/leave`, { method: 'POST', headers: { Authorization: await authorization() }, keepalive: true }); } catch (_) { /* socket close still notifies the room */ }
@@ -265,6 +299,40 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     socketRef.current?.close();
     onClose();
   }
+
+  const chatPanel = chatOpen && <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => { setChatOpen(false); setUnreadChat(0); }}>
+    <div className="flex h-[65vh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-cyan-400/50 bg-[#071333] shadow-2xl" onClick={event => event.stopPropagation()}>
+      <div className="flex items-center justify-between border-b border-white/10 p-3">
+        <div className="flex items-center gap-2">{opponent?.avatar ? <img src={opponent.avatar} alt={opponent.name || 'المنافس'} className="h-10 w-10 rounded-full object-cover" /> : <UserRound className="h-8 w-8 text-cyan-300" />}<div><strong>{opponent?.name || 'المنافس'}</strong><small className="block text-emerald-300">متصل الآن</small></div></div>
+        <button onClick={() => { setChatOpen(false); setUnreadChat(0); }} className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
+      </div>
+      <div className="flex-1 space-y-2 overflow-y-auto p-3">{chatMessages.length === 0 && <p className="mt-8 text-center text-sm text-slate-400">ابدأ المحادثة مع منافسك</p>}{chatMessages.map(message => <div key={message.id} className={`flex ${message.from === me ? 'justify-start' : 'justify-end'}`}><div className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm ${message.from === me ? 'bg-cyan-600' : 'bg-slate-700'}`}>{message.text}</div></div>)}</div>
+      <div className="flex gap-2 border-t border-white/10 p-3"><input value={chatInput} onChange={event => setChatInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') sendChat(); }} maxLength={300} placeholder="اكتب رسالة…" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 outline-none"/><button onClick={sendChat} disabled={!chatInput.trim()} className="rounded-xl bg-cyan-500 p-3 disabled:opacity-40"><Send className="h-5 w-5" /></button></div>
+    </div>
+  </div>;
+
+  if (room && state && isMillionaire) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-[radial-gradient(circle_at_top,#172554,#020617_60%)] p-3 text-white" dir="rtl">
+    <audio ref={remoteAudioRef} autoPlay playsInline />
+    <div className="mx-auto min-h-full w-full max-w-xl overflow-hidden rounded-[2rem] border-2 border-blue-500/60 bg-[#020b28] shadow-[0_0_45px_rgba(37,99,235,.35)]">
+      <header className="flex items-center justify-between border-b border-blue-400/25 p-4">
+        <div className="flex items-center gap-3"><div className="rounded-full border border-amber-400 p-2 text-amber-300"><Trophy className="h-6 w-6" /></div><div><h2 className="font-black text-amber-300">من سيربح المليون؟</h2><p className="text-xs text-slate-300">{lessonTitle}</p></div></div>
+        <button onClick={() => void closeModal()} className="rounded-full bg-white/10 p-2"><X className="h-6 w-6" /></button>
+      </header>
+      <div className="flex items-center justify-between gap-3 border-b border-blue-400/20 bg-blue-950/35 p-3">
+        <div className="flex min-w-0 items-center gap-2">{opponent?.avatar ? <img src={opponent.avatar} alt={opponent.name || 'المنافس'} className="h-12 w-12 rounded-full border-2 border-cyan-400 object-cover" /> : <div className="grid h-12 w-12 place-items-center rounded-full border-2 border-cyan-400 bg-slate-800"><UserRound className="h-7 w-7" /></div>}<div className="min-w-0"><strong className="block truncate">{opponent?.name || (state.status === 'waiting' ? 'بانتظار المنافس…' : 'المنافس')}</strong><small className="text-emerald-300">{opponent ? (opponent.bot ? 'منافس آلي' : 'متصل') : 'الغرفة مفتوحة'}</small></div></div>
+        <div className="flex gap-2"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-3 text-cyan-300"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-3 ${audioEnabled ? 'border-emerald-300 bg-emerald-500 text-white' : 'border-blue-400/50 bg-blue-500/15 text-blue-200'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-blue-400/50 bg-blue-500/15 p-3 text-blue-200 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>
+      </div>
+      <div className="m-4 rounded-3xl border border-blue-400/40 bg-blue-950/25 p-4">
+        <div className="mb-3 flex items-center justify-between text-sm"><span className="font-black text-amber-300">السؤال {Math.min((state.round || 0) + 1, state.total)} من {state.total}</span><span className="rounded-full border border-cyan-400/50 px-3 py-1 text-cyan-200">أنت {self?.score || 0} — {opponent?.score || 0} المنافس</span></div>
+        {state.status === 'waiting' && <p className="py-10 text-center text-amber-200">بانتظار انضمام اللاعب الثاني…<br/><small>رمز الغرفة: <b className="select-all text-white">{room}</b></small></p>}
+        {state.status === 'playing' && state.question && !roundResult && <><p className={`mb-4 text-center text-sm font-black ${state.turn === me ? 'text-emerald-300' : 'text-amber-300'}`}>{state.turn === me ? 'دورك للإجابة الآن ⭐' : `${opponent?.name || 'المنافس'} يفكّر في إجابته…`}</p><div className="mb-6 min-h-36 rounded-3xl border border-blue-400/50 bg-[#03123b] p-5 text-center text-xl font-black leading-9 shadow-inner">{state.question.question}</div><div className="space-y-3">{state.question.options.map((option, index) => <button key={index} disabled={!connected || state.turn !== me || pendingAnswer || self?.answered} onClick={() => answer(index)} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-blue-500/45 bg-[#05143b] px-4 text-right transition hover:border-amber-300 disabled:opacity-50"><b className="text-amber-300">{['أ:', 'ب:', 'ج:', 'د:'][index] || `${index + 1}:`}</b><span>{option}</span></button>)}</div></>}
+        {roundResult && state.question && <div className="rounded-2xl border border-emerald-400/50 bg-emerald-500/10 p-5 text-center"><p className="font-black text-emerald-300">الإجابة الصحيحة</p><p className="mt-3 rounded-xl bg-white/10 p-3">{(roundResult.question || state.question).options[roundResult.answer]}</p></div>}
+        {state.status === 'finished' && <div className="py-10 text-center"><Trophy className="mx-auto h-16 w-16 text-amber-300"/><p className="mt-3 text-2xl font-black">{state.tie ? 'تعادلتم!' : state.winner === me ? 'أنت الفائز! 🎉' : `${opponent?.name || 'المنافس'} فاز`}</p><button onClick={() => void closeModal()} className="mt-5 rounded-xl bg-blue-600 px-8 py-3 font-black">العودة</button></div>}
+      </div>
+      {error && <p className="m-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
+    </div>{chatPanel}
+  </div>;
+
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4 text-white" dir="rtl">
     <div className="w-full max-w-xl rounded-3xl border border-sky-400/30 bg-[#0b1930] p-5 shadow-2xl">
       <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black">{gameTitle} — لعب جماعي</h2><p className="text-xs text-sky-200">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
@@ -285,6 +353,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {state?.status === 'finished' && <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-center"><p className="text-2xl font-black text-amber-200">{state.tie ? 'انتهت المباراة بالتعادل!' : state.winner === me ? 'فزت بالتحدّي! 🎉' : 'فاز اللاعب الآخر'}</p><div className="mt-4 grid grid-cols-2 gap-3">{state.players.map((player, index) => <div key={player.id} className={`rounded-xl border p-3 ${player.id === state.winner ? 'border-amber-300 bg-amber-400/15' : 'border-white/15 bg-white/5'}`}><p className="text-xs text-slate-300">{player.id === me ? 'أنت' : `اللاعب ${index + 1}`}</p><p className="mt-1 text-2xl font-black">{player.score}</p></div>)}</div><button onClick={() => void closeModal()} className="mt-4 w-full rounded-xl bg-sky-600 p-3 font-black">العودة إلى الألعاب</button></div>}
       </div>}
       {error && <p className="mt-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
-    </div>
+    </div>{chatPanel}
   </div>;
 };
