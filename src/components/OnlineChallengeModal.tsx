@@ -344,7 +344,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       </div>
       <main className="space-y-5 p-3 sm:p-5">
         <div className="rounded-3xl border-2 border-[#2049a4] bg-[#061235] p-4 shadow-[0_0_25px_rgba(18,48,128,.5)]">
-          <div className="flex items-center justify-between gap-2 text-xs"><span className="font-black text-amber-300">السؤال {Math.min((state.round || 0) + (roundResult ? 0 : 1), state.total)} من {state.total}</span><span className="text-amber-300">الجائزة: {millionairePrizes[Math.min(roundResult ? state.round : state.round, 10)]} د.ع</span></div>
+          <div className="flex items-center justify-between gap-2 text-xs"><span className="font-black text-amber-300">السؤال {Math.min((state.round || 0) + 1, state.total)} من {state.total}</span><span className="text-amber-300">الجائزة: {millionairePrizes[Math.min(state.round, 10)]} د.ع</span></div>
           <p className="mt-3 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-center text-sm font-black text-amber-200">{roundResult ? answeredByMe ? 'إجابتك الآن — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : state.status === 'waiting' ? 'بانتظار انضمام المنافس' : myTurn ? 'دورك للإجابة الآن! ⭐' : `${opponent?.name || 'المنافس'} يفكّر في الإجابة...`}</p>
           <div className="mt-3 flex items-center justify-between text-xs text-cyan-200"><span>أنت: {self?.score || 0} صحيحة</span><span>{opponent?.name || 'المنافس'}: {opponent?.score || 0} صحيحة</span></div>
         </div>

@@ -139,7 +139,7 @@ test('temporary disconnect gets a 30 second grace period then a bot continues th
   assert.equal(messages.some(message => message.type === 'challenge_ended'), false);
 });
 
-test('a bot joins a waiting host after the five-second preview deadline', async () => {
+test('a bot joins only after the three-to-five-minute waiting deadline', async () => {
   const data = new Map();
   let alarmAt = null;
   const messages = [];
@@ -158,8 +158,8 @@ test('a bot joins a waiting host after the five-second preview deadline', async 
   await room.fetch(new Request('https://room/internal/init', {
     method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'true_false', roomCode: '4321', questions }),
   }));
-  assert.ok(alarmAt >= startedAt + 4500);
-  assert.ok(alarmAt <= Date.now() + 5500);
+  assert.ok(alarmAt >= startedAt + 180000);
+  assert.ok(alarmAt <= Date.now() + 300000);
   const waiting = data.get('game');
   waiting.botJoinAt = Date.now() - 1;
   data.set('game', waiting);
