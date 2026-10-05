@@ -19,7 +19,8 @@ async function authenticate(request, env, origin) {
   var header = request.headers.get('Authorization') || '';
   var guestMatch = header.match(/^Guest ([0-9a-f-]{36})$/i);
   if (guestMatch) {
-    if (env.ALLOW_PREVIEW_GUESTS !== 'true' || origin !== env.PREVIEW_GUEST_ORIGIN || !validGuestId(guestMatch[1])) return null;
+    var guestOrigins = (env.PREVIEW_GUEST_ORIGINS || env.PREVIEW_GUEST_ORIGIN || '').split(',').map(function (item) { return item.trim(); }).filter(Boolean);
+    if (env.ALLOW_PREVIEW_GUESTS !== 'true' || !guestOrigins.includes(origin) || !validGuestId(guestMatch[1])) return null;
     return 'guest:' + guestMatch[1].toLowerCase();
   }
   var match = header.match(/^Bearer (.+)$/i);

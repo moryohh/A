@@ -64,8 +64,10 @@ jobs:
           from pathlib import Path
           source = json.loads(Path('cloudflare/online-challenge/wrangler.jsonc').read_text())
           source['main'] = str(Path.cwd() / 'cloudflare/online-challenge/src/worker.js')
-          source['vars']['ALLOWED_ORIGINS'] = f"https://a-1q1.pages.dev,{__import__('os').environ['PREVIEW_URL']}"
-          source['vars']['PREVIEW_GUEST_ORIGIN'] = __import__('os').environ['PREVIEW_URL']
+          stable_preview = 'https://duha-challenge-preview.pages.dev'
+          dynamic_preview = __import__('os').environ['PREVIEW_URL']
+          source['vars']['ALLOWED_ORIGINS'] = f"https://a-1q1.pages.dev,{stable_preview},{dynamic_preview}"
+          source['vars']['PREVIEW_GUEST_ORIGINS'] = f"{stable_preview},{dynamic_preview}"
           source['vars']['ALLOW_PREVIEW_GUESTS'] = 'true'
           Path('/tmp/wrangler-preview.json').write_text(json.dumps(source))
           PY
@@ -86,6 +88,12 @@ jobs:
             echo "Worker propagation/CORS check attempt $attempt failed; retrying..."
             sleep 5
           done
+          curl --fail --silent --show-error --dump-header /tmp/stable-preview-headers.txt \
+            --header "Origin: https://duha-challenge-preview.pages.dev" \
+            https://duha-online-challenge.rafos72171.workers.dev/health \
+            --output /tmp/stable-preview-health.json
+          grep -i "^access-control-allow-origin: https://duha-challenge-preview.pages.dev" /tmp/stable-preview-headers.txt
+          grep -q '"ok":true' /tmp/stable-preview-health.json
           echo "Worker health/CORS verification failed after retries"
           cat /tmp/challenge-headers.txt || true
           cat /tmp/challenge-health.json || true

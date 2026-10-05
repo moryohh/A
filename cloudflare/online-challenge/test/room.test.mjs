@@ -15,6 +15,27 @@ test('preview origin is allowed explicitly and unrelated origins are denied', as
   assert.equal(rejected.status, 403);
 });
 
+test('guest access accepts both stable and deployment preview origins', async () => {
+  const env = {
+    ALLOWED_ORIGINS: 'https://duha-challenge-preview.pages.dev,https://abc123.duha-challenge-preview.pages.dev',
+    ALLOW_PREVIEW_GUESTS: 'true',
+    PREVIEW_GUEST_ORIGINS: 'https://duha-challenge-preview.pages.dev,https://abc123.duha-challenge-preview.pages.dev',
+  };
+  for (const origin of env.PREVIEW_GUEST_ORIGINS.split(',')) {
+    const response = await worker.fetch(new Request('https://worker/rooms', {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        Authorization: 'Guest 123e4567-e89b-42d3-a456-426614174000',
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    }), env);
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
+  }
+});
+
 test('room accepts the option counts used by true/false and card games', async () => {
   for (const [gameType, optionCount] of [['true_false', 2], ['gibha_sah', 12]]) {
     const data = new Map();
