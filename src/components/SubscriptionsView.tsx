@@ -37,7 +37,7 @@ interface SubscriptionsViewProps {
   onBack?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
   onOpenChallenge?: () => void;
-  onJoinChallenge?: (roomCode: string) => void;
+  onJoinChallenge?: (room: ActiveRoom) => void;
   onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number }) => void;
 }
 
@@ -303,7 +303,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               const status = room.status || 'waiting';
               const ended = status === 'ended';
               const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
-              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room.code)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-65"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-200' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-200'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle} · {room.players}/2 لاعبين</span></button>;
+              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-65"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-200' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-200'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle} · {room.players}/2 لاعبين</span></button>;
             })}
           </div>
         </section>
