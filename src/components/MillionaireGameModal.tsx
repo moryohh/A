@@ -33,6 +33,7 @@ import {
 import { MillionaireGameConfig, MillionaireQuestion, StudentGameResult } from '../types';
 import { getMillionaireGameForLesson } from '../data/mockMillionaire';
 import { gameAudio } from '../utils/gameAudio';
+import { millionaireAudio } from '../utils/millionaireAudio';
 import { getMillionaireReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
 
@@ -91,10 +92,10 @@ function buildMillionaireRound(source: MillionaireGameConfig): MillionaireGameCo
   };
 }
 
-const MILLIONAIRE_WRONG_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-wrong.mp3`;
-const MILLIONAIRE_CORRECT_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-correct.mp3`;
-const MILLIONAIRE_THINKING_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-thinking.mp3`;
-const MILLIONAIRE_PRIZE_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-prize.mp3`;
+const MILLIONAIRE_WRONG_AUDIO_URL = millionaireAudio.wrong;
+const MILLIONAIRE_CORRECT_AUDIO_URL = millionaireAudio.correct;
+const MILLIONAIRE_THINKING_AUDIO_URL = millionaireAudio.thinking;
+const MILLIONAIRE_PRIZE_AUDIO_URL = millionaireAudio.prize;
 
 export interface OpponentProfile {
   id: string;

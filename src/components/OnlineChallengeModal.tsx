@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Mic, MicOff, Send, Trophy, Volume2, VolumeX, UserRound, X } from 'lucide-react';
+import { CheckCircle2, MessageCircle, Mic, MicOff, Send, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 import { gameAudio } from '../utils/gameAudio';
+import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
@@ -41,6 +42,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const roundRef = useRef<number | null>(null);
+  const roomGameTypeRef = useRef<OnlineChallengeGameType>(gameType);
   const resultUntilRef = useRef(0);
   const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +118,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   useEffect(() => () => {
     socketRef.current?.close();
     closePeer();
+    gameAudio.stopExternal('millionaire-thinking');
+    gameAudio.stopExternal('millionaire-prize');
+    gameAudio.stopExternal('millionaire-correct');
+    gameAudio.stopExternal('millionaire-wrong');
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
   }, []);
@@ -223,6 +229,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'state') {
+        if (payload.gameType === 'millionaire' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
+          roomGameTypeRef.current = payload.gameType;
+        }
         const remaining = resultUntilRef.current - Date.now();
         if (remaining > 0) {
           if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
@@ -232,16 +241,17 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'round_result') {
-        resultUntilRef.current = Date.now() + (gameType === 'millionaire' ? 5000 : 2200);
+        resultUntilRef.current = Date.now() + (roomGameTypeRef.current === 'millionaire' ? 5000 : 2200);
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
         setResultRevealed(false);
         setRoundResult({ question: payload.question, answer: payload.answer, selected: payload.selected, answeredBy: payload.answeredBy, scores: payload.scores || [] });
-        if (gameType === 'millionaire') {
+        if (roomGameTypeRef.current === 'millionaire') {
+          gameAudio.stopExternal('millionaire-thinking');
           gameAudio.playMillionaireLockIn();
           revealTimerRef.current = setTimeout(() => {
             setResultRevealed(true);
-            if (payload.selected === payload.answer) gameAudio.playMillionaireCorrect();
-            else gameAudio.playMillionaireWrong();
+            if (payload.selected === payload.answer) gameAudio.playExternal('millionaire-correct', millionaireAudio.correct);
+            else gameAudio.playExternal('millionaire-wrong', millionaireAudio.wrong);
           }, 850);
         } else setResultRevealed(true);
       }
@@ -307,11 +317,26 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   const self = state?.players.find(p => p.id === me);
   const opponent = state?.players.find(p => p.id !== me);
-  const isMillionaire = gameType === 'millionaire';
+  // A room selected in the challenge hub is joined without local lesson config.
+  // Its server state, not the hub's default game type, determines the game screen.
+  const isMillionaire = (state?.gameType || gameType) === 'millionaire';
   const millionairePrizes = ['250', '500', '1 000', '5 000', '10 000', '25 000', '50 000', '100 000', '250 000', '500 000', '1 000 000'];
   const displayedQuestion = roundResult?.question || state?.question;
   const myTurn = state?.turn === me;
   const answeredByMe = roundResult?.answeredBy === me;
+  useEffect(() => {
+    const active = isMillionaire && connected && state?.status === 'playing' && myTurn && !pendingAnswer && !roundResult;
+    if (active) gameAudio.playExternal('millionaire-thinking', millionaireAudio.thinking, 0.65, true);
+    else gameAudio.stopExternal('millionaire-thinking');
+    return () => gameAudio.stopExternal('millionaire-thinking');
+  }, [isMillionaire, connected, state?.status, state?.round, myTurn, pendingAnswer, roundResult]);
+
+  useEffect(() => {
+    if (isMillionaire && state?.status === 'finished' && state.winner === me && !roundResult) {
+      gameAudio.playExternal('millionaire-prize', millionaireAudio.prize, 0.8);
+    }
+    return () => gameAudio.stopExternal('millionaire-prize');
+  }, [isMillionaire, state?.status, state?.winner, me, roundResult]);
   async function closeModal() {
     if (room) {
       try { await fetch(`${API}/rooms/${room}/leave`, { method: 'POST', headers: { Authorization: await authorization() }, keepalive: true }); } catch (_) { /* socket close still notifies the room */ }
