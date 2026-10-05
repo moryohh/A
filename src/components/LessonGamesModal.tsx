@@ -243,7 +243,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     }
     return {
       title: 'من سيربح المليون',
-      questions: (gamesBundle?.mcqConfig.questions || []).slice(0, 10).map((question) => ({
+      questions: (gamesBundle?.mcqConfig.questions || []).slice(0, 11).map((question) => ({
         question: question.question,
         options: [...question.options],
         correctAnswer: question.correctAnswer,
@@ -280,6 +280,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
         customConfig={gamesBundle?.mcqConfig}
         onScoreUpdate={(points) => awardLessonReward('millionaire', points)}
         onAssessmentResult={onAssessmentResult}
+        onOpenOnline={() => openOnlineGame('millionaire')}
       />
     );
   }
@@ -471,7 +472,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
                     <User className="w-4 h-4"/><span>{hasMillionaireQuestions ? 'لعب فردي' : 'غير متوفر'}</span>
-                  </button><button onClick={() => openOnlineGame('millionaire')} disabled={!canOpenMillionaire || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
+                  </button></div>
                 </div>
 
                 {/* 3. BOTTOM RIGHT: صواب أم خطأ */}

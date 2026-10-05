@@ -45,6 +45,7 @@ interface MillionaireGameModalProps {
   onScoreUpdate?: (points: number) => void;
   onAssessmentResult?: (correctPoints: number, totalPoints: number) => void;
   customConfig?: MillionaireGameConfig;
+  onOpenOnline?: () => void;
 }
 
 // 11-level Iraqi dinar prize ladder shown inside the game.
@@ -291,6 +292,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   onScoreUpdate,
   onAssessmentResult,
   customConfig,
+  onOpenOnline,
 }) => {
   // Game Configuration & Load (fresh round from the exact lesson-file pool)
   const [gameConfig, setGameConfig] = useState<MillionaireGameConfig>(() =>
@@ -1414,7 +1416,8 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   {/* 2. Multiplayer Button */}
                   <button
                     id="btn-millionaire-multiplayer"
-                    onClick={handleStartMultiplayerSearch}
+                    onClick={onOpenOnline || handleStartMultiplayerSearch}
+                    disabled={Boolean(onOpenOnline && !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL)}
                     className="w-full py-4 bg-gradient-to-r from-sky-500 via-cyan-400 to-blue-600 hover:from-sky-400 hover:to-cyan-300 text-black font-black rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-between px-6 text-sm sm:text-base transition-all active:scale-95 group cursor-pointer border border-cyan-300/40"
                   >
                     <div className="flex items-center gap-3">
@@ -1424,7 +1427,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                       <div className="text-right">
                         <span className="block font-black text-base">اللعب جماعي (تحدي مباشر)</span>
                         <span className="text-[10px] text-black/80 font-bold block">
-                          بحث عن لاعب قريب وتبادل الأدوار
+                          تحدَّ لاعباً حقيقياً وتبادلا الأدوار
                         </span>
                       </div>
                     </div>

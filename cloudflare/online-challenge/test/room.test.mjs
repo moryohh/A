@@ -77,7 +77,7 @@ test('two players finish a match; duplicate answers and third player are rejecte
     method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'millionaire', questions }),
   }));
   assert.equal(init.status, 200);
-  data.set('game', { gameType: 'millionaire', status: 'playing', round: 0, questions, players: [
+  data.set('game', { gameType: 'millionaire', status: 'playing', round: 0, turn: 'host', questions, players: [
     { id: 'host', score: 0, answer: null }, { id: 'guest', score: 0, answer: null },
   ] });
 
@@ -87,14 +87,14 @@ test('two players finish a match; duplicate answers and third player are rejecte
   assert.equal(third.status, 409);
   await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: 0 }));
   await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: 1 }));
-  assert.equal(data.get('game').players[0].answer, 0);
-  assert.equal(messages.get('host').filter(message => message.type === 'round_result').length, 0);
-  await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 1 }));
   assert.equal(data.get('game').round, 1);
-  assert.deepEqual(data.get('game').players.map(player => player.score), [1, 0]);
-  assert.equal(messages.get('host').find(message => message.type === 'round_result').answer, 0);
-  await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: 0 }));
+  assert.equal(data.get('game').turn, 'guest');
+  assert.equal(messages.get('host').filter(message => message.type === 'round_result').length, 1);
   await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 1 }));
+  assert.equal(data.get('game').round, 2);
+  assert.deepEqual(data.get('game').players.map(player => player.score), [1, 1]);
+  assert.equal(messages.get('host').find(message => message.type === 'round_result').answer, 0);
+  assert.equal(messages.get('guest').find(message => message.type === 'round_result').selected, 0);
   assert.equal(data.get('game').status, 'finished');
   assert.equal(room.view(data.get('game')).tie, true);
   await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: 1 }));

@@ -34,7 +34,7 @@ async function authenticate(request, env, origin) {
 }
 
 function validQuestions(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 10) return false;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 11) return false;
   return value.every(function (q) {
     return q && typeof q.question === 'string' && q.question.length > 0 && q.question.length <= 600 &&
       Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 12 && q.options.every(function (o) {
@@ -215,7 +215,7 @@ export class ChallengeRoom {
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
     if (game.status === 'playing' && game.turn === BOT_ID && bot && bot.answer === null && !game.botAnswerAt) {
-      game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
+      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
     }
     await this.scheduleNextAlarm(game);
   }
@@ -228,7 +228,7 @@ export class ChallengeRoom {
     delete game.disconnectUserId;
     delete game.disconnectDeadline;
     game.status = 'playing';
-    game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
+    game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
     this.broadcast({ type: 'bot_joined', replacedUserId: userId });
@@ -396,8 +396,26 @@ export class ChallengeRoom {
     if (!player || player.answer !== null) return;
     if (game.turn && attachment.userId !== game.turn) return;
     player.answer = payload.option;
+    if (game.gameType === 'millionaire') {
+      var chosen = player.answer;
+      var correctAnswer = currentQuestion.correctAnswer;
+      if (chosen === correctAnswer) player.score += 1;
+      game.round = currentIndex + 1;
+      game.questionIndex = currentIndex + 1;
+      game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
+      game.players.forEach(function (item) { item.answer = null; });
+      if (game.questionIndex >= game.questions.length) game.status = 'finished';
+      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + 6000;
+      this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correctAnswer, selected: chosen, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
+      await this.ctx.storage.put('game', game);
+      this.broadcast(this.view(game));
+      if (game.status === 'finished') await this.updateRegistry('ended', game);
+      else await this.scheduleNextAlarm(game);
+      return;
+    }
     if (game.players.some(this.isBot.bind(this))) {
       var correct = currentQuestion.correctAnswer;
+      var selected = player.answer;
       if (player.answer === correct) player.score += 1;
       game.round = currentIndex + 1;
       game.questionIndex = currentIndex + 1;
@@ -405,7 +423,7 @@ export class ChallengeRoom {
       game.players.forEach(function (item) { item.answer = null; });
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
       else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
-      this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correct, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
+      this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correct, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));
       if (game.status === 'finished') await this.updateRegistry('ended', game);
@@ -439,7 +457,7 @@ export class ChallengeRoom {
       game.players.push({ id: BOT_ID, score: 0, answer: null });
       game.status = 'playing';
       delete game.botJoinAt;
-      game.botAnswerAt = now + BOT_ANSWER_DELAY_MS;
+      game.botAnswerAt = now + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
@@ -465,6 +483,7 @@ export class ChallengeRoom {
       if (bot && bot.answer === null && game.turn === BOT_ID) {
         var botQuestion = game.questions[Number.isInteger(game.questionIndex) ? game.questionIndex : game.round];
         bot.answer = this.chooseBotAnswer(game);
+        var botSelected = bot.answer;
         var botCorrect = botQuestion.correctAnswer;
         if (bot.answer === botCorrect) bot.score += 1;
         game.round = (Number.isInteger(game.questionIndex) ? game.questionIndex : game.round) + 1;
@@ -472,7 +491,7 @@ export class ChallengeRoom {
         game.turn = game.players.find(function (item) { return item.id !== BOT_ID; })?.id || null;
         game.players.forEach(function (item) { item.answer = null; });
         if (game.questionIndex >= game.questions.length) game.status = 'finished';
-        this.broadcast({ type: 'round_result', question: { question: botQuestion.question, options: botQuestion.options }, answer: botCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: BOT_ID });
+        this.broadcast({ type: 'round_result', question: { question: botQuestion.question, options: botQuestion.options }, answer: botCorrect, selected: botSelected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: BOT_ID });
       }
       delete game.botAnswerAt;
       if (game.status === 'finished') await this.updateRegistry('ended', game);
