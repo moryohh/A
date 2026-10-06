@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, MessageCircle, Mic, MicOff, Send, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
+import { CheckCircle2, Clock, MessageCircle, Mic, MicOff, Send, Sparkles, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 import { gameAudio } from '../utils/gameAudio';
 import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
+import { TrueFalseAuthenticIcon } from './GameIcons';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -34,6 +35,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [unreadChat, setUnreadChat] = useState(0);
+  const [turnSeconds, setTurnSeconds] = useState(25);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
@@ -241,7 +243,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'round_result') {
-        resultUntilRef.current = Date.now() + (roomGameTypeRef.current === 'millionaire' ? 5000 : 2200);
+        resultUntilRef.current = Date.now() + (roomGameTypeRef.current === 'millionaire' ? 5000 : 3000);
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
         setResultRevealed(false);
         setRoundResult({ question: payload.question, answer: payload.answer, selected: payload.selected, answeredBy: payload.answeredBy, scores: payload.scores || [] });
@@ -253,7 +255,17 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
             if (payload.selected === payload.answer) gameAudio.playExternal('millionaire-correct', millionaireAudio.correct);
             else gameAudio.playExternal('millionaire-wrong', millionaireAudio.wrong);
           }, 850);
-        } else setResultRevealed(true);
+        } else {
+          setResultRevealed(true);
+          const correct = payload.selected === payload.answer;
+          if (roomGameTypeRef.current === 'true_false') {
+            if (correct) gameAudio.playTrueFalseCorrect();
+            else { gameAudio.playTrueFalseWrong(); gameAudio.playGameLoss(); }
+          } else if (roomGameTypeRef.current === 'gibha_sah') {
+            if (correct) gameAudio.playCardSolved();
+            else { gameAudio.playGibhaWrong(); gameAudio.playGameLoss(); }
+          }
+        }
       }
     };
     ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
@@ -282,6 +294,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   function answer(option: number) {
     if (!connected || (state?.turn && state.turn !== me) || pendingAnswer || self?.answered || socketRef.current?.readyState !== WebSocket.OPEN) return;
     setPendingAnswer(true);
+    if ((state?.gameType || gameType) === 'gibha_sah') gameAudio.playCardSelect();
     socketRef.current.send(JSON.stringify({ type: 'answer', option }));
   }
 
@@ -320,10 +333,29 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   // A room selected in the challenge hub is joined without local lesson config.
   // Its server state, not the hub's default game type, determines the game screen.
   const isMillionaire = (state?.gameType || gameType) === 'millionaire';
+  const isTrueFalse = (state?.gameType || gameType) === 'true_false';
+  const isGibhaSah = (state?.gameType || gameType) === 'gibha_sah';
   const millionairePrizes = ['250', '500', '1 000', '5 000', '10 000', '25 000', '50 000', '100 000', '250 000', '500 000', '1 000 000'];
   const displayedQuestion = roundResult?.question || state?.question;
   const myTurn = state?.turn === me;
   const answeredByMe = roundResult?.answeredBy === me;
+  useEffect(() => {
+    const themed = (isTrueFalse || isGibhaSah) && room && state?.status !== 'finished';
+    if (themed) gameAudio.playGameSessionTheme();
+    else gameAudio.stopGameSessionTheme();
+    return () => gameAudio.stopGameSessionTheme();
+  }, [isTrueFalse, isGibhaSah, room, state?.status]);
+
+  useEffect(() => {
+    setTurnSeconds(isTrueFalse ? 20 : 25);
+    if (!connected || state?.status !== 'playing' || roundResult) return;
+    const timer = window.setInterval(() => setTurnSeconds(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [isTrueFalse, connected, state?.status, state?.round, state?.turn, roundResult]);
+
+  useEffect(() => {
+    if ((isTrueFalse || isGibhaSah) && state?.status === 'finished' && state.winner === me && !roundResult) gameAudio.playVictoryFanfare();
+  }, [isTrueFalse, isGibhaSah, state?.status, state?.winner, me, roundResult]);
   useEffect(() => {
     const active = isMillionaire && connected && state?.status === 'playing' && myTurn && !pendingAnswer && !roundResult;
     if (active) gameAudio.playExternal('millionaire-thinking', millionaireAudio.thinking, 0.65, true);
@@ -354,6 +386,46 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       <div className="flex-1 space-y-2 overflow-y-auto p-3">{chatMessages.length === 0 && <p className="mt-8 text-center text-sm text-slate-400">ابدأ المحادثة مع منافسك</p>}{chatMessages.map(message => <div key={message.id} className={`flex ${message.from === me ? 'justify-start' : 'justify-end'}`}><div className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm ${message.from === me ? 'bg-cyan-600' : 'bg-slate-700'}`}>{message.text}</div></div>)}</div>
       <div className="flex gap-2 border-t border-white/10 p-3"><input value={chatInput} onChange={event => setChatInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') sendChat(); }} maxLength={300} placeholder="اكتب رسالة…" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 outline-none"/><button onClick={sendChat} disabled={!chatInput.trim()} className="rounded-xl bg-cyan-500 p-3 disabled:opacity-40"><Send className="h-5 w-5" /></button></div>
     </div>
+  </div>;
+
+  const opponentControls = <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-black/15 p-3">
+    <div className="flex min-w-0 items-center gap-2">{opponent?.avatar ? <img src={opponent.avatar} alt={opponent.name || 'المنافس'} className="h-11 w-11 rounded-full border-2 border-cyan-400 object-cover" /> : <div className="grid h-11 w-11 place-items-center rounded-full border-2 border-cyan-400 bg-slate-800"><UserRound className="h-6 w-6" /></div>}<div className="min-w-0"><strong className="block truncate text-sm">{opponent?.name || 'بانتظار المنافس…'}</strong><small className="text-emerald-300">{opponent ? opponent.bot ? 'منافس آلي' : opponent.connected ? 'متصل' : 'انقطع اتصاله' : 'الغرفة مفتوحة'}</small></div></div>
+    <div className="flex gap-1.5"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2.5 text-cyan-300"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2.5 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2.5 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>
+  </div>;
+
+  const waitingOrReconnect = <>{state?.status === 'waiting' && <div className="rounded-2xl border border-cyan-400/30 bg-white/5 p-5 text-center"><p>بانتظار اللاعب الثاني…</p><p className="mt-3">رمز الغرفة: <b className="select-all text-xl text-amber-300">{room}</b></p><button onClick={() => void navigator.clipboard.writeText(room)} className="mt-3 rounded-xl bg-sky-700 px-4 py-2">نسخ الرمز</button></div>}{!connected && state?.status !== 'finished' && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-3 font-bold">إعادة الاتصال بالغرفة</button>}{state?.reconnectDeadline && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-sm text-amber-200">انقطع اتصال المنافس؛ ننتظر عودته ثم يُكمل البوت المباراة.</p>}</>;
+
+  const finalResult = state?.status === 'finished' && !roundResult && <div className="rounded-3xl border border-amber-400/50 bg-amber-500/10 p-8 text-center"><Trophy className="mx-auto h-14 w-14 text-amber-300"/><p className="mt-3 text-2xl font-black">{state.tie ? 'تعادلتم!' : state.winner === me ? 'أنت الفائز! 🎉' : `${opponent?.name || 'المنافس'} فاز`}</p><p className="mt-2 text-sm">إجابات صحيحة: أنت {self?.score || 0} — المنافس {opponent?.score || 0}</p><button onClick={() => void closeModal()} className="mt-5 rounded-xl bg-blue-600 px-8 py-3 font-black">العودة</button></div>;
+
+  if (room && state && isTrueFalse) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/90 p-2 text-white sm:p-5" dir="rtl">
+    <audio ref={remoteAudioRef} autoPlay playsInline />
+    <div className="relative mx-auto min-h-full w-full max-w-lg overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] shadow-[0_0_40px_rgba(34,211,238,.25)]">
+      <header className="flex items-center justify-between border-b border-white/10 p-4"><div className="flex items-center gap-2.5"><div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 via-cyan-300 to-rose-400 p-1"><div className="flex h-full w-full items-center justify-center rounded-xl bg-[#08152e]"><TrueFalseAuthenticIcon className="h-12 w-12" /></div></div><div><h2 className="font-black">تحدي صح أم خطأ — جماعي</h2><p className="text-xs text-slate-300">{lessonTitle}</p></div></div><button onClick={() => void closeModal()} className="rounded-xl border border-white/10 bg-white/5 p-2"><X className="h-5 w-5" /></button></header>
+      {opponentControls}
+      <main className="space-y-4 p-4">{waitingOrReconnect}
+        {state.status === 'playing' && displayedQuestion && <>
+          <div className="flex items-center justify-between rounded-2xl border border-cyan-300/20 bg-[#07142d]/90 px-3 py-2.5 text-xs"><span className="font-black text-cyan-400">السؤال {Math.min(state.round + 1, state.total)} من {state.total}</span><span className="flex items-center gap-1 text-cyan-300"><Sparkles className="h-3 w-3" />أنت {self?.score || 0} — المنافس {opponent?.score || 0}</span><span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono ${turnSeconds <= 5 ? 'border-rose-400 bg-rose-500/20 text-rose-300' : 'border-white/10 bg-white/5'}`}><Clock className="h-3 w-3" />{turnSeconds}ث</span></div>
+          <div className="rounded-3xl border border-cyan-300/30 bg-gradient-to-br from-[#18345b] via-[#102653] to-[#0a1735] p-6 text-center text-lg font-black leading-9"><p className="mb-2 text-xs text-cyan-300">{roundResult ? answeredByMe ? 'إجابتك — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : myTurn ? 'دورك الآن' : `${opponent?.name || 'المنافس'} يفكّر…`}</p><ScientificText value={displayedQuestion.question} /></div>
+          <div className="grid grid-cols-2 gap-3">{displayedQuestion.options.slice(0, 2).map((option, index) => { const chosen = roundResult?.selected === index; const correct = roundResult?.answer === index; const base = index === 0 ? 'from-emerald-500 to-teal-600 border-emerald-300' : 'from-rose-500 to-red-700 border-rose-300'; const result = roundResult ? correct ? 'ring-4 ring-emerald-300 brightness-125' : chosen ? 'ring-4 ring-rose-300 opacity-90' : 'opacity-40' : ''; return <button key={index} disabled={!connected || !myTurn || pendingAnswer || Boolean(roundResult)} onClick={() => answer(index)} className={`min-h-36 rounded-[1.75rem] border-2 bg-gradient-to-b p-4 text-xl font-black shadow-xl transition ${base} ${result} disabled:cursor-default`}><span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-white/15">{index === 0 ? <CheckCircle2 className="h-10 w-10"/> : <XCircle className="h-10 w-10"/>}</span><ScientificText value={option} />{chosen && <small className="mt-2 block">{answeredByMe ? 'اختيارك' : 'اختيار المنافس'}</small>}</button>; })}</div>
+          {roundResult && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300' : 'border-rose-400 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✓' : 'إجابة خاطئة ✗'}<p className="mt-1 text-xs text-slate-200">الدور التالي بعد عرض النتيجة</p></div>}
+        </>}{finalResult}</main>{error && <p className="m-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
+    </div>{chatPanel}
+  </div>;
+
+  if (room && state && isGibhaSah) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-[#020818]/95 p-2 text-white sm:p-5" dir="rtl">
+    <audio ref={remoteAudioRef} autoPlay playsInline />
+    <div className="relative mx-auto min-h-full w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-cyan-500/40 bg-[linear-gradient(rgba(6,24,55,.96),rgba(2,8,24,.98)),linear-gradient(90deg,rgba(34,211,238,.08)_1px,transparent_1px),linear-gradient(rgba(34,211,238,.08)_1px,transparent_1px)] bg-[size:auto,32px_32px,32px_32px] shadow-[0_0_45px_rgba(6,182,212,.28)]">
+      <header className="flex items-center justify-between border-b border-cyan-400/20 p-4"><div><h2 className="text-lg font-black text-cyan-200">جبتها صح 🎯 — جماعي</h2><p className="text-xs text-slate-300">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-full bg-white/5 p-2"><X className="h-6 w-6" /></button></header>
+      {opponentControls}
+      <main className="space-y-5 p-4">{waitingOrReconnect}
+        {state.status === 'playing' && displayedQuestion && <>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"><div className={`rounded-2xl border p-3 text-center ${myTurn && !roundResult ? 'border-cyan-300 bg-cyan-500/15 shadow-[0_0_18px_rgba(34,211,238,.3)]' : 'border-white/10 bg-white/5'}`}><strong>أنت</strong><p className="text-2xl font-black text-cyan-300">{self?.score || 0}</p></div><div className="rounded-full border border-amber-400/50 bg-[#07142d] px-3 py-2 text-center font-mono text-amber-300"><Clock className="mx-auto h-4 w-4"/><b>{String(turnSeconds).padStart(2, '0')}</b></div><div className={`${!myTurn && !roundResult ? 'border-cyan-300 bg-cyan-500/15 shadow-[0_0_18px_rgba(34,211,238,.3)]' : 'border-white/10 bg-white/5'} rounded-2xl border p-3 text-center`}><strong className="block truncate">{opponent?.name || 'المنافس'}</strong><p className="text-2xl font-black text-cyan-300">{opponent?.score || 0}</p></div></div>
+          <div className="rounded-full border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-center text-sm font-black text-amber-200">السؤال {Math.min(state.round + 1, state.total)} من {state.total} — {roundResult ? answeredByMe ? 'شاهد المنافس إجابتك' : 'أنت تشاهد إجابة المنافس' : myTurn ? 'دورك للإجابة الآن' : `${opponent?.name || 'المنافس'} يختار بطاقة…`}</div>
+          <div className="flex min-h-40 items-center justify-center rounded-3xl border-2 border-cyan-500/40 bg-[#07142d]/90 p-6 text-center text-xl font-black leading-9"><ScientificText value={displayedQuestion.question} /></div>
+          <div className="grid grid-cols-2 gap-3">{displayedQuestion.options.map((option, index) => { const chosen = roundResult?.selected === index; const correct = roundResult?.answer === index; const style = roundResult ? correct ? 'border-emerald-300 bg-emerald-500/25 shadow-[0_0_20px_rgba(16,185,129,.4)]' : chosen ? 'border-rose-300 bg-rose-500/25' : 'border-cyan-900/50 bg-[#0a1833] opacity-45' : 'border-amber-400/45 bg-gradient-to-br from-[#28364f] to-[#182337] hover:border-cyan-300'; return <button key={index} disabled={!connected || !myTurn || pendingAnswer || Boolean(roundResult)} onClick={() => answer(index)} className={`min-h-24 rounded-2xl border-2 p-3 text-sm font-bold transition ${style} disabled:cursor-default`}><ScientificText value={option} />{chosen && <small className="mt-2 block text-amber-200">{answeredByMe ? 'اختيارك' : 'اختيار المنافس'}</small>}</button>; })}</div>
+          {roundResult && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300' : 'border-rose-400 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'جبتها صح! ✨' : 'إجابة خاطئة — ينتقل الدور'}<p className="mt-1 text-xs text-slate-200">ظهر الاختيار والنتيجة للاعبين معًا</p></div>}
+        </>}{finalResult}</main>{error && <p className="m-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
+    </div>{chatPanel}
   </div>;
 
   if (room && state && isMillionaire) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/95 p-2 text-white sm:p-5" dir="rtl">

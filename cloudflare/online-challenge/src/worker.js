@@ -394,7 +394,10 @@ export class ChallengeRoom {
     if (!player || player.answer !== null) return;
     if (game.turn && attachment.userId !== game.turn) return;
     player.answer = payload.option;
-    if (game.gameType === 'millionaire') {
+    // Every supported challenge is turn based. The other player watches the
+    // selected answer and its result before the turn moves to them. Keeping a
+    // single path also prevents the two clients from drifting between rounds.
+    if (game.gameType === 'millionaire' || game.gameType === 'true_false' || game.gameType === 'gibha_sah') {
       var chosen = player.answer;
       var correctAnswer = currentQuestion.correctAnswer;
       if (chosen === correctAnswer) player.score += 1;
@@ -403,7 +406,7 @@ export class ChallengeRoom {
       game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
       game.players.forEach(function (item) { item.answer = null; });
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + 6000;
+      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
       this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correctAnswer, selected: chosen, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));
@@ -411,28 +414,11 @@ export class ChallengeRoom {
       else await this.scheduleNextAlarm(game);
       return;
     }
-    if (game.players.some(this.isBot.bind(this))) {
-      var correct = currentQuestion.correctAnswer;
-      var selected = player.answer;
-      if (player.answer === correct) player.score += 1;
-      game.round = currentIndex + 1;
-      game.questionIndex = currentIndex + 1;
-      game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
-      game.players.forEach(function (item) { item.answer = null; });
-      if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + BOT_ANSWER_DELAY_MS;
-      this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correct, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
-      await this.ctx.storage.put('game', game);
-      this.broadcast(this.view(game));
-      if (game.status === 'finished') await this.updateRegistry('ended', game);
-      else await this.scheduleNextAlarm(game);
-      return;
-    }
+    // Unknown legacy game types retain the old simultaneous-answer behaviour.
     await this.completeRoundIfReady(game);
     await this.ctx.storage.put('game', game);
     this.broadcast(this.view(game));
     if (game.status === 'finished') await this.updateRegistry('ended', game);
-    else await this.scheduleBotAnswer(game);
   }
   async handleDisconnect(socket) {
     var game = await this.read();
