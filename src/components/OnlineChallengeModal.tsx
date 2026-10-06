@@ -9,8 +9,8 @@ import { TrueFalseAuthenticIcon } from './GameIcons';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
-type Player = { id: string; score: number; answered: boolean; connected: boolean; bot?: boolean; name?: string; avatar?: string; city?: string; school?: string; badge?: string; level?: number };
-type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; turn?: string | null; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null; teamLives?: number; teamScore?: number; botScore?: number; questionDeadline?: number | null; lifelines?: { fifty: boolean; audience: boolean; phone: boolean } | null };
+type Player = { id: string; team?: 'A' | 'B' | null; score: number; answered: boolean; connected: boolean; bot?: boolean; name?: string; avatar?: string; city?: string; school?: string; badge?: string; level?: number };
+type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; turn?: string | null; activeTeam?: 'A' | 'B' | null; question: { question: string; options: string[] } | null; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null; teamLives?: { A: number; B: number }; teamScores?: { A: number; B: number }; questionDeadline?: number | null; discussionPhase?: 'thinking' | 'recommended' | null; lifelines?: { fifty: boolean; audience: boolean; phone: boolean } | null };
 type RoundResult = { question?: { question: string; options: string[] }; answer: number; selected?: number; answeredBy?: string; scores: Array<{ id: string; score: number }>; botSelected?: number; botCorrect?: boolean; stealAwarded?: boolean };
 type ChatMessage = { id: string; from: string; text: string; sentAt: number };
 
@@ -37,6 +37,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [unreadChat, setUnreadChat] = useState(0);
   const [turnSeconds, setTurnSeconds] = useState(25);
   const [lifelineResult, setLifelineResult] = useState<{ kind: 'fifty' | 'audience' | 'phone'; keep?: number[]; percentages?: number[]; suggested?: number } | null>(null);
+  const [teamRecommendation, setTeamRecommendation] = useState<{ from: string; option: number } | null>(null);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
@@ -108,7 +109,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }
 
   useEffect(() => {
-    if (!audioEnabled || !connected || state?.players.length !== 2) return;
+    if (!audioEnabled || !connected) return;
     void (async () => {
       const peer = await ensurePeer();
       if (peer.signalingState !== 'stable') return;
@@ -224,6 +225,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         ws.close();
       }
       if (payload.type === 'bot_joined') setError('');
+      if (payload.type === 'team_recommendation' && Number.isInteger(payload.option)) setTeamRecommendation({ from: payload.from, option: payload.option });
       if (payload.type === 'lifeline_result') setLifelineResult(payload);
       if (payload.type === 'chat' && typeof payload.text === 'string') {
         setChatMessages(previous => [...previous, { id: `${payload.from}-${payload.sentAt}-${Math.random()}`, from: payload.from, text: payload.text, sentAt: payload.sentAt || Date.now() }]);
@@ -337,8 +339,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   const self = state?.players.find(p => p.id === me);
   const opponent = state?.players.find(p => p.id !== me);
-  const teammate = state?.players.find(p => p.id !== me && !p.bot);
-  const botOpponent = state?.players.find(p => p.bot);
+  const myTeam = self?.team || 'A';
+  const teammate = state?.players.find(p => p.id !== me && p.team === myTeam);
+  const enemyTeam = state?.players.filter(p => p.team && p.team !== myTeam) || [];
   // A room selected in the challenge hub is joined without local lesson config.
   // Its server state, not the hub's default game type, determines the game screen.
   const isMillionaireTeam = (state?.gameType || gameType) === 'millionaire_team';
@@ -348,6 +351,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const millionairePrizes = ['250', '500', '1 000', '5 000', '10 000', '25 000', '50 000', '100 000', '250 000', '500 000', '1 000 000'];
   const displayedQuestion = roundResult?.question || state?.question;
   const myTurn = state?.turn === me;
+  const myTeamActive = isMillionaireTeam && state?.activeTeam === myTeam;
+  const canRecommend = myTeamActive && !myTurn && state?.status === 'playing';
   const answeredByMe = roundResult?.answeredBy === me;
   useEffect(() => {
     const themed = (isTrueFalse || isGibhaSah) && room && state?.status !== 'finished';
@@ -363,7 +368,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     return () => window.clearInterval(timer);
   }, [isTrueFalse, isMillionaireTeam, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
 
-  useEffect(() => { setLifelineResult(null); }, [state?.round]);
+  useEffect(() => { setLifelineResult(null); setTeamRecommendation(null); }, [state?.round]);
 
   useEffect(() => {
     if ((isTrueFalse || isGibhaSah) && state?.status === 'finished' && state.winner === me && !roundResult) gameAudio.playVictoryFanfare();
@@ -450,7 +455,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       {isMillionaireTeam ? <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-blue-400/20 bg-blue-950/35 p-3 text-center">
         <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-2"><div className="flex justify-center -space-x-2 space-x-reverse"><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-cyan-300 bg-slate-800"><UserRound className="h-5 w-5"/></span><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-violet-300 bg-slate-800">{teammate?.avatar ? <img src={teammate.avatar} className="h-full w-full rounded-full object-cover" alt="الزميل"/> : <UserRound className="h-5 w-5"/>}</span></div><b className="mt-1 block text-xs">أنت + {teammate?.name || 'زميل منتظر'}</b></div>
         <div className="rounded-full border border-amber-400/50 bg-black/30 px-3 py-2 text-xs font-black text-amber-300">VS</div>
-        <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-2">{botOpponent?.avatar ? <img src={botOpponent.avatar} className="mx-auto h-10 w-10 rounded-full border-2 border-rose-300 object-cover" alt="المنافس"/> : <UserRound className="mx-auto h-9 w-9"/>}<b className="mt-1 block truncate text-xs">{botOpponent?.name || 'المنافس الآلي'}</b></div>
+        <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-2"><div className="flex justify-center -space-x-2 space-x-reverse">{[0, 1].map(index => { const rival = enemyTeam[index]; return rival?.avatar ? <img key={rival.id} src={rival.avatar} className="h-10 w-10 rounded-full border-2 border-rose-300 object-cover" alt="منافس"/> : <span key={rival?.id || index} className="grid h-10 w-10 place-items-center rounded-full border-2 border-rose-300 bg-slate-800"><UserRound className="h-5 w-5"/></span>; })}</div><b className="mt-1 block truncate text-xs">{enemyTeam.length ? enemyTeam.map(player => player.name || (player.bot ? 'بوت' : 'لاعب')).join(' + ') : 'فريق منافس'}</b></div>
         <div className="col-span-3 flex justify-center gap-2"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} className="relative rounded-full bg-cyan-500/20 p-2"><MessageCircle className="h-5 w-5"/>{unreadChat > 0 && <span className="absolute -top-1 -left-1 rounded-full bg-red-500 px-1 text-[10px]">{unreadChat}</span>}</button><button disabled={audioBusy || !teammate} onClick={() => void toggleMicrophone()} className="rounded-full bg-emerald-500/20 p-2 disabled:opacity-40">{audioEnabled ? <Mic className="h-5 w-5"/> : <MicOff className="h-5 w-5"/>}</button><span className="rounded-full bg-white/5 px-3 py-2 text-[10px]">صوت الفريق</span></div>
       </div> : <div className="flex items-center justify-between gap-2 border-b border-blue-400/20 bg-blue-950/35 p-3">
         <div className="flex min-w-0 items-center gap-2">{opponent?.avatar ? <img src={opponent.avatar} alt={opponent.name || 'المنافس'} className="h-11 w-11 rounded-full border-2 border-cyan-400 object-cover" /> : <div className="grid h-11 w-11 place-items-center rounded-full border-2 border-cyan-400 bg-slate-800"><UserRound className="h-6 w-6" /></div>}<div className="min-w-0"><strong className="block truncate text-sm">{opponent?.name || 'بانتظار المنافس…'}</strong><small className="text-emerald-300">{opponent ? opponent.bot ? 'منافس آلي' : opponent.connected ? 'متصل' : 'انقطع اتصاله' : 'الغرفة مفتوحة'}</small></div></div>
@@ -458,9 +463,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       </div>}
       <main className="space-y-5 p-3 sm:p-5">
         <div className="rounded-3xl border-2 border-[#2049a4] bg-[#061235] p-4 shadow-[0_0_25px_rgba(18,48,128,.5)]">
-          <div className="flex items-center justify-between gap-2 text-xs"><span className="font-black text-amber-300">السؤال {Math.min((state.round || 0) + 1, state.total)} من {state.total}</span>{isMillionaireTeam ? <><span className="text-rose-300">❤ {state.teamLives ?? 3}</span><span className="font-mono text-cyan-300">{turnSeconds}ث</span></> : <span className="text-amber-300">الجائزة: {millionairePrizes[Math.min(state.round, 10)]} د.ع</span>}</div>
-          <p className="mt-3 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-center text-sm font-black text-amber-200">{isMillionaireTeam ? roundResult ? 'ظهرت نتيجة الفريق والبوت' : state.status === 'waiting' ? 'انتظار 5 ثوانٍ لزميل حقيقي…' : myTurn ? 'أنت قائد هذا السؤال — اعتمد الإجابة' : `${teammate?.name || 'زميلك'} هو القائد الآن` : roundResult ? answeredByMe ? 'إجابتك الآن — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : state.status === 'waiting' ? 'بانتظار انضمام المنافس' : myTurn ? 'دورك للإجابة الآن! ⭐' : `${opponent?.name || 'المنافس'} يفكّر في الإجابة...`}</p>
-          <div className="mt-3 flex items-center justify-between text-xs text-cyan-200"><span>{isMillionaireTeam ? `الفريق: ${state.teamScore || 0}` : `أنت: ${self?.score || 0} صحيحة`}</span><span>{isMillionaireTeam ? `البوت: ${state.botScore || 0}` : `${opponent?.name || 'المنافس'}: ${opponent?.score || 0} صحيحة`}</span></div>
+          <div className="flex items-center justify-between gap-2 text-xs"><span className="font-black text-amber-300">السؤال {Math.min((state.round || 0) + 1, state.total)} من {state.total}</span>{isMillionaireTeam ? <><span className="text-rose-300">❤ فريقك {state.teamLives?.[myTeam] ?? 3} / المنافس {state.teamLives?.[myTeam === 'A' ? 'B' : 'A'] ?? 3}</span><span className="font-mono text-cyan-300">{turnSeconds}ث</span></> : <span className="text-amber-300">الجائزة: {millionairePrizes[Math.min(state.round, 10)]} د.ع</span>}</div>
+          <p className="mt-3 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-center text-sm font-black text-amber-200">{isMillionaireTeam ? roundResult ? `ظهرت نتيجة دور الفريق ${roundResult.answeredBy === me || state.activeTeam !== myTeam ? '' : 'المنافس'}` : state.status === 'waiting' ? 'انتظار 5 ثوانٍ لاكتمال 4 لاعبين… والمقاعد الناقصة تملؤها البوتات' : myTurn ? 'أنت قائد فريقك — ناقش زميلك ثم اعتمد الإجابة' : canRecommend ? `${state.players.find(player => player.id === state.turn)?.name || 'زميلك'} هو القائد — أرسل له توصيتك` : state.discussionPhase ? 'الفريق المنافس يناقش الإجابة ويفكر…' : 'دور الفريق المنافس — أنت تشاهد' : roundResult ? answeredByMe ? 'إجابتك الآن — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : state.status === 'waiting' ? 'بانتظار انضمام المنافس' : myTurn ? 'دورك للإجابة الآن! ⭐' : `${opponent?.name || 'المنافس'} يفكّر في الإجابة...`}</p>
+          <div className="mt-3 flex items-center justify-between text-xs text-cyan-200"><span>{isMillionaireTeam ? `فريقك: ${state.teamScores?.[myTeam] || 0}` : `أنت: ${self?.score || 0} صحيحة`}</span><span>{isMillionaireTeam ? `المنافسون: ${state.teamScores?.[myTeam === 'A' ? 'B' : 'A'] || 0}` : `${opponent?.name || 'المنافس'}: ${opponent?.score || 0} صحيحة`}</span></div>
         </div>
         {isMillionaireTeam && state.status === 'playing' && <div className="grid grid-cols-3 gap-2"><button disabled={!myTurn || state.lifelines?.audience} onClick={() => useLifeline('audience')} className="rounded-xl bg-violet-600/30 p-2 text-xs font-black disabled:opacity-35">👥 الجمهور</button><button disabled={!myTurn || state.lifelines?.phone} onClick={() => useLifeline('phone')} className="rounded-xl bg-emerald-600/30 p-2 text-xs font-black disabled:opacity-35">📞 صديق</button><button disabled={!myTurn || state.lifelines?.fifty} onClick={() => useLifeline('fifty')} className="rounded-xl bg-amber-600/30 p-2 text-xs font-black disabled:opacity-35">50:50</button></div>}
         {isMillionaireTeam && lifelineResult?.kind === 'audience' && <p className="rounded-xl bg-violet-500/15 p-3 text-center text-xs">رأي الجمهور: {lifelineResult.percentages?.map((value, index) => `${['أ','ب','ج','د'][index]} ${value}%`).join(' — ')}</p>}
@@ -475,11 +480,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
             const correct = roundResult?.answer === index;
             const resultStyle = roundResult && resultRevealed ? correct ? 'border-emerald-400 bg-emerald-500/25 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,.45)]' : chosen ? 'border-rose-400 bg-rose-500/25 text-rose-100' : 'border-blue-900/50 bg-[#03091e] opacity-60' : roundResult && chosen ? 'border-amber-400 bg-amber-500/25 animate-pulse' : 'border-[#1c3e8a] bg-gradient-to-r from-[#071233] to-[#03091e]';
             const hiddenByFifty = isMillionaireTeam && lifelineResult?.kind === 'fifty' && !lifelineResult.keep?.includes(index);
-            return <button key={index} disabled={hiddenByFifty || !connected || !myTurn || pendingAnswer || Boolean(roundResult) || state.status !== 'playing'} onClick={() => answer(index)} className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border-2 px-4 text-right text-sm font-bold transition ${hiddenByFifty ? 'invisible' : resultStyle} disabled:cursor-default`}><b className="shrink-0 text-amber-300">{['أ:', 'ب:', 'ج:', 'د:'][index] || `${index + 1}:`}</b><ScientificText value={option} />{chosen && <span className="mr-auto shrink-0 text-xs text-amber-200">{answeredByMe ? 'اختيارك' : 'اختيار المنافس'}</span>}</button>;
+            const selectable = isMillionaireTeam ? (myTurn || canRecommend) : myTurn;
+            return <button key={index} disabled={hiddenByFifty || !connected || !selectable || pendingAnswer || Boolean(roundResult) || state.status !== 'playing'} onClick={() => canRecommend ? sendSocket({ type: 'recommend', option: index }) : answer(index)} className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border-2 px-4 text-right text-sm font-bold transition ${hiddenByFifty ? 'invisible' : resultStyle} ${teamRecommendation?.option === index ? 'ring-2 ring-violet-300' : ''} disabled:cursor-default`}><b className="shrink-0 text-amber-300">{['أ:', 'ب:', 'ج:', 'د:'][index] || `${index + 1}:`}</b><ScientificText value={option} />{canRecommend && <span className="mr-auto shrink-0 text-xs text-violet-200">أرسل توصية</span>}{teamRecommendation?.option === index && <span className="mr-auto shrink-0 text-xs text-violet-200">توصية زميلك</span>}{chosen && <span className="mr-auto shrink-0 text-xs text-amber-200">{answeredByMe ? 'اختيارك' : 'اختيار القائد'}</span>}</button>;
           })}</div>
           {roundResult && resultRevealed && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-300' : 'border-rose-400/60 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✨' : 'إجابة خاطئة ✗'}{isMillionaireTeam && <p className="mt-2 text-xs text-slate-100">البوت اختار {['أ','ب','ج','د'][roundResult.botSelected ?? 0]}: {roundResult.botCorrect ? 'صحيح' : 'خطأ'} {roundResult.stealAwarded && '— سرق فريقك نقطة إضافية! ⚡'}</p>}<p className="mt-1 text-xs text-slate-200">{isMillionaireTeam ? 'ينتقل دور القائد للزميل' : `${answeredByMe ? 'شاهد منافسك اختيارك' : 'شاهدت اختيار المنافس'} — الدور التالي بعد عرض النتيجة`}</p></div>}
         </>}
-        {state.status === 'finished' && !roundResult && <div className="rounded-3xl border border-amber-400/50 bg-amber-500/10 p-8 text-center"><Trophy className="mx-auto h-14 w-14 text-amber-300"/><p className="mt-3 text-2xl font-black">{isMillionaireTeam ? state.winner === 'team' ? 'فاز فريقكم! 🎉' : 'فاز المنافس الآلي' : state.tie ? 'تعادلتم!' : state.winner === me ? 'أنت الفائز! 🎉' : `${opponent?.name || 'المنافس'} فاز`}</p><p className="mt-2 text-sm">{isMillionaireTeam ? `الفريق ${state.teamScore || 0} — البوت ${state.botScore || 0}` : `إجابات صحيحة: أنت ${self?.score || 0} — المنافس ${opponent?.score || 0}`}</p><button onClick={() => void closeModal()} className="mt-5 rounded-xl bg-blue-600 px-8 py-3 font-black">العودة</button></div>}
+        {state.status === 'finished' && !roundResult && <div className="rounded-3xl border border-amber-400/50 bg-amber-500/10 p-8 text-center"><Trophy className="mx-auto h-14 w-14 text-amber-300"/><p className="mt-3 text-2xl font-black">{isMillionaireTeam ? !state.winner ? 'تعادل الفريقان!' : state.winner === myTeam ? 'فاز فريقكم! 🎉' : 'فاز الفريق المنافس' : state.tie ? 'تعادلتم!' : state.winner === me ? 'أنت الفائز! 🎉' : `${opponent?.name || 'المنافس'} فاز`}</p><p className="mt-2 text-sm">{isMillionaireTeam ? `فريقك ${state.teamScores?.[myTeam] || 0} — المنافسون ${state.teamScores?.[myTeam === 'A' ? 'B' : 'A'] || 0}` : `إجابات صحيحة: أنت ${self?.score || 0} — المنافس ${opponent?.score || 0}`}</p><button onClick={() => void closeModal()} className="mt-5 rounded-xl bg-blue-600 px-8 py-3 font-black">العودة</button></div>}
       </main>
       {error && <p className="m-4 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">{error}</p>}
     </div>{chatPanel}

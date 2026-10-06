@@ -204,7 +204,7 @@ test('bot answers after its delay and completes every supported game type', asyn
   }
 });
 
-test('millionaire team starts after five seconds and alternates human captains against the bot', async () => {
+test('millionaire team fills four seats after five seconds and alternates 2v2 team turns', async () => {
   const data = new Map();
   let alarmAt = null;
   const messages = [];
@@ -220,17 +220,20 @@ test('millionaire team starts after five seconds and alternates human captains a
   assert.equal(response.status, 200);
   assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 5000);
   const waiting = data.get('game');
-  waiting.players.push({ id: 'mate', score: 0, answer: null });
+  waiting.players.push({ id: 'mate', team: 'A', score: 0, answer: null });
   waiting.botJoinAt = Date.now() - 1;
   data.set('game', waiting);
   await room.alarm();
-  assert.equal(data.get('game').players.length, 3);
-  assert.equal(data.get('game').teamLives, 3);
+  assert.equal(data.get('game').players.length, 4);
+  assert.deepEqual(data.get('game').players.map(player => player.team), ['A', 'A', 'B', 'B']);
+  assert.deepEqual(data.get('game').teamLives, { A: 3, B: 3 });
+  assert.equal(data.get('game').turn, 'host');
   assert.ok(data.get('game').questionDeadline > Date.now());
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
   assert.equal(data.get('game').round, 1);
-  assert.equal(data.get('game').turn, 'mate');
-  assert.equal(messages.some(message => message.type === 'round_result' && typeof message.botCorrect === 'boolean'), true);
+  assert.equal(data.get('game').activeTeam, 'B');
+  assert.equal(data.get('game').turn.startsWith('bot:team:B:'), true);
+  assert.equal(messages.some(message => message.type === 'round_result' && message.answeredTeam === 'A'), true);
 });
 
 test('gibha sah keeps its original exceptional probability sequence', () => {

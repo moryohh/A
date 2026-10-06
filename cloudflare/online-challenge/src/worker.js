@@ -48,6 +48,7 @@ function validGameType(value) {
 }
 
 var BOT_ID = 'bot:duha-challenge';
+var TEAM_BOT_PREFIX = 'bot:team:';
 var BOT_ANSWER_DELAY_MS = 2000;
 var BOT_PROFILES = [
   { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
@@ -179,15 +180,23 @@ export class ChallengeRoom {
   send(socket, payload) { try { socket.send(JSON.stringify(payload)); } catch (_) {} }
   broadcast(payload) { this.sockets().forEach(function (socket) { this.send(socket, payload); }, this); }
   connected(userId) {
-    if (userId === BOT_ID) return true;
+    if (userId === BOT_ID || (typeof userId === 'string' && userId.startsWith(TEAM_BOT_PREFIX))) return true;
     return this.sockets().some(function (socket) {
       var attachment = socket.deserializeAttachment();
       return attachment && attachment.userId === userId;
     });
   }
-  isBot(player) { return Boolean(player && player.id === BOT_ID); }
+  isBot(player) { return Boolean(player && typeof player.id === 'string' && (player.id === BOT_ID || player.id.startsWith(TEAM_BOT_PREFIX))); }
+  teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
+  sendToTeam(game, team, payload) {
+    this.sockets().forEach(function (socket) {
+      var attachment = socket.deserializeAttachment();
+      var player = attachment && game.players.find(function (item) { return item.id === attachment.userId; });
+      if (player && player.team === team) this.send(socket, payload);
+    }, this);
+  }
   async scheduleNextAlarm(game) {
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botAnswerAt, game.questionDeadline].filter(function (value) {
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -212,40 +221,48 @@ export class ChallengeRoom {
     });
     return wrong.length ? wrong[Math.floor(Math.random() * wrong.length)] : question.correctAnswer;
   }
-  teamHumans(game) { return game.players.filter(function (player) { return player.id !== BOT_ID; }); }
-  nextTeamCaptain(game, currentId) {
-    var connectedHumans = this.teamHumans(game).filter(function (player) { return this.connected(player.id); }, this);
-    if (!connectedHumans.length) return null;
-    var currentIndex = connectedHumans.findIndex(function (player) { return player.id === currentId; });
-    return connectedHumans[(currentIndex + 1 + connectedHumans.length) % connectedHumans.length].id;
+  teamHumans(game) { return game.players.filter(function (player) { return !this.isBot(player); }, this); }
+  captainForTeam(game, team) {
+    var members = this.teamPlayers(game, team);
+    if (!members.length) return null;
+    game.captainCursor = game.captainCursor || { A: 0, B: 0 };
+    var index = game.captainCursor[team] % members.length;
+    game.captainCursor[team] += 1;
+    return members[index].id;
+  }
+  beginTeamTurn(game, team) {
+    game.activeTeam = team;
+    game.turn = this.captainForTeam(game, team);
+    game.recommendations = {};
+    delete game.botDiscussionAt;
+    delete game.botAnswerAt;
+    delete game.questionDeadline;
+    var captain = game.players.find(function (player) { return player.id === game.turn; });
+    var botMate = this.teamPlayers(game, team).find(function (player) { return this.isBot(player) && player.id !== game.turn; }, this);
+    if ((captain && this.isBot(captain)) || botMate) game.botDiscussionAt = Date.now() + randomDelay(1500, 3000);
+    else game.questionDeadline = Date.now() + 60000;
   }
   async finishTeamRound(game, selected, answeredBy, timedOut) {
     var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     var question = game.questions[currentIndex];
     if (!question) return;
-    var bot = game.players.find(this.isBot.bind(this));
-    var botSelected = this.chooseBotAnswer(game);
-    var humanCorrect = !timedOut && selected === question.correctAnswer;
-    var botCorrect = botSelected === question.correctAnswer;
-    if (humanCorrect) game.teamScore += 1;
-    else game.teamLives = Math.max(0, game.teamLives - 1);
-    if (botCorrect) game.botScore += 1;
-    var stealAwarded = humanCorrect && !botCorrect;
-    if (stealAwarded) game.teamScore += 1;
-    if (bot) bot.score = game.botScore;
-    this.teamHumans(game).forEach(function (player) { player.score = game.teamScore; player.answer = null; });
-    if (bot) bot.answer = null;
+    var team = game.activeTeam || 'A';
+    var correct = !timedOut && selected === question.correctAnswer;
+    if (correct) game.teamScores[team] += 1;
+    else game.teamLives[team] = Math.max(0, game.teamLives[team] - 1);
+    this.teamPlayers(game, team).forEach(function (player) { player.score = game.teamScores[team]; });
+    game.players.forEach(function (player) { player.answer = null; });
     game.round = currentIndex + 1;
     game.questionIndex = game.round;
-    game.turn = this.nextTeamCaptain(game, answeredBy);
-    delete game.questionDeadline;
-    if (game.teamLives <= 0 || game.questionIndex >= game.questions.length) {
+    var nextTeam = team === 'A' ? 'B' : 'A';
+    if ((game.teamLives.A <= 0 && game.teamLives.B <= 0) || game.questionIndex >= game.questions.length) {
       game.status = 'finished';
-      game.winner = game.teamLives > 0 && game.teamScore > game.botScore ? 'team' : BOT_ID;
+      game.winner = game.teamScores.A > game.teamScores.B ? 'A' : game.teamScores.B > game.teamScores.A ? 'B' : null;
     } else {
-      game.questionDeadline = Date.now() + 60000;
+      if (game.teamLives[nextTeam] <= 0) nextTeam = team;
+      this.beginTeamTurn(game, nextTeam);
     }
-    this.broadcast({ type: 'round_result', question: { question: question.question, options: question.options }, answer: question.correctAnswer, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: answeredBy, botSelected: botSelected, botCorrect: botCorrect, stealAwarded: stealAwarded, timedOut: Boolean(timedOut) });
+    this.broadcast({ type: 'round_result', question: { question: question.question, options: question.options }, answer: question.correctAnswer, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: answeredBy, answeredTeam: team, timedOut: Boolean(timedOut) });
   }
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
@@ -257,13 +274,17 @@ export class ChallengeRoom {
   async replacePlayerWithBot(game, userId) {
     var player = game.players.find(function (item) { return item.id === userId; });
     if (!player || this.isBot(player)) return false;
-    player.id = BOT_ID;
+    player.id = game.gameType === 'millionaire_team' ? TEAM_BOT_PREFIX + player.team + ':' + crypto.randomUUID() : BOT_ID;
+    player.profile = BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)];
     player.answer = null;
     game.botReplacedUserId = userId;
     delete game.disconnectUserId;
     delete game.disconnectDeadline;
     game.status = 'playing';
-    game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+    if (game.gameType === 'millionaire_team' && game.turn === userId) {
+      game.turn = player.id;
+      game.botDiscussionAt = Date.now() + randomDelay(1500, 3000);
+    } else if (game.gameType !== 'millionaire_team') game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
     this.broadcast({ type: 'bot_joined', replacedUserId: userId });
@@ -296,7 +317,7 @@ export class ChallengeRoom {
     var current = game.status === 'playing' ? game.questions[currentIndex] : null;
     var winner = game.winner || null;
     if (game.gameType === 'millionaire_team' && game.status === 'finished') {
-      winner = game.winner || (game.teamScore > game.botScore ? 'team' : BOT_ID);
+      winner = game.winner || null;
     } else if (game.status === 'finished' && game.players.length === 2) {
       winner = game.players[0].score > game.players[1].score ? game.players[0].id :
         game.players[1].score > game.players[0].score ? game.players[1].id : null;
@@ -305,17 +326,18 @@ export class ChallengeRoom {
       type: 'state', gameType: game.gameType, status: game.status, round: currentIndex, total: game.questions.length, turn: game.turn || null,
       question: current ? { question: current.question, options: current.options } : null,
       players: game.players.map(function (p) {
-        var profile = this.isBot(p) ? game.botProfile : p.profile;
-        return { id: p.id, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
+        var profile = p.profile || (this.isBot(p) ? game.botProfile : null);
+        return { id: p.id, team: p.team || null, score: p.score, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length === 2 && game.players[0].score === game.players[1].score,
       endedReason: game.endedReason || null,
       leftPlayerId: game.leftPlayerId || null,
       reconnectDeadline: game.disconnectDeadline || null,
+      activeTeam: game.activeTeam || null,
       teamLives: game.teamLives,
-      teamScore: game.teamScore,
-      botScore: game.botScore,
+      teamScores: game.teamScores,
+      discussionPhase: game.botDiscussionAt ? 'thinking' : game.botAnswerAt ? 'recommended' : null,
       questionDeadline: game.questionDeadline || null,
       lifelines: game.lifelines || null,
     };
@@ -328,7 +350,9 @@ export class ChallengeRoom {
       var init = await request.json();
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
       var teamMode = init.gameType === 'millionaire_team';
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (teamMode ? 5000 : randomDelay(180000, 300000)), teamLives: teamMode ? 3 : undefined, teamScore: teamMode ? 0 : undefined, botScore: teamMode ? 0 : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
+      var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (teamMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -337,7 +361,7 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/ticket' && request.method === 'POST') {
       var ticketBody = await request.json();
       if (!ticketBody || typeof ticketBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
-      var maxPlayers = game.gameType === 'millionaire_team' ? 3 : 2;
+      var maxPlayers = game.gameType === 'millionaire_team' ? 4 : 2;
       if (game.players.length >= maxPlayers && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
       var ticket = crypto.randomUUID();
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
@@ -350,7 +374,7 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/leave' && request.method === 'POST') {
       var leaveBody = await request.json().catch(function () { return null; });
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
-      if (game.status === 'playing' && game.players.length === 2 && game.players.some(function (player) { return player.id === leaveBody.userId; })) {
+      if (game.status === 'playing' && game.players.some(function (player) { return player.id === leaveBody.userId; }) && (game.players.length === 2 || game.gameType === 'millionaire_team')) {
         await this.replacePlayerWithBot(game, leaveBody.userId);
         return json({ ok: true, botContinues: true }, 200, '');
       }
@@ -373,9 +397,14 @@ export class ChallengeRoom {
       await this.ctx.storage.delete('ticket:' + ticketId);
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
-        var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 2 && (game.status === 'waiting' || game.status === 'playing');
+        var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 4 && game.status === 'waiting';
         if (!canJoinTeam && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
-        game.players.push({ id: userId, score: 0, answer: null, profile: ticketRecord.profile || null });
+        var team = null;
+        if (game.gameType === 'millionaire_team') {
+          var humans = this.teamHumans(game).length;
+          team = humans === 0 || humans === 1 ? 'A' : 'B';
+        }
+        game.players.push({ id: userId, team: team, score: 0, answer: null, profile: ticketRecord.profile || null });
         if (game.gameType !== 'millionaire_team') game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
         if (game.gameType !== 'millionaire_team') {
@@ -412,22 +441,41 @@ export class ChallengeRoom {
     var payload;
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
+    var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
     if (payload && payload.type === 'chat' && sender && typeof payload.text === 'string') {
       var chatText = payload.text.trim().slice(0, 300);
       if (!chatText) return;
-      this.broadcast({ type: 'chat', from: sender.userId, text: chatText, sentAt: Date.now() });
+      var chatSender = liveGame && liveGame.players.find(function (player) { return player.id === sender.userId; });
+      if (liveGame && liveGame.gameType === 'millionaire_team' && chatSender) this.sendToTeam(liveGame, chatSender.team, { type: 'chat', from: sender.userId, text: chatText, sentAt: Date.now(), team: chatSender.team });
+      else this.broadcast({ type: 'chat', from: sender.userId, text: chatText, sentAt: Date.now() });
       return;
     }
     if (payload && payload.type === 'audio_state' && sender && typeof payload.enabled === 'boolean') {
+      var audioSender = liveGame && liveGame.players.find(function (player) { return player.id === sender.userId; });
       this.sockets().forEach(function (peer) {
-        if (peer !== socket) this.send(peer, { type: 'audio_state', from: sender.userId, enabled: payload.enabled });
+        var peerAttachment = peer.deserializeAttachment();
+        var peerPlayer = liveGame && liveGame.players.find(function (player) { return player.id === (peerAttachment && peerAttachment.userId); });
+        if (peer !== socket && (!liveGame || liveGame.gameType !== 'millionaire_team' || (audioSender && peerPlayer && audioSender.team === peerPlayer.team))) this.send(peer, { type: 'audio_state', from: sender.userId, enabled: payload.enabled });
       }, this);
       return;
     }
     if (payload && payload.type === 'audio_signal' && sender && payload.signal && typeof payload.signal === 'object') {
+      var signalSender = liveGame && liveGame.players.find(function (player) { return player.id === sender.userId; });
       this.sockets().forEach(function (peer) {
-        if (peer !== socket) this.send(peer, { type: 'audio_signal', from: sender.userId, signal: payload.signal });
+        var peerAttachment = peer.deserializeAttachment();
+        var peerPlayer = liveGame && liveGame.players.find(function (player) { return player.id === (peerAttachment && peerAttachment.userId); });
+        if (peer !== socket && (!liveGame || liveGame.gameType !== 'millionaire_team' || (signalSender && peerPlayer && signalSender.team === peerPlayer.team))) this.send(peer, { type: 'audio_signal', from: sender.userId, signal: payload.signal });
       }, this);
+      return;
+    }
+    if (payload && payload.type === 'recommend' && sender && Number.isInteger(payload.option) && liveGame && liveGame.gameType === 'millionaire_team' && liveGame.status === 'playing') {
+      var recommender = liveGame.players.find(function (player) { return player.id === sender.userId; });
+      var recommendQuestion = liveGame.questions[liveGame.questionIndex];
+      if (!recommender || recommender.team !== liveGame.activeTeam || payload.option < 0 || payload.option >= recommendQuestion.options.length) return;
+      liveGame.recommendations[recommender.id] = payload.option;
+      await this.ctx.storage.put('game', liveGame);
+      this.sendToTeam(liveGame, recommender.team, { type: 'team_recommendation', from: recommender.id, option: payload.option, team: recommender.team });
+      this.broadcast(this.view(liveGame));
       return;
     }
     if (payload && payload.type === 'lifeline' && sender && ['fifty', 'audience', 'phone'].includes(payload.kind)) {
@@ -452,7 +500,8 @@ export class ChallengeRoom {
         result.suggested = Math.random() < 0.8 ? lifelineQuestion.correctAnswer : Math.floor(Math.random() * lifelineQuestion.options.length);
       }
       await this.ctx.storage.put('game', lifelineGame);
-      this.broadcast(result);
+      var lifelinePlayer = lifelineGame.players.find(function (player) { return player.id === sender.userId; });
+      this.sendToTeam(lifelineGame, lifelinePlayer.team, result);
       this.broadcast(this.view(lifelineGame));
       return;
     }
@@ -519,13 +568,34 @@ export class ChallengeRoom {
     if (!game || ['closed', 'finished', 'abandoned'].includes(game.status)) return;
     var now = Date.now();
     if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.players.length === 1) && this.connected(game.players[0].id)) {
-      game.players.push({ id: BOT_ID, score: 0, answer: null });
+      if (game.gameType === 'millionaire_team') {
+        while (game.players.length < 4) {
+          var teamASeats = this.teamPlayers(game, 'A').length;
+          var botTeam = teamASeats < 2 ? 'A' : 'B';
+          var profile = BOT_PROFILES[(game.players.length - 1) % BOT_PROFILES.length];
+          game.players.push({ id: TEAM_BOT_PREFIX + botTeam + ':' + crypto.randomUUID(), team: botTeam, score: 0, answer: null, profile: profile });
+        }
+      } else game.players.push({ id: BOT_ID, score: 0, answer: null });
       game.status = 'playing';
       delete game.botJoinAt;
-      if (game.gameType === 'millionaire_team') game.questionDeadline = now + 60000;
+      if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
       else game.botAnswerAt = now + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
+      this.broadcast(this.view(game));
+    }
+    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.botDiscussionAt && now >= game.botDiscussionAt) {
+      var discussionQuestion = game.questions[game.questionIndex];
+      var discussionCaptain = game.players.find(function (player) { return player.id === game.turn; });
+      var discussionMate = this.teamPlayers(game, game.activeTeam).find(function (player) { return this.isBot(player) && player.id !== game.turn; }, this);
+      if (discussionMate && discussionQuestion) {
+        var recommendation = this.chooseBotAnswer(game);
+        game.recommendations[discussionMate.id] = recommendation;
+        this.sendToTeam(game, game.activeTeam, { type: 'team_recommendation', from: discussionMate.id, option: recommendation, team: game.activeTeam, bot: true });
+      }
+      delete game.botDiscussionAt;
+      if (discussionCaptain && this.isBot(discussionCaptain)) game.botAnswerAt = now + randomDelay(3000, 6000);
+      else game.questionDeadline = now + 60000;
       this.broadcast(this.view(game));
     }
     if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
@@ -549,7 +619,17 @@ export class ChallengeRoom {
         await this.updateRegistry('ended', game);
       }
     }
-    if (game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
+    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
+      var teamBot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
+      if (teamBot) {
+        var teamBotSelected = this.chooseBotAnswer(game);
+        await this.finishTeamRound(game, teamBotSelected, teamBot.id, false);
+        if (game.status === 'finished') await this.updateRegistry('ended', game);
+        this.broadcast(this.view(game));
+      }
+      delete game.botAnswerAt;
+    }
+    if (game.gameType !== 'millionaire_team' && game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
       var bot = game.players.find(this.isBot.bind(this));
       if (bot && bot.answer === null && game.turn === BOT_ID) {
         var botQuestion = game.questions[Number.isInteger(game.questionIndex) ? game.questionIndex : game.round];
