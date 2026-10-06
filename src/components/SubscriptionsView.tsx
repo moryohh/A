@@ -27,7 +27,7 @@ import { fetchLessonGamesData } from '../services/gamesService';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 
 const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
-type ChallengeGame = 'millionaire' | 'true_false' | 'gibha_sah';
+type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
 type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };

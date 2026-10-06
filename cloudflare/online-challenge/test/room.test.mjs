@@ -204,6 +204,35 @@ test('bot answers after its delay and completes every supported game type', asyn
   }
 });
 
+test('millionaire team starts after five seconds and alternates human captains against the bot', async () => {
+  const data = new Map();
+  let alarmAt = null;
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const mateSocket = { deserializeAttachment: () => ({ userId: 'mate' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => {} },
+    getWebSockets: () => [hostSocket, mateSocket],
+  });
+  const questions = Array.from({ length: 20 }, (_, index) => ({ question: `Team ${index}?`, options: ['a', 'b', 'c', 'd'], correctAnswer: 0 }));
+  const startedAt = Date.now();
+  const response = await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'millionaire_team', questions }) }));
+  assert.equal(response.status, 200);
+  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 5000);
+  const waiting = data.get('game');
+  waiting.players.push({ id: 'mate', score: 0, answer: null });
+  waiting.botJoinAt = Date.now() - 1;
+  data.set('game', waiting);
+  await room.alarm();
+  assert.equal(data.get('game').players.length, 3);
+  assert.equal(data.get('game').teamLives, 3);
+  assert.ok(data.get('game').questionDeadline > Date.now());
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
+  assert.equal(data.get('game').round, 1);
+  assert.equal(data.get('game').turn, 'mate');
+  assert.equal(messages.some(message => message.type === 'round_result' && typeof message.botCorrect === 'boolean'), true);
+});
+
 test('gibha sah keeps its original exceptional probability sequence', () => {
   const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
   const originalRandom = Math.random;

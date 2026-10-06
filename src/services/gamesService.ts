@@ -528,3 +528,33 @@ export async function fetchLessonGamesData(
     return fallbackBundle;
   }
 }
+
+/** Loads Millionaire team questions lazily from the selected lesson first,
+ * then neighbouring lessons in the same chapter only. */
+export async function fetchMillionaireTeamQuestions(context: OpenLessonContext, minimum = 20): Promise<MillionaireQuestion[]> {
+  const collected: MillionaireQuestion[] = [];
+  const seen = new Set<string>();
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8];
+  for (const offset of offsets) {
+    const lessonNumber = context.lessonNumber + offset;
+    if (lessonNumber < 1) continue;
+    const lessonContext: OpenLessonContext = {
+      ...context,
+      lessonNumber,
+      lessonId: offset === 0 ? context.lessonId : buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      lessonKey: buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      title: offset === 0 ? (context.title || context.lessonTitle) : `الدرس ${lessonNumber}`,
+      lessonTitle: offset === 0 ? (context.lessonTitle || context.title) : `الدرس ${lessonNumber}`,
+    };
+    const bundle = await fetchLessonGamesData(lessonContext);
+    if (bundle.source !== 'database') continue;
+    const questions = bundle.mcqConfig.questionPool || bundle.mcqConfig.questions || [];
+    for (const question of questions) {
+      const key = `${question.question.trim()}|${question.options.join('|')}`;
+      if (!seen.has(key)) { seen.add(key); collected.push(question); }
+      if (collected.length >= minimum) return collected;
+    }
+  }
+  if (!collected.length) return [];
+  return Array.from({ length: minimum }, (_, index) => collected[index % collected.length]);
+}

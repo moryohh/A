@@ -25,7 +25,7 @@ import { GibhaSahGameModal } from './GibhaSahGameModal';
 import { DailyExamModal } from './DailyExamModal';
 import { MillionaireAuthenticIcon, TrueFalseAuthenticIcon, GibhaSahAuthenticIcon, DailyExamAuthenticIcon } from './GameIcons';
 import { gameAudio } from '../utils/gameAudio';
-import { fetchLessonGamesData, LessonGamesBundle } from '../services/gamesService';
+import { fetchLessonGamesData, fetchMillionaireTeamQuestions, LessonGamesBundle } from '../services/gamesService';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
 import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
@@ -73,6 +73,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
   >('menu');
   const [onlineGameType, setOnlineGameType] = useState<OnlineChallengeGameType>('millionaire');
+  const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>([]);
 
   // Dynamic Supabase Games Bundle (Lazy-loaded on demand only when modal opens)
   const [gamesBundle, setGamesBundle] = useState<LessonGamesBundle | null>(null);
@@ -241,9 +242,14 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
           : [],
       };
     }
+    const millionairePool = onlineGameType === 'millionaire_team' && teamQuestions.length ? teamQuestions : gamesBundle?.mcqConfig.questionPool || gamesBundle?.mcqConfig.questions || [];
+    const millionaireCount = onlineGameType === 'millionaire_team' ? 20 : 11;
+    const millionaireQuestions = millionairePool.length
+      ? Array.from({ length: millionaireCount }, (_, index) => millionairePool[index % millionairePool.length])
+      : [];
     return {
-      title: 'من سيربح المليون',
-      questions: (gamesBundle?.mcqConfig.questions || []).slice(0, 11).map((question) => ({
+      title: onlineGameType === 'millionaire_team' ? 'من سيربح المليون — لعب فرق' : 'من سيربح المليون',
+      questions: millionaireQuestions.map((question) => ({
         question: question.question,
         options: [...question.options],
         correctAnswer: question.correctAnswer,
@@ -251,7 +257,14 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     };
   })();
 
-  const openOnlineGame = (gameType: OnlineChallengeGameType) => {
+  const openOnlineGame = async (gameType: OnlineChallengeGameType) => {
+    if (gameType === 'millionaire_team' && openLessonContext) {
+      setIsLoadingBundle(true);
+      try {
+        const loaded = await fetchMillionaireTeamQuestions(openLessonContext, 20);
+        setTeamQuestions(loaded.map(question => ({ question: question.question, options: [...question.options], correctAnswer: question.correctAnswer })));
+      } finally { setIsLoadingBundle(false); }
+    }
     setOnlineGameType(gameType);
     gameAudio.playGameStart();
     setActiveGameMode('online');
@@ -280,7 +293,8 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
         customConfig={gamesBundle?.mcqConfig}
         onScoreUpdate={(points) => awardLessonReward('millionaire', points)}
         onAssessmentResult={onAssessmentResult}
-        onOpenOnline={() => openOnlineGame('millionaire')}
+        onOpenOnline={() => void openOnlineGame('millionaire')}
+        onOpenTeam={() => void openOnlineGame('millionaire_team')}
       />
     );
   }

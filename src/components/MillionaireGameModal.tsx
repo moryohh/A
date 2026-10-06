@@ -47,6 +47,7 @@ interface MillionaireGameModalProps {
   onAssessmentResult?: (correctPoints: number, totalPoints: number) => void;
   customConfig?: MillionaireGameConfig;
   onOpenOnline?: () => void;
+  onOpenTeam?: () => void;
 }
 
 // 11-level Iraqi dinar prize ladder shown inside the game.
@@ -294,6 +295,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   onAssessmentResult,
   customConfig,
   onOpenOnline,
+  onOpenTeam,
 }) => {
   // Game Configuration & Load (fresh round from the exact lesson-file pool)
   const [gameConfig, setGameConfig] = useState<MillionaireGameConfig>(() =>
@@ -1435,7 +1437,26 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     <Radio className="w-5 h-5 text-black group-hover:scale-110 transition-transform animate-spin" />
                   </button>
 
-                  {/* 3. Exit Button */}
+                  {/* 3. Cooperative team mode */}
+                  <button
+                    id="btn-millionaire-team"
+                    onClick={onOpenTeam}
+                    disabled={!onOpenTeam || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
+                    className="w-full py-4 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-purple-700 hover:from-violet-500 hover:to-fuchsia-500 text-white font-black rounded-2xl shadow-[0_0_25px_rgba(168,85,247,0.35)] flex items-center justify-between px-6 text-sm sm:text-base transition-all active:scale-95 group cursor-pointer border border-fuchsia-300/40 disabled:opacity-40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div className="text-right">
+                        <span className="block font-black text-base">لعب فرق</span>
+                        <span className="text-[10px] text-white/80 font-bold block">أنت وزميلك ضد منافس آلي — قائد متناوب</span>
+                      </div>
+                    </div>
+                    <Trophy className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  {/* 4. Exit Button */}
                   <button
                     id="btn-millionaire-exit"
                     onClick={onClose}

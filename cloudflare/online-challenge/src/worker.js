@@ -34,7 +34,7 @@ async function authenticate(request, env, origin) {
 }
 
 function validQuestions(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 11) return false;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 30) return false;
   return value.every(function (q) {
     return q && typeof q.question === 'string' && q.question.length > 0 && q.question.length <= 600 &&
       Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 12 && q.options.every(function (o) {
@@ -44,7 +44,7 @@ function validQuestions(value) {
 }
 
 function validGameType(value) {
-  return ['millionaire', 'true_false', 'gibha_sah'].includes(value);
+  return ['millionaire', 'millionaire_team', 'true_false', 'gibha_sah'].includes(value);
 }
 
 var BOT_ID = 'bot:duha-challenge';
@@ -187,7 +187,7 @@ export class ChallengeRoom {
   }
   isBot(player) { return Boolean(player && player.id === BOT_ID); }
   async scheduleNextAlarm(game) {
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botAnswerAt].filter(function (value) {
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botAnswerAt, game.questionDeadline].filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -211,6 +211,41 @@ export class ChallengeRoom {
       return index !== question.correctAnswer;
     });
     return wrong.length ? wrong[Math.floor(Math.random() * wrong.length)] : question.correctAnswer;
+  }
+  teamHumans(game) { return game.players.filter(function (player) { return player.id !== BOT_ID; }); }
+  nextTeamCaptain(game, currentId) {
+    var connectedHumans = this.teamHumans(game).filter(function (player) { return this.connected(player.id); }, this);
+    if (!connectedHumans.length) return null;
+    var currentIndex = connectedHumans.findIndex(function (player) { return player.id === currentId; });
+    return connectedHumans[(currentIndex + 1 + connectedHumans.length) % connectedHumans.length].id;
+  }
+  async finishTeamRound(game, selected, answeredBy, timedOut) {
+    var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+    var question = game.questions[currentIndex];
+    if (!question) return;
+    var bot = game.players.find(this.isBot.bind(this));
+    var botSelected = this.chooseBotAnswer(game);
+    var humanCorrect = !timedOut && selected === question.correctAnswer;
+    var botCorrect = botSelected === question.correctAnswer;
+    if (humanCorrect) game.teamScore += 1;
+    else game.teamLives = Math.max(0, game.teamLives - 1);
+    if (botCorrect) game.botScore += 1;
+    var stealAwarded = humanCorrect && !botCorrect;
+    if (stealAwarded) game.teamScore += 1;
+    if (bot) bot.score = game.botScore;
+    this.teamHumans(game).forEach(function (player) { player.score = game.teamScore; player.answer = null; });
+    if (bot) bot.answer = null;
+    game.round = currentIndex + 1;
+    game.questionIndex = game.round;
+    game.turn = this.nextTeamCaptain(game, answeredBy);
+    delete game.questionDeadline;
+    if (game.teamLives <= 0 || game.questionIndex >= game.questions.length) {
+      game.status = 'finished';
+      game.winner = game.teamLives > 0 && game.teamScore > game.botScore ? 'team' : BOT_ID;
+    } else {
+      game.questionDeadline = Date.now() + 60000;
+    }
+    this.broadcast({ type: 'round_result', question: { question: question.question, options: question.options }, answer: question.correctAnswer, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: answeredBy, botSelected: botSelected, botCorrect: botCorrect, stealAwarded: stealAwarded, timedOut: Boolean(timedOut) });
   }
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
@@ -260,7 +295,9 @@ export class ChallengeRoom {
     var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     var current = game.status === 'playing' ? game.questions[currentIndex] : null;
     var winner = game.winner || null;
-    if (game.status === 'finished' && game.players.length === 2) {
+    if (game.gameType === 'millionaire_team' && game.status === 'finished') {
+      winner = game.winner || (game.teamScore > game.botScore ? 'team' : BOT_ID);
+    } else if (game.status === 'finished' && game.players.length === 2) {
       winner = game.players[0].score > game.players[1].score ? game.players[0].id :
         game.players[1].score > game.players[0].score ? game.players[1].id : null;
     }
@@ -276,6 +313,11 @@ export class ChallengeRoom {
       endedReason: game.endedReason || null,
       leftPlayerId: game.leftPlayerId || null,
       reconnectDeadline: game.disconnectDeadline || null,
+      teamLives: game.teamLives,
+      teamScore: game.teamScore,
+      botScore: game.botScore,
+      questionDeadline: game.questionDeadline || null,
+      lifelines: game.lifelines || null,
     };
   }
   async fetch(request) {
@@ -285,7 +327,8 @@ export class ChallengeRoom {
       if (game) return json({ error: 'already_initialized' }, 409, '');
       var init = await request.json();
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + randomDelay(180000, 300000) };
+      var teamMode = init.gameType === 'millionaire_team';
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, score: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (teamMode ? 5000 : randomDelay(180000, 300000)), teamLives: teamMode ? 3 : undefined, teamScore: teamMode ? 0 : undefined, botScore: teamMode ? 0 : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -294,7 +337,8 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/ticket' && request.method === 'POST') {
       var ticketBody = await request.json();
       if (!ticketBody || typeof ticketBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
-      if (game.players.length >= 2 && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
+      var maxPlayers = game.gameType === 'millionaire_team' ? 3 : 2;
+      if (game.players.length >= maxPlayers && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
       var ticket = crypto.randomUUID();
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
         name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
@@ -329,12 +373,15 @@ export class ChallengeRoom {
       await this.ctx.storage.delete('ticket:' + ticketId);
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
-        if (game.players.length !== 1 || game.status !== 'waiting') return json({ error: 'room_full' }, 409, '');
+        var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 2 && (game.status === 'waiting' || game.status === 'playing');
+        if (!canJoinTeam && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
         game.players.push({ id: userId, score: 0, answer: null, profile: ticketRecord.profile || null });
-        game.status = 'playing';
+        if (game.gameType !== 'millionaire_team') game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
-        game.turn = game.players[0].id;
-        delete game.botJoinAt;
+        if (game.gameType !== 'millionaire_team') {
+          game.turn = game.players[0].id;
+          delete game.botJoinAt;
+        }
       }
       var currentPlayer = game.players.find(function (player) { return player.id === userId; });
       if (currentPlayer && ticketRecord.profile) currentPlayer.profile = ticketRecord.profile;
@@ -383,6 +430,32 @@ export class ChallengeRoom {
       }, this);
       return;
     }
+    if (payload && payload.type === 'lifeline' && sender && ['fifty', 'audience', 'phone'].includes(payload.kind)) {
+      var lifelineGame = await this.read();
+      if (!lifelineGame || lifelineGame.gameType !== 'millionaire_team' || lifelineGame.status !== 'playing' || lifelineGame.turn !== sender.userId || lifelineGame.lifelines[payload.kind]) return;
+      var lifelineQuestion = lifelineGame.questions[lifelineGame.questionIndex];
+      if (!lifelineQuestion) return;
+      lifelineGame.lifelines[payload.kind] = true;
+      var result = { type: 'lifeline_result', kind: payload.kind };
+      if (payload.kind === 'fifty') {
+        var wrongOptions = lifelineQuestion.options.map(function (_, index) { return index; }).filter(function (index) { return index !== lifelineQuestion.correctAnswer; });
+        result.keep = [lifelineQuestion.correctAnswer, wrongOptions[Math.floor(Math.random() * wrongOptions.length)]].sort(function (a, b) { return a - b; });
+      } else if (payload.kind === 'audience') {
+        var remaining = 35;
+        result.percentages = lifelineQuestion.options.map(function (_, index) {
+          if (index === lifelineQuestion.correctAnswer) return 65;
+          var share = index === lifelineQuestion.options.length - 1 ? remaining : Math.floor(Math.random() * (remaining + 1));
+          remaining -= share;
+          return share;
+        });
+      } else {
+        result.suggested = Math.random() < 0.8 ? lifelineQuestion.correctAnswer : Math.floor(Math.random() * lifelineQuestion.options.length);
+      }
+      await this.ctx.storage.put('game', lifelineGame);
+      this.broadcast(result);
+      this.broadcast(this.view(lifelineGame));
+      return;
+    }
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
     if (!game || game.status !== 'playing') return;
@@ -394,6 +467,14 @@ export class ChallengeRoom {
     if (!player || player.answer !== null) return;
     if (game.turn && attachment.userId !== game.turn) return;
     player.answer = payload.option;
+    if (game.gameType === 'millionaire_team') {
+      await this.finishTeamRound(game, payload.option, attachment.userId, false);
+      await this.ctx.storage.put('game', game);
+      this.broadcast(this.view(game));
+      if (game.status === 'finished') await this.updateRegistry('ended', game);
+      else await this.scheduleNextAlarm(game);
+      return;
+    }
     // Every supported challenge is turn based. The other player watches the
     // selected answer and its result before the turn moves to them. Keeping a
     // single path also prevents the two clients from drifting between rounds.
@@ -437,13 +518,19 @@ export class ChallengeRoom {
     var game = await this.read();
     if (!game || ['closed', 'finished', 'abandoned'].includes(game.status)) return;
     var now = Date.now();
-    if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && game.players.length === 1 && this.connected(game.players[0].id)) {
+    if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.players.length === 1) && this.connected(game.players[0].id)) {
       game.players.push({ id: BOT_ID, score: 0, answer: null });
       game.status = 'playing';
       delete game.botJoinAt;
-      game.botAnswerAt = now + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+      if (game.gameType === 'millionaire_team') game.questionDeadline = now + 60000;
+      else game.botAnswerAt = now + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
+      this.broadcast(this.view(game));
+    }
+    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
+      await this.finishTeamRound(game, -1, game.turn, true);
+      if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
     }
     if (game.disconnectUserId && game.disconnectDeadline && now >= game.disconnectDeadline) {
