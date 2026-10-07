@@ -17,6 +17,7 @@ import {
   FileText,
   User,
   Users,
+  Layers3,
 } from 'lucide-react';
 import { EducationalGame, NotificationExamAnswer, OpenLessonContext } from '../types';
 import { MillionaireGameModal } from './MillionaireGameModal';
@@ -26,6 +27,7 @@ import { DailyExamModal } from './DailyExamModal';
 import { MillionaireAuthenticIcon, TrueFalseAuthenticIcon, GibhaSahAuthenticIcon, DailyExamAuthenticIcon } from './GameIcons';
 import { gameAudio } from '../utils/gameAudio';
 import { fetchLessonGamesData, fetchMillionaireTeamQuestions, LessonGamesBundle } from '../services/gamesService';
+import { FlashCardGameModal } from './FlashCardGameModal';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
 import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
@@ -68,9 +70,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   playerId,
 }) => {
   const { theme } = useAppTheme();
-  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
+  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'flash_cards' | 'quick' | 'online'
   const [activeGameMode, setActiveGameMode] = useState<
-    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
+    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'flash_cards' | 'quick' | 'online'
   >('menu');
   const [onlineGameType, setOnlineGameType] = useState<OnlineChallengeGameType>('millionaire');
   const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>([]);
@@ -83,12 +85,14 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   const hasTrueFalseQuestions = Boolean(gamesBundle?.trueFalseConfig.questions.length);
   const hasGibhaSahCards = Boolean(gamesBundle?.gibhaSahConfig.cards.length);
   const hasDailyExam = Boolean(gamesBundle?.dailyExamAvailable);
+  const hasFlashCards = Boolean(gamesBundle?.flashCards.length);
   const canLoadGame = Boolean(gamesBundle) && !isLoadingBundle && !bundleLoadError;
-  const hasAnyAvailableGame = hasMillionaireQuestions || hasTrueFalseQuestions || hasGibhaSahCards || hasDailyExam;
+  const hasAnyAvailableGame = hasMillionaireQuestions || hasTrueFalseQuestions || hasGibhaSahCards || hasDailyExam || hasFlashCards;
   const canOpenMillionaire = canLoadGame && hasMillionaireQuestions;
   const canOpenTrueFalse = canLoadGame && hasTrueFalseQuestions;
   const canOpenGibhaSah = canLoadGame && hasGibhaSahCards;
   const canOpenDailyExam = canLoadGame && hasDailyExam;
+  const canOpenFlashCards = canLoadGame && hasFlashCards;
 
   const lessonRewardIdentity = [
     playerId || 'anonymous',
@@ -281,6 +285,13 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     lessonNumber={openLessonContext?.lessonNumber || 1}
   />;
 
+  if (activeGameMode === 'flash_cards') return <FlashCardGameModal
+    isOpen={true}
+    onClose={() => setActiveGameMode('menu')}
+    cards={gamesBundle?.flashCards || []}
+    lessonTitle={lessonTitle}
+  />;
+
   // Render Millionaire Modal (MCQ)
   if (activeGameMode === 'millionaire') {
     return (
@@ -437,6 +448,26 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                   </span>
                 </div>
               ) : null}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canOpenFlashCards) return;
+                  gameAudio.playGameStart();
+                  setActiveGameMode('flash_cards');
+                }}
+                disabled={!canOpenFlashCards}
+                className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border-2 border-cyan-300/40 bg-gradient-to-l from-cyan-950 via-slate-900 to-blue-950 p-3 text-right shadow-xl transition-all hover:border-cyan-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-cyan-200/40 bg-cyan-300/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,0.2)] transition-transform group-hover:rotate-3 group-hover:scale-105">
+                  <Layers3 className="h-10 w-10" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-black text-white">فلاش كارد</span>
+                  <span className="mt-1 block text-[10px] font-bold leading-5 text-cyan-100">سؤال أمام البطاقة وجواب خلفها — من فقرات منهج هذا الدرس فقط</span>
+                </span>
+                <span className="rounded-xl bg-cyan-400 px-3 py-2 text-[11px] font-black text-slate-950">{hasFlashCards ? 'ابدأ' : 'غير متوفر'}</span>
+              </button>
 
               {/* 2x2 Grid (4 Quadrants / Square Sides) */}
               <div className="grid grid-cols-2 gap-3 pt-1">

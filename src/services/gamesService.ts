@@ -10,10 +10,39 @@ export interface LessonGamesBundle {
   mcqConfig: MillionaireGameConfig;
   trueFalseConfig: TrueFalseGameConfig;
   gibhaSahConfig: GibhaSahGameConfig;
+  flashCards: FlashCard[];
   dailyExamAvailable: boolean;
   source: 'database' | 'fallback';
   loadedAt: number;
   dataSource?: 'cloudflare' | 'supabase' | 'fallback';
+}
+
+export interface FlashCard {
+  id: string;
+  question: string;
+  answer: string;
+  pageId: string;
+  itemId: number;
+}
+
+function parseCurriculumToFlashCards(rawContent: any, lessonId: string): FlashCard[] {
+  const sourceLessonId = String(rawContent?.lesson_info?.lesson_id || '').trim();
+  if (!sourceLessonId || sourceLessonId !== String(lessonId).trim()) return [];
+  const cards: FlashCard[] = [];
+  for (const page of Array.isArray(rawContent?.pages) ? rawContent.pages : []) {
+    const pageId = String(page?.page_id || '').trim();
+    if (!pageId || !Array.isArray(page?.items)) continue;
+    for (const item of page.items) {
+      const itemId = Number(item?.item_id);
+      if (!Number.isFinite(itemId)) continue;
+      if (item?.type === 'question' && String(item.question || '').trim() && String(item.answer || '').trim()) {
+        cards.push({ id: `${pageId}-${itemId}`, question: String(item.question).trim(), answer: String(item.answer).trim(), pageId, itemId });
+      } else if (item?.type === 'paragraph' && String(item.content || '').trim()) {
+        cards.push({ id: `${pageId}-${itemId}`, question: 'ما الفكرة أو المعلومات الأساسية التي يوضحها هذا الجزء؟', answer: String(item.content).trim(), pageId, itemId });
+      }
+    }
+  }
+  return Array.from(new Map(cards.map((card) => [card.id, card])).values());
 }
 
 // In-memory cache for game bundles by key (subject_lessonId)
@@ -433,6 +462,7 @@ export async function fetchLessonGamesData(
           mcqConfig,
           trueFalseConfig,
           gibhaSahConfig,
+          flashCards: parseCurriculumToFlashCards(bundle.curriculumData, actualLessonId),
           dailyExamAvailable: Boolean(bundle.curriculumData?.pages?.length),
           source: 'database',
           dataSource: bundle.dataSource || 'supabase',
@@ -505,6 +535,7 @@ export async function fetchLessonGamesData(
       mcqConfig,
       trueFalseConfig,
       gibhaSahConfig,
+      flashCards: [],
       dailyExamAvailable: false,
       source: mcqRes || tfRes || phRes ? 'database' : 'fallback',
       dataSource: mcqRes || tfRes || phRes ? 'cloudflare' : 'fallback',
@@ -519,6 +550,7 @@ export async function fetchLessonGamesData(
       mcqConfig: parseMcqToMillionaire(null, actualLessonId, actualLessonTitle, actualCategory),
       trueFalseConfig: parseTrueFalseConfig(null, actualLessonId, actualLessonTitle, actualCategory),
       gibhaSahConfig: parsePhToGibhaSah(null, actualLessonId, actualLessonTitle, actualCategory),
+      flashCards: [],
       dailyExamAvailable: false,
       source: 'fallback',
       dataSource: 'fallback',
