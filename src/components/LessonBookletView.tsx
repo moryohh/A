@@ -84,6 +84,16 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
 
   // Flatten all items across all pages
   const allItems = bookletData.pages.flatMap((page) => page.items || []);
+  const boardSource = (bookletData as LessonBookletData & { boardData?: any; board?: any }).boardData
+    || (bookletData as LessonBookletData & { board?: any }).board;
+  const boardSteps = Array.isArray(boardSource?.steps)
+    ? boardSource.steps
+    : Array.isArray(boardSource?.sections)
+      ? boardSource.sections
+      : Array.isArray(boardSource)
+        ? boardSource
+        : [];
+  const hasBoardContent = boardSteps.length > 0;
 
   if (allItems.length === 0) {
     return null;
@@ -296,6 +306,8 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
           </div>
         </div>
 
+        <div className={`grid gap-4 ${hasBoardContent ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`} dir="ltr">
+          <div dir="rtl" className="min-w-0">
         {allItems.map((item, idx) => {
           const uniqueKey = `item-${item.item_id || idx}-${idx}`;
 
@@ -647,6 +659,33 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
             </div>
           );
         })}
+          </div>
+
+          {hasBoardContent && (
+            <aside dir="rtl" className="min-w-0 space-y-3 rounded-2xl border border-amber-300/40 bg-gradient-to-b from-amber-950/20 via-slate-900/40 to-orange-950/20 p-3 shadow-lg">
+              <div className="flex items-center justify-between border-b border-amber-300/20 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-amber-200">حل معي</h3>
+                  <p className="mt-1 text-[10px] text-amber-100/70">شرح مختصر للحفظ والفهم خطوة بخطوة</p>
+                </div>
+                <span className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[10px] font-black text-amber-200">السبورة</span>
+              </div>
+              {boardSteps.map((step: any, index: number) => {
+                const title = step?.title || step?.heading || `الخطوة ${index + 1}`;
+                const content = step?.content ?? step?.explanation ?? step?.text ?? step;
+                return (
+                  <div key={step?.id || step?.step_id || index} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-black text-amber-200">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-300/15 text-amber-200">{index + 1}</span>
+                      {renderSafeNode(title, `board-title-${index}`)}
+                    </div>
+                    <div className="text-xs leading-7 text-slate-200">{renderSafeNode(content, `board-content-${index}`)}</div>
+                  </div>
+                );
+              })}
+            </aside>
+          )}
+        </div>
       </div>
     </div>
   );
