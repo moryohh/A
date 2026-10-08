@@ -239,7 +239,7 @@ export class ChallengeRoom {
     delete game.questionDeadline;
     var captain = game.players.find(function (player) { return player.id === game.turn; });
     var botMate = this.teamPlayers(game, team).find(function (player) { return this.isBot(player) && player.id !== game.turn; }, this);
-    if ((captain && this.isBot(captain)) || botMate) game.botDiscussionAt = Date.now() + randomDelay(1500, 3000);
+    if ((captain && this.isBot(captain)) || botMate) game.botDiscussionAt = Date.now() + randomDelay(3000, 7000);
     else game.questionDeadline = Date.now() + 60000;
   }
   async finishTeamRound(game, selected, answeredBy, timedOut) {
@@ -267,7 +267,7 @@ export class ChallengeRoom {
   async scheduleBotAnswer(game) {
     var bot = game.players.find(this.isBot.bind(this));
     if (game.status === 'playing' && game.turn === BOT_ID && bot && bot.answer === null && !game.botAnswerAt) {
-      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
     }
     await this.scheduleNextAlarm(game);
   }
@@ -283,8 +283,8 @@ export class ChallengeRoom {
     game.status = 'playing';
     if (game.gameType === 'millionaire_team' && game.turn === userId) {
       game.turn = player.id;
-      game.botDiscussionAt = Date.now() + randomDelay(1500, 3000);
-    } else if (game.gameType !== 'millionaire_team') game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+      game.botDiscussionAt = Date.now() + randomDelay(3000, 7000);
+    } else if (game.gameType !== 'millionaire_team') game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
     this.broadcast({ type: 'bot_joined', replacedUserId: userId });
@@ -536,7 +536,7 @@ export class ChallengeRoom {
       game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
       game.players.forEach(function (item) { item.answer = null; });
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+      else if (game.turn === BOT_ID) game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
       this.broadcast({ type: 'round_result', question: { question: currentQuestion.question, options: currentQuestion.options }, answer: correctAnswer, selected: chosen, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId });
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));
@@ -579,7 +579,7 @@ export class ChallengeRoom {
       game.status = 'playing';
       delete game.botJoinAt;
       if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
-      else game.botAnswerAt = now + (game.gameType === 'millionaire' ? 6000 : BOT_ANSWER_DELAY_MS);
+      else game.botAnswerAt = now + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
@@ -594,7 +594,9 @@ export class ChallengeRoom {
         this.sendToTeam(game, game.activeTeam, { type: 'team_recommendation', from: discussionMate.id, option: recommendation, team: game.activeTeam, bot: true });
       }
       delete game.botDiscussionAt;
-      if (discussionCaptain && this.isBot(discussionCaptain)) game.botAnswerAt = now + randomDelay(3000, 6000);
+      // The complete visible thinking time is 10–30 seconds: 3–7 seconds
+      // of team discussion followed by 7–23 seconds before the captain answers.
+      if (discussionCaptain && this.isBot(discussionCaptain)) game.botAnswerAt = now + randomDelay(7000, 23000);
       else game.questionDeadline = now + 60000;
       this.broadcast(this.view(game));
     }
