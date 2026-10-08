@@ -442,6 +442,10 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
     var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
+    if (payload && payload.type === 'ping') {
+      this.send(socket, { type: 'pong', sentAt: Date.now() });
+      return;
+    }
     if (payload && payload.type === 'chat' && sender && typeof payload.text === 'string') {
       var chatText = payload.text.trim().slice(0, 300);
       if (!chatText) return;
@@ -556,6 +560,17 @@ export class ChallengeRoom {
     var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
     var userId = attachment && attachment.userId;
     if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId)) return;
+    // Waiting rooms remain durable. A transient browser/network disconnect
+    // must not close the room after 30 seconds; only the explicit leave route
+    // closes a room while it is waiting for its second player.
+    if (game.status === 'waiting') {
+      delete game.disconnectUserId;
+      delete game.disconnectDeadline;
+      await this.ctx.storage.put('game', game);
+      await this.updateRegistry('waiting', game);
+      await this.scheduleNextAlarm(game);
+      return;
+    }
     game.disconnectUserId = userId;
     game.disconnectDeadline = Date.now() + 30000;
     await this.ctx.storage.put('game', game);
@@ -668,7 +683,7 @@ export class ChallengeRegistry {
       var body = await request.json().catch(function () { return null; });
       if (!body || typeof body.roomId !== 'string' || !validGameType(body.gameType)) return json({ error: 'invalid_room' }, 400, '');
       var code = null;
-      for (var attempt = 0; attempt < 12; attempt += 1) {
+      for (var attempt = 0; attempt < 9000; attempt += 1) {
         var candidate = String(Math.floor(1000 + Math.random() * 9000));
         if (!rooms[candidate]) { code = candidate; break; }
       }

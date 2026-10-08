@@ -41,6 +41,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -121,6 +122,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   useEffect(() => () => {
     socketRef.current?.close();
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     closePeer();
     gameAudio.stopExternal('millionaire-thinking');
     gameAudio.stopExternal('millionaire-prize');
@@ -164,11 +166,18 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const response = await fetch(`${API}/rooms/${roomId}/connect`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: await challengeProfile() }) });
     if (!response.ok) throw new Error(response.status === 404 ? 'أُغلقت هذه الغرفة أو لم تعد متاحة. حدّث القائمة واختر غرفة أخرى.' : response.status === 409 ? 'هذه الغرفة ممتلئة.' : 'تعذر دخول الغرفة. تحقق من الرمز.');
     const { ticket, roomId: internalRoomId } = await response.json();
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     socketRef.current?.close();
     setConnected(false);
     const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/rooms/${internalRoomId || roomId}/ws?ticket=${encodeURIComponent(ticket)}`);
     socketRef.current = ws;
-    ws.onopen = () => { setConnected(true); setError(''); };
+    ws.onopen = () => {
+      setConnected(true);
+      setError('');
+      heartbeatRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+      }, 20000);
+    };
     const applyState = (payload: State) => {
       if (roundRef.current !== payload.round) roundRef.current = payload.round;
       setPendingAnswer(false);
@@ -275,6 +284,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
     ws.onclose = () => {
       if (socketRef.current === ws) {
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
         closePeer();
         setAudioEnabled(false);
         setRemoteTalking(false);
