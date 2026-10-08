@@ -11,7 +11,6 @@ import {
   XCircle,
   Users,
   User,
-  Swords,
   BookOpen,
   GraduationCap,
   Phone,
@@ -46,7 +45,6 @@ interface MillionaireGameModalProps {
   onScoreUpdate?: (points: number) => void;
   onAssessmentResult?: (correctPoints: number, totalPoints: number) => void;
   customConfig?: MillionaireGameConfig;
-  onOpenOnline?: () => void;
   onOpenTeam?: () => void;
 }
 
@@ -294,7 +292,6 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   onScoreUpdate,
   onAssessmentResult,
   customConfig,
-  onOpenOnline,
   onOpenTeam,
 }) => {
   // Game Configuration & Load (fresh round from the exact lesson-file pool)
@@ -1394,7 +1391,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   </p>
                 </div>
 
-                {/* The 3 Action Buttons (اللعب فردي + اللعب جماعي + خروج) */}
+                {/* Main actions: single player + online team challenge + exit */}
                 <div className="w-full space-y-3 pt-2">
                   {/* 1. Single Player Button */}
                   <button
@@ -1416,28 +1413,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     <ArrowRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
                   </button>
 
-                  {/* 2. Multiplayer Button */}
-                  <button
-                    id="btn-millionaire-multiplayer"
-                    onClick={onOpenOnline || handleStartMultiplayerSearch}
-                    disabled={Boolean(onOpenOnline && !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL)}
-                    className="w-full py-4 bg-gradient-to-r from-sky-500 via-cyan-400 to-blue-600 hover:from-sky-400 hover:to-cyan-300 text-black font-black rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-between px-6 text-sm sm:text-base transition-all active:scale-95 group cursor-pointer border border-cyan-300/40"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-black">
-                        <Swords className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div className="text-right">
-                        <span className="block font-black text-base">اللعب جماعي (تحدي مباشر)</span>
-                        <span className="text-[10px] text-black/80 font-bold block">
-                          تحدَّ لاعباً حقيقياً وتبادلا الأدوار
-                        </span>
-                      </div>
-                    </div>
-                    <Radio className="w-5 h-5 text-black group-hover:scale-110 transition-transform animate-spin" />
-                  </button>
-
-                  {/* 3. Cooperative team mode */}
+                  {/* 2. Online 2v2 team challenge */}
                   <button
                     id="btn-millionaire-team"
                     onClick={onOpenTeam}
@@ -1449,14 +1425,14 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                         <Users className="w-5 h-5" />
                       </div>
                       <div className="text-right">
-                        <span className="block font-black text-base">لعب فرق</span>
-                        <span className="text-[10px] text-white/80 font-bold block">أنت وزميلك ضد منافس آلي — قائد متناوب</span>
+                        <span className="block font-black text-base">تحدّي أونلاين</span>
+                        <span className="text-[10px] text-white/80 font-bold block">فريقان 2 ضد 2 — قائد وتوصيات وتناوب أدوار</span>
                       </div>
                     </div>
                     <Trophy className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  {/* 4. Exit Button */}
+                  {/* 3. Exit Button */}
                   <button
                     id="btn-millionaire-exit"
                     onClick={onClose}
