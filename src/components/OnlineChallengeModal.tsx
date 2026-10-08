@@ -342,6 +342,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const myTeam = self?.team || 'A';
   const teammate = state?.players.find(p => p.id !== me && p.team === myTeam);
   const enemyTeam = state?.players.filter(p => p.team && p.team !== myTeam) || [];
+  const teamAPlayers = state?.players.filter(player => player.team === 'A') || [];
+  const teamBPlayers = state?.players.filter(player => player.team === 'B') || [];
   // A room selected in the challenge hub is joined without local lesson config.
   // Its server state, not the hub's default game type, determines the game screen.
   const isMillionaireTeam = (state?.gameType || gameType) === 'millionaire_team';
@@ -374,18 +376,21 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if ((isTrueFalse || isGibhaSah) && state?.status === 'finished' && state.winner === me && !roundResult) gameAudio.playVictoryFanfare();
   }, [isTrueFalse, isGibhaSah, state?.status, state?.winner, me, roundResult]);
   useEffect(() => {
-    const active = isMillionaire && connected && state?.status === 'playing' && myTurn && !pendingAnswer && !roundResult;
+    // Every player receives the same authoritative room state, so the game music
+    // must follow that shared state instead of running only on the captain's client.
+    const active = isMillionaire && connected && state?.status === 'playing' && !roundResult;
     if (active) gameAudio.playExternal('millionaire-thinking', millionaireAudio.thinking, 0.65, true);
     else gameAudio.stopExternal('millionaire-thinking');
     return () => gameAudio.stopExternal('millionaire-thinking');
-  }, [isMillionaire, connected, state?.status, state?.round, myTurn, pendingAnswer, roundResult]);
+  }, [isMillionaire, connected, state?.status, state?.round, roundResult]);
 
   useEffect(() => {
-    if (isMillionaire && state?.status === 'finished' && state.winner === me && !roundResult) {
+    const won = isMillionaireTeam ? state?.winner === self?.team : state?.winner === me;
+    if (isMillionaire && state?.status === 'finished' && won && !roundResult) {
       gameAudio.playExternal('millionaire-prize', millionaireAudio.prize, 0.8);
     }
     return () => gameAudio.stopExternal('millionaire-prize');
-  }, [isMillionaire, state?.status, state?.winner, me, roundResult]);
+  }, [isMillionaire, isMillionaireTeam, state?.status, state?.winner, self?.team, me, roundResult]);
   async function closeModal() {
     if (room) {
       try { await fetch(`${API}/rooms/${room}/leave`, { method: 'POST', headers: { Authorization: await authorization() }, keepalive: true }); } catch (_) { /* socket close still notifies the room */ }
@@ -452,10 +457,16 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         <div className="flex items-center gap-3"><div className="rounded-full border-2 border-amber-400 p-2 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,.4)]"><Trophy className="h-6 w-6" /></div><div><h2 className="font-black text-amber-300">من سيربح المليون؟ {isMillionaireTeam && '— لعب فرق'}</h2><p className="text-xs text-slate-300">{lessonTitle}</p></div></div>
         <button onClick={() => void closeModal()} aria-label="الخروج من التحدي" className="rounded-full bg-blue-950 p-2"><X className="h-6 w-6" /></button>
       </header>
-      {isMillionaireTeam ? <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-blue-400/20 bg-blue-950/35 p-3 text-center">
-        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-2"><div className="flex justify-center -space-x-2 space-x-reverse"><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-cyan-300 bg-slate-800"><UserRound className="h-5 w-5"/></span><span className="grid h-10 w-10 place-items-center rounded-full border-2 border-violet-300 bg-slate-800">{teammate?.avatar ? <img src={teammate.avatar} className="h-full w-full rounded-full object-cover" alt="الزميل"/> : <UserRound className="h-5 w-5"/>}</span></div><b className="mt-1 block text-xs">أنت + {teammate?.name || 'زميل منتظر'}</b></div>
+      {isMillionaireTeam ? <div className="relative grid grid-cols-[1fr_auto_1fr] items-end gap-2 overflow-hidden border-b border-blue-400/20 bg-blue-950/35 px-3 pb-3 pt-16 text-center">
+        {(['A', 'B'] as const).map((team, index) => <div key={`lamp-${team}`} aria-label={`مصباح فريق ${team}`} className={`pointer-events-none absolute top-1 z-10 flex w-1/2 justify-center transition-all duration-700 ${index === 0 ? 'right-0' : 'left-0'} ${state.activeTeam === team ? 'opacity-100' : 'opacity-25 grayscale'}`}>
+          <div className="relative">
+            <span className={`relative z-10 block rotate-180 text-4xl transition-transform duration-500 ${state.activeTeam === team ? 'scale-110 drop-shadow-[0_0_14px_rgba(250,204,21,1)]' : 'scale-90'}`}>💡</span>
+            {state.activeTeam === team && <><span className="absolute left-1/2 top-8 h-20 w-24 -translate-x-1/2 bg-gradient-to-b from-yellow-200/55 via-amber-300/25 to-transparent [clip-path:polygon(43%_0,57%_0,100%_100%,0_100%)] animate-pulse"/><span className="absolute left-1/2 top-3 h-8 w-8 -translate-x-1/2 rounded-full bg-yellow-200/60 blur-lg"/></>}
+          </div>
+        </div>)}
+        <div className={`relative z-20 rounded-2xl border p-2 transition-all duration-500 ${state.activeTeam === 'A' ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_24px_rgba(250,204,21,.45)]' : 'border-cyan-400/30 bg-cyan-500/10'}`}><div className="flex justify-center -space-x-2 space-x-reverse">{[0, 1].map(index => { const player = teamAPlayers[index]; return player?.avatar ? <img key={player.id} src={player.avatar} className="h-10 w-10 rounded-full border-2 border-cyan-300 object-cover" alt={player.name || 'لاعب فريق A'}/> : <span key={player?.id || index} className="grid h-10 w-10 place-items-center rounded-full border-2 border-cyan-300 bg-slate-800"><UserRound className="h-5 w-5"/></span>; })}</div><b className="mt-1 block truncate text-xs">فريق A · {teamAPlayers.map(player => player.id === me ? 'أنت' : player.name || (player.bot ? 'بوت' : 'لاعب')).join(' + ') || 'بانتظار اللاعبين'}</b>{state.activeTeam === 'A' && <small className="mt-1 block font-black text-amber-200">الدور الآن</small>}</div>
         <div className="rounded-full border border-amber-400/50 bg-black/30 px-3 py-2 text-xs font-black text-amber-300">VS</div>
-        <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-2"><div className="flex justify-center -space-x-2 space-x-reverse">{[0, 1].map(index => { const rival = enemyTeam[index]; return rival?.avatar ? <img key={rival.id} src={rival.avatar} className="h-10 w-10 rounded-full border-2 border-rose-300 object-cover" alt="منافس"/> : <span key={rival?.id || index} className="grid h-10 w-10 place-items-center rounded-full border-2 border-rose-300 bg-slate-800"><UserRound className="h-5 w-5"/></span>; })}</div><b className="mt-1 block truncate text-xs">{enemyTeam.length ? enemyTeam.map(player => player.name || (player.bot ? 'بوت' : 'لاعب')).join(' + ') : 'فريق منافس'}</b></div>
+        <div className={`relative z-20 rounded-2xl border p-2 transition-all duration-500 ${state.activeTeam === 'B' ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_24px_rgba(250,204,21,.45)]' : 'border-rose-400/30 bg-rose-500/10'}`}><div className="flex justify-center -space-x-2 space-x-reverse">{[0, 1].map(index => { const player = teamBPlayers[index]; return player?.avatar ? <img key={player.id} src={player.avatar} className="h-10 w-10 rounded-full border-2 border-rose-300 object-cover" alt={player.name || 'لاعب فريق B'}/> : <span key={player?.id || index} className="grid h-10 w-10 place-items-center rounded-full border-2 border-rose-300 bg-slate-800"><UserRound className="h-5 w-5"/></span>; })}</div><b className="mt-1 block truncate text-xs">فريق B · {teamBPlayers.map(player => player.id === me ? 'أنت' : player.name || (player.bot ? 'بوت' : 'لاعب')).join(' + ') || 'بانتظار اللاعبين'}</b>{state.activeTeam === 'B' && <small className="mt-1 block font-black text-amber-200">الدور الآن</small>}</div>
         <div className="col-span-3 flex justify-center gap-2"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} className="relative rounded-full bg-cyan-500/20 p-2"><MessageCircle className="h-5 w-5"/>{unreadChat > 0 && <span className="absolute -top-1 -left-1 rounded-full bg-red-500 px-1 text-[10px]">{unreadChat}</span>}</button><button disabled={audioBusy || !teammate} onClick={() => void toggleMicrophone()} className="rounded-full bg-emerald-500/20 p-2 disabled:opacity-40">{audioEnabled ? <Mic className="h-5 w-5"/> : <MicOff className="h-5 w-5"/>}</button><span className="rounded-full bg-white/5 px-3 py-2 text-[10px]">صوت الفريق</span></div>
       </div> : <div className="flex items-center justify-between gap-2 border-b border-blue-400/20 bg-blue-950/35 p-3">
         <div className="flex min-w-0 items-center gap-2">{opponent?.avatar ? <img src={opponent.avatar} alt={opponent.name || 'المنافس'} className="h-11 w-11 rounded-full border-2 border-cyan-400 object-cover" /> : <div className="grid h-11 w-11 place-items-center rounded-full border-2 border-cyan-400 bg-slate-800"><UserRound className="h-6 w-6" /></div>}<div className="min-w-0"><strong className="block truncate text-sm">{opponent?.name || 'بانتظار المنافس…'}</strong><small className="text-emerald-300">{opponent ? opponent.bot ? 'منافس آلي' : opponent.connected ? 'متصل' : 'انقطع اتصاله' : 'الغرفة مفتوحة'}</small></div></div>
