@@ -330,7 +330,19 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   async function create() {
     setError(''); setBusy(true);
     try {
-      const selected = questions.slice(0, gameType === 'gibha_sah' ? Math.max(24, questions.length) : gameType === 'millionaire_team' ? 20 : gameType === 'millionaire' ? 11 : 10).map(q => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer }));
+      const optionPool = questions.flatMap(question => question.options).filter((option, index, all) => option.trim() && all.indexOf(option) === index);
+      const selected = questions.slice(0, gameType === 'gibha_sah' ? Math.max(24, questions.length) : gameType === 'millionaire_team' ? 20 : gameType === 'millionaire' ? 11 : 10).map((q, questionIndex) => {
+        if (gameType !== 'gibha_sah') return { question: q.question, options: q.options, correctAnswer: q.correctAnswer };
+        const correctOption = q.options[q.correctAnswer];
+        const options = q.options.filter((option, index, all) => option.trim() && all.indexOf(option) === index).slice(0, 6);
+        if (correctOption && !options.includes(correctOption)) options[options.length - 1] = correctOption;
+        const rotatedPool = optionPool.slice(questionIndex).concat(optionPool.slice(0, questionIndex));
+        for (const candidate of rotatedPool) {
+          if (options.length >= 6) break;
+          if (!options.includes(candidate)) options.push(candidate);
+        }
+        return { question: q.question, options, correctAnswer: Math.max(0, options.indexOf(correctOption)) };
+      });
       if (!selected.length) throw new Error('لا توجد أسئلة لهذا الدرس.');
       const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected, subject, chapter: chapterNumber, lesson: lessonNumber, lessonTitle, gameTitle }) });
       if (!response.ok) throw new Error('تعذر إنشاء غرفة التحدّي.');
