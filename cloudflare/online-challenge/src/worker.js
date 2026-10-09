@@ -274,6 +274,7 @@ export class ChallengeRoom {
   async replacePlayerWithBot(game, userId) {
     var player = game.players.find(function (item) { return item.id === userId; });
     if (!player || this.isBot(player)) return false;
+    var wasTurn = game.turn === userId;
     player.id = game.gameType === 'millionaire_team' ? TEAM_BOT_PREFIX + player.team + ':' + crypto.randomUUID() : BOT_ID;
     player.profile = BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)];
     player.answer = null;
@@ -284,7 +285,12 @@ export class ChallengeRoom {
     if (game.gameType === 'millionaire_team' && game.turn === userId) {
       game.turn = player.id;
       game.botDiscussionAt = Date.now() + randomDelay(3000, 7000);
-    } else if (game.gameType !== 'millionaire_team') game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+    } else if (game.gameType !== 'millionaire_team') {
+      // If the departed player owned the turn, hand it to the bot immediately;
+      // otherwise it will answer on its next turn after the human player acts.
+      if (wasTurn) game.turn = BOT_ID;
+      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+    }
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
     this.broadcast({ type: 'bot_joined', replacedUserId: userId });
