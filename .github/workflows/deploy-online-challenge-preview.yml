@@ -68,6 +68,7 @@ jobs:
           dynamic_preview = __import__('os').environ['PREVIEW_URL']
           legacy_previews = [
               'https://442b9c76.duha-challenge-preview.pages.dev',
+              'https://8befce4f.duha-challenge-preview.pages.dev',
               'https://1c1ae7f7.duha-challenge-preview.pages.dev',
           ]
           allowed_origins = ['https://a-1q1.pages.dev', stable_preview, dynamic_preview, *legacy_previews]
