@@ -263,13 +263,25 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   const wrongResult = messages.find(message => message.type === 'round_result' && message.correct === false);
   assert.equal(wrongResult.answer, undefined);
   assert.equal(data.get('game').players[0].score, 0);
+  assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 6);
   const retry = data.get('game');
   retry.turn = 'host';
   data.set('game', retry);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
   assert.equal(data.get('game').round, 1);
+  assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 5);
   assert.equal(data.get('game').turn, data.get('game').players[1].id);
   assert.equal(messages.some(message => message.type === 'round_result' && message.answeredBy === 'host'), true);
+
+  for (const expectedRound of [2, 3]) {
+    const continued = data.get('game');
+    continued.turn = 'host';
+    data.set('game', continued);
+    await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: expectedRound - 1 }));
+    assert.equal(data.get('game').round, expectedRound);
+  }
+  assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 6);
+  assert.deepEqual(data.get('game').gibhaRefillSlots, [0, 1, 2]);
 });
 
 test('gibha sah keeps its original exceptional probability sequence', () => {
