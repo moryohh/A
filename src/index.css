@@ -72,6 +72,39 @@ a,
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
+@keyframes gibha-card-from-bottom {
+  from { opacity: 0; transform: translateY(80px) scale(.78) rotate(3deg); }
+  to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+@keyframes gibha-card-from-right {
+  from { opacity: 0; transform: translateX(90px) scale(.78) rotate(4deg); }
+  to { opacity: 1; transform: translateX(0) scale(1) rotate(0); }
+}
+
+@keyframes gibha-card-from-left {
+  from { opacity: 0; transform: translateX(-90px) scale(.78) rotate(-4deg); }
+  to { opacity: 1; transform: translateX(0) scale(1) rotate(0); }
+}
+
+@keyframes gibha-wrong-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+@keyframes gibha-correct-pulse {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.045); filter: brightness(1.35); }
+}
+
+.gibha-card-enter-bottom { animation: gibha-card-from-bottom .65s cubic-bezier(.2,.85,.25,1) both; }
+.gibha-card-enter-right { animation: gibha-card-from-right .65s .1s cubic-bezier(.2,.85,.25,1) both; }
+.gibha-card-enter-left { animation: gibha-card-from-left .65s .2s cubic-bezier(.2,.85,.25,1) both; }
+.gibha-wrong-shake { animation: gibha-wrong-shake .48s ease-in-out both; }
+.gibha-correct-pulse { animation: gibha-correct-pulse .7s ease-in-out both; }
+.gibha-thinking-dots { display: inline-block; animation: gibha-correct-pulse 1s ease-in-out infinite; letter-spacing: 2px; }
+
 .game-sheen,
 .game-pop {
   position: relative;

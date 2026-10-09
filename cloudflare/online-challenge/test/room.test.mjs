@@ -185,6 +185,7 @@ test('bot answers after its delay and completes every supported game type', asyn
     });
     const optionCount = gameType === 'true_false' ? 2 : gameType === 'gibha_sah' ? 10 : 4;
     const questions = [0, 1, 2].map((round) => ({ question: `Question ${round + 1}?`, options: Array.from({ length: optionCount }, (_, index) => `option-${index}`), correctAnswer: round % optionCount }));
+    if (gameType === 'gibha_sah') room.chooseBotAnswer = game => game.questions[game.round].correctAnswer;
     const now = Date.now();
     data.set('game', {
       gameType, roomCode: '1111', hostId: 'host', status: 'playing', round: 0, questionIndex: 0, turn: 'bot:duha-challenge', questions,
@@ -257,6 +258,14 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   assert.equal(data.get('game').status, 'playing');
   assert.equal(data.get('game').players.length, 4);
   assert.equal(data.get('game').turn, 'host');
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 1 }));
+  assert.equal(data.get('game').round, 0);
+  const wrongResult = messages.find(message => message.type === 'round_result' && message.correct === false);
+  assert.equal(wrongResult.answer, undefined);
+  assert.equal(data.get('game').players[0].score, 0);
+  const retry = data.get('game');
+  retry.turn = 'host';
+  data.set('game', retry);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
   assert.equal(data.get('game').round, 1);
   assert.equal(data.get('game').turn, data.get('game').players[1].id);
