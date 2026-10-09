@@ -34,6 +34,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [playerMessageBubble, setPlayerMessageBubble] = useState<{ from: string; text: string; nonce: number } | null>(null);
   const [unreadChat, setUnreadChat] = useState(0);
   const [turnSeconds, setTurnSeconds] = useState(25);
   const [lifelineResult, setLifelineResult] = useState<{ kind: 'fifty' | 'audience' | 'phone'; keep?: number[]; percentages?: number[]; suggested?: number } | null>(null);
@@ -56,6 +57,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const resultUntilRef = useRef(0);
   const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function sendSocket(payload: unknown) {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
@@ -134,6 +136,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     gameAudio.stopExternal('millionaire-wrong');
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    if (messageBubbleTimerRef.current) clearTimeout(messageBubbleTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -240,6 +243,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       }
       if (payload.type === 'chat' && typeof payload.text === 'string') {
         setChatMessages(previous => [...previous, { id: `${payload.from}-${payload.sentAt}-${Math.random()}`, from: payload.from, text: payload.text, sentAt: payload.sentAt || Date.now() }]);
+        if (roomGameTypeRef.current === 'gibha_sah') {
+          setPlayerMessageBubble({ from: payload.from, text: payload.text, nonce: Date.now() });
+          if (messageBubbleTimerRef.current) clearTimeout(messageBubbleTimerRef.current);
+          messageBubbleTimerRef.current = setTimeout(() => setPlayerMessageBubble(null), 5000);
+        }
         if (payload.from !== meRef.current) {
           setUnreadChat(previous => previous + 1);
           setChatOpen(true);
@@ -491,10 +499,16 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const active = Boolean(player && state?.turn === player.id && state.status === 'playing' && !roundResult);
     const activeMe = active && player?.id === me;
     const label = player?.id === me ? 'أنت' : player?.name || `اللاعب ${seat + 1}`;
-    return <div key={player?.id || `seat-${seat}`} onClick={() => rocketTargeting && player && player.id !== me && sendReaction('rocket', player.id)} className={`relative min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${rocketTargeting && player?.id !== me ? 'cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${reactionFx?.targetId === player?.id && reactionFx.kind === 'rocket' ? 'gibha-rocket-target' : ''}`}>
+    const showMessage = Boolean(player && playerMessageBubble?.from === player.id);
+    const avatarSide = seat % 2 === 0 ? 'right-3' : 'left-3';
+    const bubbleSide = seat % 2 === 0 ? 'right-[4.7rem]' : 'left-[4.7rem]';
+    const bubbleTail = seat % 2 === 0 ? 'after:-right-2 after:border-l-cyan-100' : 'after:-left-2 after:border-r-cyan-100';
+    return <div key={player?.id || `seat-${seat}`} onClick={() => rocketTargeting && player && player.id !== me && sendReaction('rocket', player.id)} className={`relative min-h-[6.6rem] min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${rocketTargeting && player?.id !== me ? 'cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${reactionFx?.targetId === player?.id && reactionFx.kind === 'rocket' ? 'gibha-rocket-target' : ''}`}>
       <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-15 grayscale'}`}><span className={`relative z-10 block rotate-180 text-4xl ${activeMe ? 'animate-pulse drop-shadow-[0_0_26px_rgba(52,211,153,1)] [filter:hue-rotate(70deg)_brightness(1.5)]' : active ? 'animate-pulse drop-shadow-[0_0_25px_rgba(250,204,21,1)] brightness-150' : ''}`}>💡</span>{active && <span className={`absolute left-1/2 top-8 h-16 w-24 -translate-x-1/2 bg-gradient-to-b to-transparent blur-[2px] [clip-path:polygon(42%_0,58%_0,100%_100%,0_100%)] ${activeMe ? 'from-emerald-100/90' : 'from-yellow-100/85'}`}/>}</div>
-      <div className="relative z-10 mx-auto h-11 w-11 overflow-hidden rounded-full border-2 border-cyan-300 bg-slate-800">{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-2 h-6 w-6 text-cyan-200"/>}</div>
-      <strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 text-cyan-200">{player ? `${player.score} نقطة` : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className="absolute bottom-1 left-1 z-20 rounded-full bg-black/35 p-1" aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}
+      <div className={`absolute top-8 z-10 h-14 w-14 overflow-hidden rounded-full border-2 border-cyan-200 bg-slate-800 shadow-[0_0_14px_rgba(34,211,238,.45)] ${avatarSide}`}>{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-3 h-7 w-7 text-cyan-200"/>}</div>
+      <div className={`${seat % 2 === 0 ? 'pr-[4.25rem]' : 'pl-[4.25rem]'}`}><strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 text-cyan-200">{player ? `${player.score} نقطة` : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}</div>
+      {showMessage && <div key={playerMessageBubble?.nonce} className={`gibha-message-bubble absolute top-2 z-30 max-w-[calc(100%_-_5.4rem)] rounded-2xl border border-cyan-200/80 bg-cyan-50 px-3 py-2 text-right text-[11px] font-bold leading-5 text-slate-900 shadow-[0_8px_25px_rgba(34,211,238,.35)] after:absolute after:top-7 after:border-y-[7px] after:border-y-transparent ${bubbleSide} ${bubbleTail}`}><span className="mb-0.5 block text-[9px] font-black text-cyan-700">{label}</span><span className="line-clamp-3">{playerMessageBubble?.text}</span></div>}
+      {player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className={`absolute bottom-1 z-20 rounded-full bg-black/45 p-1 ${seat % 2 === 0 ? 'right-2' : 'left-2'}`} aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}
     </div>;
   };
 
