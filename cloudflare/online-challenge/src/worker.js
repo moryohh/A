@@ -212,15 +212,24 @@ export class ChallengeRoom {
     // then its error rate grows by 5% from question eight onward.
     return Math.max(0.6, 1 - (game.round >= 7 ? (game.round - 6) * 0.05 : 0));
   }
+  answerKey(value) {
+    return String(value || '').normalize('NFKC').replace(/[\u0640\u064B-\u065F\u0670]/g, '').replace(/\s+/g, ' ').trim();
+  }
   prepareGibhaBoard(game) {
     if (game.gameType !== 'gibha_sah') return;
     var questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     if (Array.isArray(game.gibhaBoardSlots)) return;
-    game.gibhaBoardSlots = game.questions.slice(questionIndex, questionIndex + 6).map(function (question, offset) {
-      return { questionIndex: questionIndex + offset, option: question.options[question.correctAnswer] };
-    });
+    game.gibhaBoardSlots = [];
+    var scanIndex = questionIndex;
+    while (game.gibhaBoardSlots.length < 6 && scanIndex < game.questions.length) {
+      var question = game.questions[scanIndex];
+      var option = question.options[question.correctAnswer];
+      var optionKey = this.answerKey(option);
+      if (optionKey && !game.gibhaBoardSlots.some(function (slot) { return this.answerKey(slot.option) === optionKey; }, this)) game.gibhaBoardSlots.push({ questionIndex: scanIndex, option: option });
+      scanIndex += 1;
+    }
     while (game.gibhaBoardSlots.length < 6) game.gibhaBoardSlots.push(null);
-    game.gibhaNextQuestionIndex = questionIndex + 6;
+    game.gibhaNextQuestionIndex = scanIndex;
     game.gibhaBoardOptions = game.gibhaBoardSlots.map(function (slot) { return slot ? slot.option : ''; });
     game.gibhaRefillSlots = [];
   }
@@ -228,13 +237,18 @@ export class ChallengeRoom {
     var emptySlots = game.gibhaBoardSlots.map(function (slot, index) { return slot ? -1 : index; }).filter(function (index) { return index >= 0; }).slice(0, 3);
     var filledSlots = [];
     emptySlots.forEach(function (slot) {
-      var questionIndex = game.gibhaNextQuestionIndex || 0;
-      var question = game.questions[questionIndex];
-      if (!question) return;
-      game.gibhaBoardSlots[slot] = { questionIndex: questionIndex, option: question.options[question.correctAnswer] };
-      game.gibhaNextQuestionIndex = questionIndex + 1;
-      filledSlots.push(slot);
-    });
+      while ((game.gibhaNextQuestionIndex || 0) < game.questions.length) {
+        var questionIndex = game.gibhaNextQuestionIndex || 0;
+        var question = game.questions[questionIndex];
+        var option = question.options[question.correctAnswer];
+        game.gibhaNextQuestionIndex = questionIndex + 1;
+        var optionKey = this.answerKey(option);
+        if (!optionKey || game.gibhaBoardSlots.some(function (existing) { return existing && this.answerKey(existing.option) === optionKey; }, this)) continue;
+        game.gibhaBoardSlots[slot] = { questionIndex: questionIndex, option: option };
+        filledSlots.push(slot);
+        break;
+      }
+    }, this);
     game.gibhaBoardOptions = game.gibhaBoardSlots.map(function (slot) { return slot ? slot.option : ''; });
     game.gibhaRefillSlots = filledSlots;
     game.gibhaRefillVersion = (game.gibhaRefillVersion || 0) + 1;
@@ -244,7 +258,10 @@ export class ChallengeRoom {
     if (!question) return null;
     if (game.gameType === 'gibha_sah') {
       this.prepareGibhaBoard(game);
-      var correctSlot = game.gibhaBoardSlots.findIndex(function (slot) { return slot && slot.questionIndex === game.questionIndex; });
+      var activeQuestion = game.questions[game.questionIndex];
+      var activeAnswer = activeQuestion && activeQuestion.options[activeQuestion.correctAnswer];
+      var activeAnswerKey = this.answerKey(activeAnswer);
+      var correctSlot = game.gibhaBoardOptions.findIndex(function (option) { return this.answerKey(option) === activeAnswerKey; }, this);
       if (Math.random() < this.botAccuracy(game)) return correctSlot;
       var visibleWrong = game.gibhaBoardOptions.map(function (option, index) { return option && index !== correctSlot ? index : -1; }).filter(function (index) { return index >= 0; });
       return visibleWrong.length ? visibleWrong[Math.floor(Math.random() * visibleWrong.length)] : correctSlot;
@@ -566,7 +583,9 @@ export class ChallengeRoom {
       powerGame.gibhaPowers[sender.userId][payload.kind] = true;
       var powerResult = { type: 'gibha_power_result', kind: payload.kind };
       if (payload.kind === 'fifty') {
-        var powerCorrect = powerGame.gibhaBoardSlots.findIndex(function (slot) { return slot && slot.questionIndex === powerGame.questionIndex; });
+        var powerAnswer = powerQuestion.options[powerQuestion.correctAnswer];
+        var powerAnswerKey = this.answerKey(powerAnswer);
+        var powerCorrect = powerGame.gibhaBoardOptions.findIndex(function (option) { return this.answerKey(option) === powerAnswerKey; }, this);
         var powerWrong = powerGame.gibhaBoardOptions.map(function (option, index) { return option && index !== powerCorrect ? index : -1; }).filter(function (index) { return index >= 0; });
         var keepWrongCount = Math.min(3, Math.max(1, powerGame.gibhaBoardOptions.length - 3));
         powerWrong.sort(function () { return Math.random() - 0.5; });
@@ -609,8 +628,10 @@ export class ChallengeRoom {
     // single path also prevents the two clients from drifting between rounds.
     if (game.gameType === 'millionaire' || game.gameType === 'true_false' || game.gameType === 'gibha_sah') {
       var chosen = player.answer;
-      var correctAnswer = game.gameType === 'gibha_sah' ? game.gibhaBoardSlots.findIndex(function (slot) { return slot && slot.questionIndex === currentIndex; }) : currentQuestion.correctAnswer;
-      var isCorrect = chosen === correctAnswer;
+      var correctText = game.gameType === 'gibha_sah' ? currentQuestion.options[currentQuestion.correctAnswer] : null;
+      var correctTextKey = this.answerKey(correctText);
+      var correctAnswer = game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.findIndex(function (option) { return this.answerKey(option) === correctTextKey; }, this) : currentQuestion.correctAnswer;
+      var isCorrect = game.gameType === 'gibha_sah' ? this.answerKey(game.gibhaBoardOptions[chosen]) === correctTextKey : chosen === correctAnswer;
       var resultOptions = game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.slice() : currentQuestion.options;
       if (isCorrect) {
         if (game.gameType === 'gibha_sah') {
@@ -622,8 +643,6 @@ export class ChallengeRoom {
       // solution. The same card passes to the next player until somebody
       // solves it; only a correct answer advances the shared deck.
       var nextQuestionIndex = game.gameType === 'gibha_sah' && !isCorrect ? currentIndex : currentIndex + 1;
-      game.round = nextQuestionIndex;
-      game.questionIndex = nextQuestionIndex;
       if (game.gameType === 'gibha_sah') {
         game.gibhaRefillSlots = [];
         if (isCorrect) {
@@ -631,8 +650,12 @@ export class ChallengeRoom {
           game.gibhaBoardOptions[chosen] = '';
           var remainingCards = game.gibhaBoardSlots.filter(Boolean).length;
           if (remainingCards === 3) this.refillGibhaBoard(game);
+          var nextCard = game.gibhaBoardSlots.filter(Boolean).sort(function (a, b) { return a.questionIndex - b.questionIndex; })[0];
+          nextQuestionIndex = nextCard ? nextCard.questionIndex : game.questions.length;
         }
       }
+      game.round = nextQuestionIndex;
+      game.questionIndex = nextQuestionIndex;
       if (game.gameType === 'gibha_sah') {
         var currentPlayerIndex = game.players.findIndex(function (item) { return item.id === attachment.userId; });
         game.turn = game.players[(currentPlayerIndex + 1) % game.players.length]?.id || null;
@@ -751,8 +774,10 @@ export class ChallengeRoom {
         var botSelected = bot.answer;
         game.lastSelections = game.lastSelections || {};
         game.lastSelections[bot.id] = botSelected;
-        var botCorrect = game.gameType === 'gibha_sah' ? game.gibhaBoardSlots.findIndex(function (slot) { return slot && slot.questionIndex === game.questionIndex; }) : botQuestion.correctAnswer;
-        var botWasCorrect = bot.answer === botCorrect;
+        var botCorrectText = game.gameType === 'gibha_sah' ? botQuestion.options[botQuestion.correctAnswer] : null;
+        var botCorrectTextKey = this.answerKey(botCorrectText);
+        var botCorrect = game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.findIndex(function (option) { return this.answerKey(option) === botCorrectTextKey; }, this) : botQuestion.correctAnswer;
+        var botWasCorrect = game.gameType === 'gibha_sah' ? this.answerKey(game.gibhaBoardOptions[botSelected]) === botCorrectTextKey : bot.answer === botCorrect;
         var botResultOptions = game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.slice() : botQuestion.options;
         if (botWasCorrect) {
           if (game.gameType === 'gibha_sah') {
@@ -761,8 +786,7 @@ export class ChallengeRoom {
           } else bot.score += 1;
         } else if (game.gameType === 'gibha_sah') bot.streak = 0;
         var botCurrentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
-        game.round = game.gameType === 'gibha_sah' && !botWasCorrect ? botCurrentIndex : botCurrentIndex + 1;
-        game.questionIndex = game.round;
+        var botNextQuestionIndex = game.gameType === 'gibha_sah' && !botWasCorrect ? botCurrentIndex : botCurrentIndex + 1;
         if (game.gameType === 'gibha_sah') {
           game.gibhaRefillSlots = [];
           if (botWasCorrect) {
@@ -770,8 +794,12 @@ export class ChallengeRoom {
             game.gibhaBoardOptions[botSelected] = '';
             var botRemainingCards = game.gibhaBoardSlots.filter(Boolean).length;
             if (botRemainingCards === 3) this.refillGibhaBoard(game);
+            var botNextCard = game.gibhaBoardSlots.filter(Boolean).sort(function (a, b) { return a.questionIndex - b.questionIndex; })[0];
+            botNextQuestionIndex = botNextCard ? botNextCard.questionIndex : game.questions.length;
           }
         }
+        game.round = botNextQuestionIndex;
+        game.questionIndex = botNextQuestionIndex;
         if (game.gameType === 'gibha_sah') {
           var botIndex = game.players.findIndex(function (item) { return item.id === bot.id; });
           game.turn = game.players[(botIndex + 1) % game.players.length]?.id || null;

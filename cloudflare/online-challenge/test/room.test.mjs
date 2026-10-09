@@ -246,7 +246,7 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
     storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => {} },
     getWebSockets: () => [hostSocket],
   });
-  const questions = Array.from({ length: 24 }, (_, index) => ({ question: `Card ${index}?`, options: ['a', 'b', 'c', 'd', 'e', 'f'], correctAnswer: 0 }));
+  const questions = Array.from({ length: 24 }, (_, index) => ({ question: `Card ${index}?`, options: [`answer-${index}`, `wrong-${index}-1`, `wrong-${index}-2`, `wrong-${index}-3`, `wrong-${index}-4`, `wrong-${index}-5`], correctAnswer: 0 }));
   const startedAt = Date.now();
   const response = await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
   assert.equal(response.status, 200);
@@ -282,6 +282,29 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   }
   assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 6);
   assert.deepEqual(data.get('game').gibhaRefillSlots, [0, 1, 2]);
+});
+
+test('gibha sah removes duplicate answers and accepts matching answer text', async () => {
+  const data = new Map();
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} },
+    getWebSockets: () => [hostSocket],
+  });
+  const answers = ['الغشاء البلازمي', 'الغشاء البلازمي', 'الجدار الخلوي', 'السيتوبلازم', 'النواة', 'الميتوكندريا', 'الريبوسومات'];
+  const questions = answers.map((answer, index) => ({ question: `Card ${index}?`, options: [answer, `خطأ-${index}`], correctAnswer: 0 }));
+  await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
+  const game = data.get('game');
+  game.status = 'playing';
+  game.players = [{ id: 'host', name: 'Host', score: 0, answer: null, streak: 0 }];
+  game.turn = 'host';
+  room.prepareGibhaBoard(game);
+  assert.equal(game.gibhaBoardOptions.filter(option => option === 'الغشاء البلازمي').length, 1);
+  const correctSlot = game.gibhaBoardOptions.indexOf('الغشاء البلازمي');
+  data.set('game', game);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: correctSlot }));
+  assert.equal(messages.some(message => message.type === 'round_result' && message.correct === true), true);
 });
 
 test('gibha sah keeps its original exceptional probability sequence', () => {
