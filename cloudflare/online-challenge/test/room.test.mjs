@@ -259,7 +259,8 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   assert.equal(data.get('game').players.length, 4);
   assert.equal(data.get('game').turn, 'host');
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 1 }));
-  assert.equal(data.get('game').round, 0);
+  assert.equal(data.get('game').round, 1);
+  assert.equal(data.get('game').gibhaQuestionQueue.at(-1), 0);
   const wrongResult = messages.find(message => message.type === 'round_result' && message.correct === false);
   assert.equal(wrongResult.answer, undefined);
   assert.equal(data.get('game').players[0].score, 0);
@@ -267,13 +268,13 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   const retry = data.get('game');
   retry.turn = 'host';
   data.set('game', retry);
-  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
-  assert.equal(data.get('game').round, 1);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 1 }));
+  assert.equal(data.get('game').round, 2);
   assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 5);
   assert.equal(data.get('game').turn, data.get('game').players[1].id);
   assert.equal(messages.some(message => message.type === 'round_result' && message.answeredBy === 'host'), true);
 
-  for (const expectedRound of [2, 3]) {
+  for (const expectedRound of [3, 4]) {
     const continued = data.get('game');
     continued.turn = 'host';
     data.set('game', continued);
@@ -281,7 +282,7 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
     assert.equal(data.get('game').round, expectedRound);
   }
   assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 6);
-  assert.deepEqual(data.get('game').gibhaRefillSlots, [0, 1, 2]);
+  assert.deepEqual(data.get('game').gibhaRefillSlots, [1, 2, 3]);
 });
 
 test('gibha sah removes duplicate answers and accepts matching answer text', async () => {
@@ -316,6 +317,19 @@ test('gibha sah keeps its original exceptional probability sequence', () => {
     Math.random = () => 0.999;
     assert.equal(room.botAccuracy({ gameType: 'gibha_sah', round: 0 }), 1);
     assert.equal(room.botAccuracy({ gameType: 'millionaire', round: 0 }), 1);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('gibha sah bot delay is randomized between five and twenty seconds', () => {
+  const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0;
+    assert.equal(room.botAnswerDelay({ gameType: 'gibha_sah' }), 5000);
+    Math.random = () => 0.999999;
+    assert.equal(room.botAnswerDelay({ gameType: 'gibha_sah' }), 20000);
   } finally {
     Math.random = originalRandom;
   }

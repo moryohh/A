@@ -215,6 +215,26 @@ export class ChallengeRoom {
   answerKey(value) {
     return String(value || '').normalize('NFKC').replace(/[\u0640\u064B-\u065F\u0670]/g, '').replace(/\s+/g, ' ').trim();
   }
+  botAnswerDelay(game) {
+    if (game.gameType === 'gibha_sah') return randomDelay(5000, 20000);
+    if (game.gameType === 'millionaire') return randomDelay(10000, 30000);
+    return BOT_ANSWER_DELAY_MS;
+  }
+  syncGibhaQuestionQueue(game) {
+    var available = game.gibhaBoardSlots.filter(Boolean).map(function (slot) { return slot.questionIndex; });
+    var queue = Array.isArray(game.gibhaQuestionQueue) ? game.gibhaQuestionQueue.filter(function (index, position, all) {
+      return available.includes(index) && all.indexOf(index) === position;
+    }) : [];
+    available.forEach(function (index) { if (!queue.includes(index)) queue.push(index); });
+    game.gibhaQuestionQueue = queue;
+    return queue;
+  }
+  advanceGibhaQuestion(game, currentIndex, solved) {
+    var queue = this.syncGibhaQuestionQueue(game).filter(function (index) { return index !== currentIndex; });
+    if (!solved && game.gibhaBoardSlots.some(function (slot) { return slot && slot.questionIndex === currentIndex; })) queue.push(currentIndex);
+    game.gibhaQuestionQueue = queue;
+    return queue[0] ?? game.questions.length;
+  }
   prepareGibhaBoard(game) {
     if (game.gameType !== 'gibha_sah') return;
     var questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
@@ -231,6 +251,7 @@ export class ChallengeRoom {
     while (game.gibhaBoardSlots.length < 6) game.gibhaBoardSlots.push(null);
     game.gibhaNextQuestionIndex = scanIndex;
     game.gibhaBoardOptions = game.gibhaBoardSlots.map(function (slot) { return slot ? slot.option : ''; });
+    game.gibhaQuestionQueue = game.gibhaBoardSlots.filter(Boolean).map(function (slot) { return slot.questionIndex; });
     game.gibhaRefillSlots = [];
   }
   refillGibhaBoard(game) {
@@ -250,6 +271,7 @@ export class ChallengeRoom {
       }
     }, this);
     game.gibhaBoardOptions = game.gibhaBoardSlots.map(function (slot) { return slot ? slot.option : ''; });
+    this.syncGibhaQuestionQueue(game);
     game.gibhaRefillSlots = filledSlots;
     game.gibhaRefillVersion = (game.gibhaRefillVersion || 0) + 1;
   }
@@ -318,7 +340,7 @@ export class ChallengeRoom {
   async scheduleBotAnswer(game) {
     var bot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
     if (game.status === 'playing' && bot && bot.answer === null && !game.botAnswerAt) {
-      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' || game.gameType === 'gibha_sah' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+      game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
     }
     await this.scheduleNextAlarm(game);
   }
@@ -338,7 +360,7 @@ export class ChallengeRoom {
       game.botDiscussionAt = Date.now() + randomDelay(3000, 7000);
     } else if (game.gameType !== 'millionaire_team') {
       if (wasTurn) game.turn = player.id;
-      game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' || game.gameType === 'gibha_sah' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+      game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
     }
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
@@ -639,10 +661,10 @@ export class ChallengeRoom {
           player.score += player.streak >= 3 ? 2 : 1;
         } else player.score += 1;
       } else if (game.gameType === 'gibha_sah') player.streak = 0;
-      // In Gibha Sah, a wrong answer does not remove a card or reveal its
-      // solution. The same card passes to the next player until somebody
-      // solves it; only a correct answer advances the shared deck.
-      var nextQuestionIndex = game.gameType === 'gibha_sah' && !isCorrect ? currentIndex : currentIndex + 1;
+      // In Gibha Sah, a wrong answer stays on the board but moves to the end
+      // of the question queue. This prevents repeated immediate retries while
+      // ensuring the unsolved card returns later.
+      var nextQuestionIndex = currentIndex + 1;
       if (game.gameType === 'gibha_sah') {
         game.gibhaRefillSlots = [];
         if (isCorrect) {
@@ -650,9 +672,8 @@ export class ChallengeRoom {
           game.gibhaBoardOptions[chosen] = '';
           var remainingCards = game.gibhaBoardSlots.filter(Boolean).length;
           if (remainingCards === 3) this.refillGibhaBoard(game);
-          var nextCard = game.gibhaBoardSlots.filter(Boolean).sort(function (a, b) { return a.questionIndex - b.questionIndex; })[0];
-          nextQuestionIndex = nextCard ? nextCard.questionIndex : game.questions.length;
         }
+        nextQuestionIndex = this.advanceGibhaQuestion(game, currentIndex, isCorrect);
       }
       game.round = nextQuestionIndex;
       game.questionIndex = nextQuestionIndex;
@@ -662,7 +683,7 @@ export class ChallengeRoom {
       } else game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
       game.players.forEach(function (item) { item.answer = null; });
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.players.some(function (item) { return item.id === game.turn && this.isBot(item); }, this)) game.botAnswerAt = Date.now() + (game.gameType === 'millionaire' || game.gameType === 'gibha_sah' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+      else if (game.players.some(function (item) { return item.id === game.turn && this.isBot(item); }, this)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
       var roundPayload = { type: 'round_result', question: { question: currentQuestion.question, options: resultOptions }, selected: chosen, correct: isCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId };
       // Never disclose Gibha Sah's correct card after a mistake.
       if (game.gameType !== 'gibha_sah' || isCorrect) roundPayload.answer = correctAnswer;
@@ -786,7 +807,7 @@ export class ChallengeRoom {
           } else bot.score += 1;
         } else if (game.gameType === 'gibha_sah') bot.streak = 0;
         var botCurrentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
-        var botNextQuestionIndex = game.gameType === 'gibha_sah' && !botWasCorrect ? botCurrentIndex : botCurrentIndex + 1;
+        var botNextQuestionIndex = botCurrentIndex + 1;
         if (game.gameType === 'gibha_sah') {
           game.gibhaRefillSlots = [];
           if (botWasCorrect) {
@@ -794,9 +815,8 @@ export class ChallengeRoom {
             game.gibhaBoardOptions[botSelected] = '';
             var botRemainingCards = game.gibhaBoardSlots.filter(Boolean).length;
             if (botRemainingCards === 3) this.refillGibhaBoard(game);
-            var botNextCard = game.gibhaBoardSlots.filter(Boolean).sort(function (a, b) { return a.questionIndex - b.questionIndex; })[0];
-            botNextQuestionIndex = botNextCard ? botNextCard.questionIndex : game.questions.length;
           }
+          botNextQuestionIndex = this.advanceGibhaQuestion(game, botCurrentIndex, botWasCorrect);
         }
         game.round = botNextQuestionIndex;
         game.questionIndex = botNextQuestionIndex;
