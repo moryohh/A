@@ -363,3 +363,20 @@ test('room relays a trimmed chat message to both players', async () => {
   assert.equal(chatMessages[0].from, 'host');
   assert.equal(chatMessages[0].text, 'مرحباً بالمنافس');
 });
+
+test('gibha sah allows one synchronized reaction per player and turn', async () => {
+  const data = new Map();
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) },
+    getWebSockets: () => [hostSocket],
+  });
+  data.set('game', { gameType: 'gibha_sah', status: 'playing', reactionTurn: 3, reactionUses: {}, players: [{ id: 'host' }, { id: 'guest' }] });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'reaction', kind: 'rocket', targetId: 'guest' }));
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'reaction', kind: 'laugh' }));
+  const reactions = messages.filter(message => message.type === 'reaction');
+  assert.equal(reactions.length, 1);
+  assert.equal(reactions[0].kind, 'rocket');
+  assert.equal(reactions[0].targetId, 'guest');
+});

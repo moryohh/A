@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Clock, MessageCircle, Mic, MicOff, Send, Sparkles, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
+import { CheckCircle2, Clock, Crosshair, MessageCircle, Mic, MicOff, Music, Music2, Send, Sparkles, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 import { gameAudio } from '../utils/gameAudio';
@@ -40,6 +40,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [teamRecommendation, setTeamRecommendation] = useState<{ from: string; option: number } | null>(null);
   const [gibhaPowerResult, setGibhaPowerResult] = useState<{ kind: 'fifty' | 'freeze' | 'reveal'; keep?: number[]; seconds?: number; option?: number | null } | null>(null);
   const [usedGibhaPowers, setUsedGibhaPowers] = useState<Array<'fifty' | 'freeze' | 'reveal'>>([]);
+  const [musicMuted, setMusicMuted] = useState(false);
+  const [reactionUsed, setReactionUsed] = useState(false);
+  const [rocketTargeting, setRocketTargeting] = useState(false);
+  const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number } | null>(null);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
@@ -241,6 +245,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           setChatOpen(true);
         }
       }
+      if (payload.type === 'reaction') {
+        setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce: Date.now() });
+        if (payload.kind === 'rocket') { gameAudio.playClick(1050); window.setTimeout(() => gameAudio.playGibhaWrong(), 650); }
+        else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
+        window.setTimeout(() => setReactionFx(null), payload.kind === 'rocket' ? 1700 : 1100);
+      }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
           roomGameTypeRef.current = payload.gameType;
@@ -325,6 +335,21 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (!myTurn || roundResult || usedGibhaPowers.includes(kind)) return;
     setGibhaPowerResult(null);
     sendSocket({ type: 'gibha_power', kind });
+  }
+
+  function sendReaction(kind: 'clap' | 'laugh' | 'think' | 'angry' | 'rocket', targetId?: string) {
+    if (reactionUsed || !connected) return;
+    if (kind === 'rocket' && !targetId) { setRocketTargeting(true); return; }
+    sendSocket({ type: 'reaction', kind, targetId });
+    setReactionUsed(true);
+    setRocketTargeting(false);
+  }
+
+  function toggleMusic() {
+    const next = !musicMuted;
+    setMusicMuted(next);
+    gameAudio.setMuted(next);
+    if (!next && isGibhaSah && state?.status === 'playing') gameAudio.playGameSessionTheme();
   }
 
   async function create() {
@@ -412,6 +437,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, [isGibhaSah, turnSeconds]);
 
   useEffect(() => { setLifelineResult(null); setTeamRecommendation(null); setGibhaPowerResult(null); }, [state?.round]);
+  useEffect(() => { setReactionUsed(false); setRocketTargeting(false); }, [state?.round, state?.turn]);
 
   useEffect(() => {
     if ((isTrueFalse || isGibhaSah) && state?.status === 'finished' && state.winner === me && !roundResult) gameAudio.playVictoryFanfare();
@@ -465,10 +491,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const active = Boolean(player && state?.turn === player.id && state.status === 'playing' && !roundResult);
     const activeMe = active && player?.id === me;
     const label = player?.id === me ? 'أنت' : player?.name || `اللاعب ${seat + 1}`;
-    return <div key={player?.id || `seat-${seat}`} className={`relative min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${activeMe ? 'border-emerald-300 bg-emerald-400/15 shadow-[0_0_28px_rgba(52,211,153,.6)]' : active ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_24px_rgba(250,204,21,.45)]' : 'border-cyan-400/25 bg-cyan-500/5'}`}>
-      <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-15 grayscale'}`}><span className={`relative z-10 block rotate-180 text-3xl ${activeMe ? 'animate-pulse drop-shadow-[0_0_14px_rgba(52,211,153,1)] [filter:hue-rotate(70deg)]' : active ? 'animate-pulse drop-shadow-[0_0_12px_rgba(250,204,21,1)]' : ''}`}>💡</span>{active && <span className={`absolute left-1/2 top-7 h-12 w-16 -translate-x-1/2 bg-gradient-to-b to-transparent [clip-path:polygon(43%_0,57%_0,100%_100%,0_100%)] ${activeMe ? 'from-emerald-200/70' : 'from-yellow-200/55'}`}/>}</div>
+    return <div key={player?.id || `seat-${seat}`} onClick={() => rocketTargeting && player && player.id !== me && sendReaction('rocket', player.id)} className={`relative min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${rocketTargeting && player?.id !== me ? 'cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${reactionFx?.targetId === player?.id && reactionFx.kind === 'rocket' ? 'gibha-rocket-target' : ''}`}>
+      <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-15 grayscale'}`}><span className={`relative z-10 block rotate-180 text-4xl ${activeMe ? 'animate-pulse drop-shadow-[0_0_26px_rgba(52,211,153,1)] [filter:hue-rotate(70deg)_brightness(1.5)]' : active ? 'animate-pulse drop-shadow-[0_0_25px_rgba(250,204,21,1)] brightness-150' : ''}`}>💡</span>{active && <span className={`absolute left-1/2 top-8 h-16 w-24 -translate-x-1/2 bg-gradient-to-b to-transparent blur-[2px] [clip-path:polygon(42%_0,58%_0,100%_100%,0_100%)] ${activeMe ? 'from-emerald-100/90' : 'from-yellow-100/85'}`}/>}</div>
       <div className="relative z-10 mx-auto h-11 w-11 overflow-hidden rounded-full border-2 border-cyan-300 bg-slate-800">{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-2 h-6 w-6 text-cyan-200"/>}</div>
-      <strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 text-cyan-200">{player ? `${player.score} نقطة` : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}
+      <strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 text-cyan-200">{player ? `${player.score} نقطة` : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className="absolute bottom-1 left-1 z-20 rounded-full bg-black/35 p-1" aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}
     </div>;
   };
 
@@ -496,9 +522,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {state.status === 'playing' && displayedQuestion && <>
           <div className="grid shrink-0 grid-cols-2 gap-2">{state.players.slice(0, 2).map((player, index) => renderGibhaPlayer(player, index))}</div>
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <div className="flex gap-1 overflow-x-auto"><button disabled={!myTurn || usedGibhaPowers.includes('fifty')} onClick={() => useGibhaPower('fifty')} className="rounded-lg bg-violet-500/20 px-2 py-1 text-[10px] disabled:opacity-30">50:50</button><button disabled={!myTurn || usedGibhaPowers.includes('freeze')} onClick={() => useGibhaPower('freeze')} className="rounded-lg bg-cyan-500/20 px-2 py-1 text-[10px] disabled:opacity-30">❄️ +5ث</button><button disabled={!myTurn || usedGibhaPowers.includes('reveal')} onClick={() => useGibhaPower('reveal')} className="rounded-lg bg-amber-500/20 px-2 py-1 text-[10px] disabled:opacity-30">👁 اختيار</button></div>
+            <div className="flex gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} className="relative rounded-full bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-4 w-4"/>{unreadChat > 0 && <b className="absolute -left-1 -top-1 rounded-full bg-red-500 px-1 text-[9px]">{unreadChat}</b>}</button><button disabled={audioBusy} onClick={() => void toggleMicrophone()} className={`rounded-full p-2 ${audioEnabled ? 'bg-emerald-500' : 'bg-white/10'}`}>{audioEnabled ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button><button onClick={toggleMusic} className="rounded-full bg-white/10 p-2">{musicMuted ? <Music className="h-4 w-4 text-rose-300"/> : <Music2 className="h-4 w-4 text-amber-200"/>}</button></div>
             <div className={`grid h-11 w-11 place-items-center rounded-full border-2 font-mono text-lg font-black ${turnSeconds <= 5 ? 'animate-pulse border-rose-400 text-rose-300' : 'border-emerald-300 text-emerald-200'}`}>{String(turnSeconds).padStart(2, '0')}</div>
-            <div className="flex justify-end gap-1">{['👏','😂','🤔','🚀'].map(emoji => <button key={emoji} onClick={() => sendSocket({ type: 'chat', text: emoji })} className="rounded-full bg-white/5 p-1 text-sm">{emoji}</button>)}</div>
+            <div className="flex justify-end gap-1">{([{kind:'clap',icon:'👏'},{kind:'laugh',icon:'😂'},{kind:'think',icon:'🤔'},{kind:'angry',icon:'😡'},{kind:'rocket',icon:'🚀'}] as const).map(item => <button key={item.kind} disabled={reactionUsed} onClick={() => sendReaction(item.kind)} className={`rounded-full p-1 text-sm ${rocketTargeting && item.kind === 'rocket' ? 'bg-rose-500 ring-2 ring-white' : 'bg-white/5'} disabled:opacity-30`}>{item.icon}</button>)}</div>
           </div>
           <div className="h-1.5 shrink-0 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full transition-all duration-1000 ${turnSeconds <= 5 ? 'bg-rose-500' : turnSeconds <= 12 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.max(0, Math.min(100, (turnSeconds / 25) * 100))}%` }}/></div>
           <div className="flex min-h-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-500/40 bg-[#07142d]/90 px-4 py-2 text-center text-base font-black leading-6 sm:text-xl"><ScientificText value={displayedQuestion.question} /></div>
@@ -515,7 +541,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           {gibhaPowerResult?.kind === 'reveal' && <div className="shrink-0 rounded-xl bg-amber-500/15 px-3 py-1 text-center text-xs text-amber-100">{Number.isInteger(gibhaPowerResult.option) ? `آخر اختيار لمنافس: البطاقة ${(gibhaPowerResult.option || 0) + 1}` : 'لا يوجد اختيار سابق للمنافس بعد'}</div>}
           {roundResult && <div className={`shrink-0 rounded-xl border px-3 py-1 text-center text-xs font-black ${roundResult.correct ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200' : 'border-rose-500/50 bg-rose-500/10 text-rose-200'}`}>{roundResult.correct ? 'جبتها صح! ✨ البطاقة خرجت من اللوحة' : 'ليست صحيحة — لا نكشف الحل وينتقل الدور'}</div>}
           <div className="grid shrink-0 grid-cols-2 gap-2">{[2, 3].map(index => renderGibhaPlayer(state.players[index], index))}</div>
-        </>}{gibhaFinalResult}</main>{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
+        </>}{gibhaFinalResult}</main>{rocketTargeting && <div className="pointer-events-none absolute inset-x-3 top-1/2 z-40 flex items-center justify-center"><span className="rounded-full bg-rose-600/95 px-4 py-2 text-sm font-black shadow-xl"><Crosshair className="ml-1 inline h-4 w-4"/>اختر اللاعب الذي تريد قصفه</span></div>}{reactionFx && reactionFx.kind !== 'rocket' && <div key={reactionFx.nonce} className="gibha-reaction-pop pointer-events-none absolute inset-0 z-50 grid place-items-center text-7xl">{{clap:'👏',laugh:'😂',think:'🤔',angry:'😡'}[reactionFx.kind]}</div>}{reactionFx?.kind === 'rocket' && <div key={reactionFx.nonce} className="gibha-rocket-flight pointer-events-none absolute z-50 text-6xl">🚀</div>}{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
     </div>{chatPanel}
   </div>;
 

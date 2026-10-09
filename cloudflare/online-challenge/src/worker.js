@@ -530,6 +530,19 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
     var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
+    if (payload && payload.type === 'reaction' && sender && liveGame && liveGame.gameType === 'gibha_sah' && liveGame.status === 'playing') {
+      var reactionKinds = ['clap', 'laugh', 'think', 'angry', 'rocket'];
+      if (!reactionKinds.includes(payload.kind)) return;
+      liveGame.reactionTurn = Number(liveGame.reactionTurn || 0);
+      liveGame.reactionUses = liveGame.reactionUses || {};
+      if (liveGame.reactionUses[sender.userId] === liveGame.reactionTurn) return;
+      var reactionTarget = payload.kind === 'rocket' ? liveGame.players.find(function (player) { return player.id === payload.targetId && player.id !== sender.userId; }) : null;
+      if (payload.kind === 'rocket' && !reactionTarget) return;
+      liveGame.reactionUses[sender.userId] = liveGame.reactionTurn;
+      await this.ctx.storage.put('game', liveGame);
+      this.broadcast({ type: 'reaction', kind: payload.kind, from: sender.userId, targetId: reactionTarget ? reactionTarget.id : null, sentAt: Date.now(), turn: liveGame.reactionTurn });
+      return;
+    }
     if (payload && payload.type === 'chat' && sender && typeof payload.text === 'string') {
       var chatText = payload.text.trim().slice(0, 300);
       if (!chatText) return;
@@ -682,6 +695,7 @@ export class ChallengeRoom {
         game.turn = game.players[(currentPlayerIndex + 1) % game.players.length]?.id || null;
       } else game.turn = game.players.find(function (item) { return item.id !== attachment.userId; })?.id || null;
       game.players.forEach(function (item) { item.answer = null; });
+      game.reactionTurn = Number(game.reactionTurn || 0) + 1;
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
       else if (game.players.some(function (item) { return item.id === game.turn && this.isBot(item); }, this)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
       var roundPayload = { type: 'round_result', question: { question: currentQuestion.question, options: resultOptions }, selected: chosen, correct: isCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId };
@@ -825,6 +839,7 @@ export class ChallengeRoom {
           game.turn = game.players[(botIndex + 1) % game.players.length]?.id || null;
         } else game.turn = game.players.find(function (item) { return item.id !== bot.id; })?.id || null;
         game.players.forEach(function (item) { item.answer = null; });
+        game.reactionTurn = Number(game.reactionTurn || 0) + 1;
         if (game.questionIndex >= game.questions.length) game.status = 'finished';
         var botRoundPayload = { type: 'round_result', question: { question: botQuestion.question, options: botResultOptions }, selected: botSelected, correct: botWasCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: bot.id };
         if (game.gameType !== 'gibha_sah' || botWasCorrect) botRoundPayload.answer = botCorrect;
