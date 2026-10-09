@@ -98,6 +98,11 @@ class GameAudioEngine {
     this.stopExternal('game-session-theme');
   }
 
+  public setGameSessionThemeRate(rate: number) {
+    const player = this.externalPlayers.get('game-session-theme');
+    if (player) player.playbackRate = Math.max(0.75, Math.min(1.4, rate));
+  }
+
   public playGameLoss() {
     const shouldResumeTheme = this.gameSessionThemeRequested;
     const themePlayer = this.externalPlayers.get('game-session-theme');

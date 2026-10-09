@@ -394,6 +394,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     return () => window.clearInterval(timer);
   }, [isTrueFalse, isMillionaireTeam, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
 
+  useEffect(() => {
+    if (isGibhaSah) gameAudio.setGameSessionThemeRate(turnSeconds <= 5 ? 1.28 : 1);
+    return () => gameAudio.setGameSessionThemeRate(1);
+  }, [isGibhaSah, turnSeconds]);
+
   useEffect(() => { setLifelineResult(null); setTeamRecommendation(null); setGibhaPowerResult(null); }, [state?.round]);
 
   useEffect(() => {
