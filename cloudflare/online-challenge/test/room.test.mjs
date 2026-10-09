@@ -236,6 +236,33 @@ test('millionaire team fills four seats after five seconds and alternates 2v2 te
   assert.equal(messages.some(message => message.type === 'round_result' && message.answeredTeam === 'A'), true);
 });
 
+test('gibha sah fills four seats and rotates the turn through all players', async () => {
+  const data = new Map();
+  let alarmAt = null;
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => {} },
+    getWebSockets: () => [hostSocket],
+  });
+  const questions = Array.from({ length: 24 }, (_, index) => ({ question: `Card ${index}?`, options: ['a', 'b', 'c', 'd', 'e', 'f'], correctAnswer: 0 }));
+  const startedAt = Date.now();
+  const response = await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
+  assert.equal(response.status, 200);
+  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 5000);
+  const waiting = data.get('game');
+  waiting.botJoinAt = Date.now() - 1;
+  data.set('game', waiting);
+  await room.alarm();
+  assert.equal(data.get('game').status, 'playing');
+  assert.equal(data.get('game').players.length, 4);
+  assert.equal(data.get('game').turn, 'host');
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
+  assert.equal(data.get('game').round, 1);
+  assert.equal(data.get('game').turn, data.get('game').players[1].id);
+  assert.equal(messages.some(message => message.type === 'round_result' && message.answeredBy === 'host'), true);
+});
+
 test('gibha sah keeps its original exceptional probability sequence', () => {
   const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
   const originalRandom = Math.random;

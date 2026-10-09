@@ -25,7 +25,7 @@ import { GibhaSahGameModal } from './GibhaSahGameModal';
 import { DailyExamModal } from './DailyExamModal';
 import { MillionaireAuthenticIcon, TrueFalseAuthenticIcon, GibhaSahAuthenticIcon, DailyExamAuthenticIcon } from './GameIcons';
 import { gameAudio } from '../utils/gameAudio';
-import { fetchLessonGamesData, fetchMillionaireTeamQuestions, LessonGamesBundle } from '../services/gamesService';
+import { fetchGibhaSahOnlineQuestions, fetchLessonGamesData, fetchMillionaireTeamQuestions, LessonGamesBundle } from '../services/gamesService';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
 import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
@@ -74,6 +74,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   >('menu');
   const [onlineGameType, setOnlineGameType] = useState<OnlineChallengeGameType>('millionaire');
   const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>([]);
+  const [gibhaOnlineQuestions, setGibhaOnlineQuestions] = useState<OnlineChallengeQuestion[]>([]);
 
   // Dynamic Supabase Games Bundle (Lazy-loaded on demand only when modal opens)
   const [gamesBundle, setGamesBundle] = useState<LessonGamesBundle | null>(null);
@@ -227,19 +228,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
       })),
     };
     if (onlineGameType === 'gibha_sah') {
-      const cards = gamesBundle?.gibhaSahConfig.cards || [];
       return {
         title: 'جبتها صح',
-        questions: cards.length >= 2 && cards.length <= 12
-          ? (gamesBundle?.gibhaSahConfig.questions || []).slice(0, 10).flatMap((question) => {
-              const correctAnswer = cards.findIndex((card) => card.number === question.correctCardNumber);
-              return correctAnswer >= 0 ? [{
-                question: question.question,
-                options: cards.map((card) => card.label),
-                correctAnswer,
-              }] : [];
-            })
-          : [],
+        questions: gibhaOnlineQuestions,
       };
     }
     const millionairePool = onlineGameType === 'millionaire_team' && teamQuestions.length ? teamQuestions : gamesBundle?.mcqConfig.questionPool || gamesBundle?.mcqConfig.questions || [];
@@ -263,6 +254,13 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
       try {
         const loaded = await fetchMillionaireTeamQuestions(openLessonContext, 20);
         setTeamQuestions(loaded.map(question => ({ question: question.question, options: [...question.options], correctAnswer: question.correctAnswer })));
+      } finally { setIsLoadingBundle(false); }
+    }
+    if (gameType === 'gibha_sah' && openLessonContext) {
+      setIsLoadingBundle(true);
+      try {
+        const loaded = await fetchGibhaSahOnlineQuestions(openLessonContext, 24);
+        setGibhaOnlineQuestions(loaded);
       } finally { setIsLoadingBundle(false); }
     }
     setOnlineGameType(gameType);

@@ -10,39 +10,10 @@ export interface LessonGamesBundle {
   mcqConfig: MillionaireGameConfig;
   trueFalseConfig: TrueFalseGameConfig;
   gibhaSahConfig: GibhaSahGameConfig;
-  flashCards: FlashCard[];
   dailyExamAvailable: boolean;
   source: 'database' | 'fallback';
   loadedAt: number;
   dataSource?: 'cloudflare' | 'supabase' | 'fallback';
-}
-
-export interface FlashCard {
-  id: string;
-  question: string;
-  answer: string;
-  pageId: string;
-  itemId: number;
-}
-
-function parseCurriculumToFlashCards(rawContent: any, lessonId: string): FlashCard[] {
-  const sourceLessonId = String(rawContent?.lesson_info?.lesson_id || '').trim();
-  if (!sourceLessonId || sourceLessonId !== String(lessonId).trim()) return [];
-  const cards: FlashCard[] = [];
-  for (const page of Array.isArray(rawContent?.pages) ? rawContent.pages : []) {
-    const pageId = String(page?.page_id || '').trim();
-    if (!pageId || !Array.isArray(page?.items)) continue;
-    for (const item of page.items) {
-      const itemId = Number(item?.item_id);
-      if (!Number.isFinite(itemId)) continue;
-      if (item?.type === 'question' && String(item.question || '').trim() && String(item.answer || '').trim()) {
-        cards.push({ id: `${pageId}-${itemId}`, question: String(item.question).trim(), answer: String(item.answer).trim(), pageId, itemId });
-      } else if (item?.type === 'paragraph' && String(item.content || '').trim()) {
-        cards.push({ id: `${pageId}-${itemId}`, question: 'ما الفكرة أو المعلومات الأساسية التي يوضحها هذا الجزء؟', answer: String(item.content).trim(), pageId, itemId });
-      }
-    }
-  }
-  return Array.from(new Map(cards.map((card) => [card.id, card])).values());
 }
 
 // In-memory cache for game bundles by key (subject_lessonId)
@@ -462,7 +433,6 @@ export async function fetchLessonGamesData(
           mcqConfig,
           trueFalseConfig,
           gibhaSahConfig,
-          flashCards: parseCurriculumToFlashCards(bundle.curriculumData, actualLessonId),
           dailyExamAvailable: Boolean(bundle.curriculumData?.pages?.length),
           source: 'database',
           dataSource: bundle.dataSource || 'supabase',
@@ -535,7 +505,6 @@ export async function fetchLessonGamesData(
       mcqConfig,
       trueFalseConfig,
       gibhaSahConfig,
-      flashCards: [],
       dailyExamAvailable: false,
       source: mcqRes || tfRes || phRes ? 'database' : 'fallback',
       dataSource: mcqRes || tfRes || phRes ? 'cloudflare' : 'fallback',
@@ -550,7 +519,6 @@ export async function fetchLessonGamesData(
       mcqConfig: parseMcqToMillionaire(null, actualLessonId, actualLessonTitle, actualCategory),
       trueFalseConfig: parseTrueFalseConfig(null, actualLessonId, actualLessonTitle, actualCategory),
       gibhaSahConfig: parsePhToGibhaSah(null, actualLessonId, actualLessonTitle, actualCategory),
-      flashCards: [],
       dailyExamAvailable: false,
       source: 'fallback',
       dataSource: 'fallback',
@@ -589,4 +557,65 @@ export async function fetchMillionaireTeamQuestions(context: OpenLessonContext, 
   }
   if (!collected.length) return [];
   return Array.from({ length: minimum }, (_, index) => collected[index % collected.length]);
+}
+
+export interface GibhaSahOnlineQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+}
+
+/** Builds a 24-question online deck from the selected lesson first, then only
+ * neighbouring lessons that belong to the same subject and chapter. Six answer
+ * cards are shown initially; after three are consumed, three new cards enter. */
+export async function fetchGibhaSahOnlineQuestions(context: OpenLessonContext, minimum = 24): Promise<GibhaSahOnlineQuestion[]> {
+  const collected: Array<{ question: string; answer: string }> = [];
+  const seenQuestions = new Set<string>();
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8];
+
+  for (const offset of offsets) {
+    const lessonNumber = context.lessonNumber + offset;
+    if (lessonNumber < 1) continue;
+    const lessonContext: OpenLessonContext = {
+      ...context,
+      lessonNumber,
+      lessonId: offset === 0 ? context.lessonId : buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      lessonKey: buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      title: offset === 0 ? (context.title || context.lessonTitle) : `الدرس ${lessonNumber}`,
+      lessonTitle: offset === 0 ? (context.lessonTitle || context.title) : `الدرس ${lessonNumber}`,
+    };
+    const bundle = await fetchLessonGamesData(lessonContext);
+    if (bundle.source !== 'database') continue;
+    const source = bundle.gibhaSahConfig;
+    const pool = source.questionPool?.length ? source.questionPool : source.questions;
+    for (const item of pool) {
+      const question = item.question.trim();
+      const answer = (item.answerLabel || source.cards.find(card => card.number === item.correctCardNumber)?.label || '').trim();
+      if (!question || !answer || seenQuestions.has(question)) continue;
+      seenQuestions.add(question);
+      collected.push({ question, answer });
+      if (collected.length >= minimum) break;
+    }
+    if (collected.length >= minimum) break;
+  }
+
+  if (!collected.length) return [];
+  const deck = collected.length >= minimum
+    ? collected.slice(0, minimum)
+    : Array.from({ length: minimum }, (_, index) => collected[index % collected.length]);
+
+  return deck.map((item, index) => {
+    const refillStart = Math.floor(index / 3) * 3;
+    const windowEnd = Math.min(deck.length, refillStart + 6);
+    const visibleAnswers = deck.slice(index, windowEnd).map(entry => entry.answer);
+    const uniqueAnswers = Array.from(new Set(visibleAnswers));
+    if (uniqueAnswers.length < 2) {
+      for (const candidate of deck) {
+        if (!uniqueAnswers.includes(candidate.answer)) uniqueAnswers.push(candidate.answer);
+        if (uniqueAnswers.length >= 2) break;
+      }
+    }
+    const options = uniqueAnswers.sort(() => Math.random() - 0.5);
+    return { question: item.question, options, correctAnswer: options.indexOf(item.answer) };
+  }).filter(item => item.correctAnswer >= 0 && item.options.length >= 2);
 }
