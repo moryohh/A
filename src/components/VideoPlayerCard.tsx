@@ -12,6 +12,7 @@ import {
   Clock,
   VideoOff,
   BookOpen,
+  Presentation,
 } from 'lucide-react';
 import { LessonBookletView } from './LessonBookletView';
 import { LessonBookletData } from '../data/lessonBooklet';
@@ -45,6 +46,8 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const [studyView, setStudyView] = useState<'booklet' | 'board'>('booklet');
+
   // Curriculum State
   const [curriculumData, setCurriculumData] = useState<LessonBookletData | null>(null);
   const [isLoadingCurriculum, setIsLoadingCurriculum] = useState(true);
@@ -77,6 +80,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
     setIsPlaying(true);
     setProgress(0);
     setCurriculumData(null);
+    setStudyView('booklet');
 
     let isMounted = true;
     setIsLoadingCurriculum(true);
@@ -374,6 +378,21 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         )}
       </div>
 
+      <div className="grid grid-cols-2 gap-3" dir="ltr" role="tablist" aria-label="أدوات الدراسة">
+        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'border-white/15 text-gray-400'}`}><BookOpen size={22} /> الملزمة</button>
+        <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'border-white/15 text-gray-400'}`}><Presentation size={22} /> الصبورة — حل معي</button>
+      </div>
+      <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
+      {studyView === 'board' && <iframe
+        key={`${lesson.id}-board`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}`}
+        title="صبورة حل معي: السؤال والشرح وخطوات الحل"
+        className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900"
+        style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
+        allow="fullscreen; clipboard-write; web-share"
+        allowFullScreen
+      />}
+      <div hidden={studyView !== 'booklet'}>
       {/* Educational Booklet / Real Curriculum View */}
       <LessonBookletView
         bookletData={curriculumData}
@@ -381,6 +400,9 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         error={curriculumError}
         lessonTitle={formatArabicLessonTitle(lesson.title)}
       />
+
+      </div>
+      </div>
 
       {/* ========================================================= */}
       {/* 🧭 END OF LESSON ACTIONS: Back to Map or Enter Tests */}
