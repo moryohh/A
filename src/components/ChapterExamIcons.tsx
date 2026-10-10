@@ -894,17 +894,17 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                 '--page-drag-x': `${touchDeltaX * 0.18}px`,
                 '--page-drag-rotate': `${touchDeltaX * -0.16}deg`,
               } as React.CSSProperties}
-              className={`exam-page-turn ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
+              className={`exam-page-turn exam-paper ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-[1.35rem] border-2 p-5 text-right shadow-[0_10px_28px_rgba(111,86,42,.2)]`}
             >
-              <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
-                <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#cbb98d]/70 pb-3">
+                <h3 className="text-sm font-black text-[#594a2d]">{activeQuestion.title} - الفرع {activePart.title}</h3>
                 {activeQuestion.parts.length > 1 && (
                   <button
                     type="button"
                     onClick={flipForward}
-                    className="shrink-0 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
+                    className="shrink-0 rounded-full border border-[#c8b57e] bg-[#fffaf0]/90 px-3 py-1 text-[10px] font-black text-[#66552f] shadow-sm transition hover:bg-[#66552f] hover:text-white"
                   >
-                    اقلب الصفحة
+                    صفحة {activePartIndex + 1} من {activeQuestion.parts.length}
                   </button>
                 )}
               </div>
@@ -917,22 +917,22 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                 onTouchEnd={handleTouchEnd}
                 className="exam-page-sheet rounded-xl"
               >
-                <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
+                <p className="whitespace-pre-line rounded-xl border border-[#d8c99e]/80 bg-[#eee1bf]/70 p-4 text-sm leading-7 text-[#4d422c] shadow-inner">{activePart.text}</p>
               </div>
               <div
-                className="mt-5 border-t border-slate-100 pt-4"
+                className="mt-5 border-t border-[#cbb98d]/70 pt-4"
                 onTouchStart={(event) => event.stopPropagation()}
                 onTouchMove={(event) => event.stopPropagation()}
                 onTouchEnd={(event) => event.stopPropagation()}
               >
-                <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
+                <label className="text-xs font-black text-[#66552f]" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
                   الجواب
                 </label>
                 <textarea
                   id={`exam-answer-${exam.id}-${answerKey}`}
                   value={answers[answerKey] || ''}
                   onChange={(event) => setAnswers((current) => ({ ...current, [answerKey]: event.target.value }))}
-                  className="mt-2 min-h-32 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-7 outline-none focus:border-sky-400 focus:bg-white"
+                  className="mt-2 min-h-32 w-full resize-y rounded-xl border border-[#d1c096] bg-[#fffaf0]/80 p-3 text-sm leading-7 text-[#403722] outline-none focus:border-[#a98b4f] focus:bg-white"
                   placeholder="اكتب جوابك بدون أن تظهر الإجابة النموذجية للطالب..."
                   onTouchStart={(event) => event.stopPropagation()}
                 />
