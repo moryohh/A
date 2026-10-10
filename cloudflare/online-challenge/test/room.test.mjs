@@ -308,6 +308,40 @@ test('gibha sah removes duplicate answers and accepts matching answer text', asy
   assert.equal(messages.some(message => message.type === 'round_result' && message.correct === true), true);
 });
 
+test('gibha sah completes all 24 questions even when answers repeat', async () => {
+  const data = new Map();
+  const socket = { deserializeAttachment: () => ({ userId: 'host' }), send: () => {} };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} },
+    getWebSockets: () => [socket],
+  });
+  const questions = Array.from({ length: 24 }, (_, index) => ({ question: `Question ${index + 1}?`, options: [`answer-${index % 8}`, `wrong-${index}`], correctAnswer: 0 }));
+  await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
+  const started = data.get('game');
+  started.status = 'playing';
+  started.turn = 'host';
+  room.prepareGibhaBoard(started);
+  assert.equal(started.gibhaBoardSlots.filter(Boolean).length, 6);
+  assert.equal(started.gibhaPendingQuestions.length, 18);
+  data.set('game', started);
+  const seen = new Set();
+  for (let round = 0; round < 24; round += 1) {
+    const current = data.get('game');
+    assert.equal(current.status, 'playing', `game ended after ${round} solved questions`);
+    const index = current.questionIndex;
+    assert.equal(seen.has(index), false, `question ${index} was repeated`);
+    seen.add(index);
+    const answer = current.questions[index].options[0];
+    const slot = current.gibhaBoardOptions.indexOf(answer);
+    assert.ok(slot >= 0, `answer ${answer} must be on the board`);
+    current.turn = 'host';
+    data.set('game', current);
+    await room.webSocketMessage(socket, JSON.stringify({ type: 'answer', option: slot }));
+  }
+  assert.equal(seen.size, 24);
+  assert.equal(data.get('game').status, 'finished');
+});
+
 test('gibha sah keeps its original exceptional probability sequence', () => {
   const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
   const originalRandom = Math.random;
@@ -379,4 +413,12 @@ test('gibha sah allows one synchronized reaction per player and turn', async () 
   assert.equal(reactions.length, 1);
   assert.equal(reactions[0].kind, 'rocket');
   assert.equal(reactions[0].targetId, 'guest');
+  const nextTurn = data.get('game');
+  nextTurn.reactionTurn = 4;
+  data.set('game', nextTurn);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'reaction', kind: 'laugh' }));
+  assert.equal(messages.filter(message => message.type === 'reaction').length, 1);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'reaction', kind: 'laugh', targetId: 'guest' }));
+  assert.equal(messages.filter(message => message.type === 'reaction').length, 2);
+  assert.equal(messages.at(-1).targetId, 'guest');
 });
