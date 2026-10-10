@@ -13,6 +13,7 @@ type Player = { id: string; team?: 'A' | 'B' | null; score: number; streak?: num
 type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; turn?: string | null; activeTeam?: 'A' | 'B' | null; question: { question: string; options: string[] } | null; gibhaRefillSlots?: number[]; gibhaRefillVersion?: number; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null; teamLives?: { A: number; B: number }; teamScores?: { A: number; B: number }; questionDeadline?: number | null; discussionPhase?: 'thinking' | 'recommended' | null; lifelines?: { fifty: boolean; audience: boolean; phone: boolean } | null };
 type RoundResult = { question?: { question: string; options: string[] }; answer?: number; selected?: number; correct?: boolean; answeredBy?: string; scores: Array<{ id: string; score: number }>; botSelected?: number; botCorrect?: boolean; stealAwarded?: boolean };
 type ChatMessage = { id: string; from: string; text: string; sentAt: number };
+type ReactionPath = { startX: number; startY: number; endX: number; endY: number };
 
 interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; }
 
@@ -45,7 +46,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [reactionUsed, setReactionUsed] = useState(false);
   const [rocketTargeting, setRocketTargeting] = useState(false);
   const [laughTargeting, setLaughTargeting] = useState(false);
-  const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number } | null>(null);
+  const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number; path?: ReactionPath } | null>(null);
+  const gibhaBoardRef = useRef<HTMLDivElement | null>(null);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
@@ -255,10 +257,23 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'reaction') {
-        setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce: Date.now() });
+        const board = gibhaBoardRef.current;
+        const avatars: HTMLElement[] = board ? Array.from(board.querySelectorAll<HTMLElement>('[data-gibha-avatar]')) : [];
+        const source = avatars.find(avatar => avatar.dataset.gibhaAvatar === payload.from);
+        const target = avatars.find(avatar => avatar.dataset.gibhaAvatar === payload.targetId);
+        const bounds = board?.getBoundingClientRect();
+        const sourceBounds = source?.getBoundingClientRect();
+        const targetBounds = target?.getBoundingClientRect();
+        const path = bounds && sourceBounds && targetBounds ? {
+          startX: sourceBounds.left + sourceBounds.width / 2 - bounds.left,
+          startY: sourceBounds.top + sourceBounds.height / 2 - bounds.top,
+          endX: targetBounds.left + targetBounds.width / 2 - bounds.left,
+          endY: targetBounds.top + targetBounds.height / 2 - bounds.top,
+        } : undefined;
+        setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce: Date.now(), path });
         if (payload.kind === 'rocket') { gameAudio.playClick(1050); window.setTimeout(() => gameAudio.playGibhaWrong(), 650); }
         else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
-        window.setTimeout(() => setReactionFx(null), payload.kind === 'rocket' ? 1900 : payload.kind === 'laugh' && payload.targetId ? 1500 : 1100);
+        window.setTimeout(() => setReactionFx(null), payload.kind === 'rocket' ? 2300 : payload.kind === 'laugh' && payload.targetId ? 1900 : 1100);
       }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
@@ -510,10 +525,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const targetedReaction = reactionFx?.targetId === player?.id ? reactionFx.kind : null;
     return <div key={player?.id || `seat-${seat}`} onClick={() => { if (!isTargetable || !player) return; sendReaction(rocketTargeting ? 'rocket' : 'laugh', player.id); }} className={`relative min-h-[6.6rem] min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${isTargetable ? 'cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${targetedReaction === 'rocket' ? 'gibha-rocket-target' : ''}`}>
       <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-15 grayscale'}`}><span className={`relative z-10 block rotate-180 text-4xl ${activeMe ? 'animate-pulse drop-shadow-[0_0_26px_rgba(52,211,153,1)] [filter:hue-rotate(70deg)_brightness(1.5)]' : active ? 'animate-pulse drop-shadow-[0_0_25px_rgba(250,204,21,1)] brightness-150' : ''}`}>💡</span>{active && <span className={`absolute left-1/2 top-8 h-16 w-24 -translate-x-1/2 bg-gradient-to-b to-transparent blur-[2px] [clip-path:polygon(42%_0,58%_0,100%_100%,0_100%)] ${activeMe ? 'from-emerald-100/90' : 'from-yellow-100/85'}`}/>}</div>
-      <div className={`absolute top-8 z-10 h-14 w-14 overflow-hidden rounded-full border-2 border-cyan-200 bg-slate-800 shadow-[0_0_14px_rgba(34,211,238,.45)] ${avatarSide}`}>{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-3 h-7 w-7 text-cyan-200"/>}</div>
+      <div data-gibha-avatar={player?.id || ''} className={`absolute top-8 z-10 h-14 w-14 overflow-hidden rounded-full border-2 border-cyan-200 bg-slate-800 shadow-[0_0_14px_rgba(34,211,238,.45)] ${avatarSide}`}>{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-3 h-7 w-7 text-cyan-200"/>}</div>
       <div className={`${seat % 2 === 0 ? 'pr-[4.25rem]' : 'pl-[4.25rem]'}`}><strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/10 px-2 py-0.5 font-black text-amber-200">{player ? <><span aria-hidden="true">⭐</span><span>{player.score}</span></> : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}</div>
-      {targetedReaction === 'laugh' && <div key={reactionFx?.nonce} className="gibha-laugh-orbit pointer-events-none absolute inset-0 z-40" aria-hidden="true"><span>😂</span><span>🤣</span><span>😂</span><span>🤣</span></div>}
-      {targetedReaction === 'rocket' && <div key={reactionFx?.nonce} className="pointer-events-none absolute inset-0 z-40 overflow-visible" aria-hidden="true"><span className="gibha-target-rocket">🚀</span><span className="gibha-target-explosion">💥</span></div>}
+      {targetedReaction === 'laugh' && <div key={reactionFx?.nonce} className={`gibha-laugh-orbit pointer-events-none absolute z-40 h-14 w-14 ${avatarSide} top-8`} aria-hidden="true"><span>😂</span><span>🤣</span><span>😂</span><span>🤣</span></div>}
       {showMessage && <div key={playerMessageBubble?.nonce} className={`gibha-message-bubble absolute top-2 z-30 max-w-[calc(100%_-_5.4rem)] rounded-2xl border border-cyan-200/80 bg-cyan-50 px-3 py-2 text-right text-[11px] font-bold leading-5 text-slate-900 shadow-[0_8px_25px_rgba(34,211,238,.35)] after:absolute after:top-7 after:border-y-[7px] after:border-y-transparent ${bubbleSide} ${bubbleTail}`}><span className="mb-0.5 block text-[9px] font-black text-cyan-700">{label}</span><span className="line-clamp-3">{playerMessageBubble?.text}</span></div>}
       {player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className={`absolute bottom-1 z-20 rounded-full bg-black/45 p-1 ${seat % 2 === 0 ? 'right-2' : 'left-2'}`} aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}
     </div>;
@@ -537,7 +551,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   if (room && state && isGibhaSah) return <div className="fixed inset-0 z-[90] overflow-hidden bg-[#020818] text-white" dir="rtl">
     <audio ref={remoteAudioRef} autoPlay playsInline />
-    <div className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border-x-2 border-cyan-500/40 bg-[radial-gradient(circle_at_center,rgba(15,67,113,.42),rgba(2,8,24,.98)_70%),linear-gradient(90deg,rgba(34,211,238,.07)_1px,transparent_1px),linear-gradient(rgba(34,211,238,.07)_1px,transparent_1px)] bg-[size:auto,32px_32px,32px_32px] shadow-[0_0_45px_rgba(6,182,212,.28)]">
+    <div ref={gibhaBoardRef} className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border-x-2 border-cyan-500/40 bg-[radial-gradient(circle_at_center,rgba(15,67,113,.42),rgba(2,8,24,.98)_70%),linear-gradient(90deg,rgba(34,211,238,.07)_1px,transparent_1px),linear-gradient(rgba(34,211,238,.07)_1px,transparent_1px)] bg-[size:auto,32px_32px,32px_32px] shadow-[0_0_45px_rgba(6,182,212,.28)]">
       <header className="flex h-11 shrink-0 items-center justify-between border-b border-cyan-400/20 px-3"><div className="min-w-0"><b className="block truncate text-sm text-cyan-200">جبتها صح — تحدّي 4 لاعبين</b><p className="truncate text-[10px] text-slate-400">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-full bg-white/5 p-1.5"><X className="h-5 w-5" /></button></header>
       <main className="flex min-h-0 flex-1 flex-col gap-2 p-2">{waitingOrReconnect}
         {state.status === 'playing' && displayedQuestion && <>
@@ -562,7 +576,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           {gibhaPowerResult?.kind === 'reveal' && <div className="shrink-0 rounded-xl bg-amber-500/15 px-3 py-1 text-center text-xs text-amber-100">{Number.isInteger(gibhaPowerResult.option) ? `آخر اختيار لمنافس: البطاقة ${(gibhaPowerResult.option || 0) + 1}` : 'لا يوجد اختيار سابق للمنافس بعد'}</div>}
           {roundResult && <div className={`shrink-0 rounded-xl border px-3 py-1 text-center text-xs font-black ${roundResult.correct ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200' : 'border-rose-500/50 bg-rose-500/10 text-rose-200'}`}>{roundResult.correct ? 'جبتها صح! ✨ البطاقة خرجت من اللوحة' : 'ليست صحيحة — لا نكشف الحل وينتقل الدور'}</div>}
           <div className="grid shrink-0 grid-cols-2 gap-2">{[2, 3].map(index => renderGibhaPlayer(state.players[index], index))}</div>
-        </>}{gibhaFinalResult}</main>{(rocketTargeting || laughTargeting) && <div className="pointer-events-none absolute inset-x-3 top-1/2 z-40 flex items-center justify-center"><span className="rounded-full bg-rose-600/95 px-4 py-2 text-sm font-black shadow-xl"><Crosshair className="ml-1 inline h-4 w-4"/>{rocketTargeting ? 'اختر اللاعب الذي تريد قصفه' : 'اختر اللاعب الذي تريد إضحاكه'}</span></div>}{reactionFx && reactionFx.kind !== 'rocket' && !(reactionFx.kind === 'laugh' && reactionFx.targetId) && <div key={reactionFx.nonce} className="gibha-reaction-pop pointer-events-none absolute inset-0 z-50 grid place-items-center text-7xl">{{clap:'👏',laugh:'😂',think:'🤔',angry:'😡'}[reactionFx.kind]}</div>}{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
+        </>}{gibhaFinalResult}</main>{(rocketTargeting || laughTargeting) && <div className="pointer-events-none absolute inset-x-3 top-1/2 z-40 flex items-center justify-center"><span className="rounded-full bg-rose-600/95 px-4 py-2 text-sm font-black shadow-xl"><Crosshair className="ml-1 inline h-4 w-4"/>{rocketTargeting ? 'اختر اللاعب الذي تريد قصفه' : 'اختر اللاعب الذي تريد إضحاكه'}</span></div>}{reactionFx?.path && (reactionFx.kind === 'rocket' || reactionFx.kind === 'laugh') && <div key={reactionFx.nonce} className="pointer-events-none absolute inset-0 z-50" style={{ '--gibha-start-x': `${reactionFx.path.startX}px`, '--gibha-start-y': `${reactionFx.path.startY}px`, '--gibha-end-x': `${reactionFx.path.endX}px`, '--gibha-end-y': `${reactionFx.path.endY}px`, '--gibha-mid-x': `${(reactionFx.path.startX + reactionFx.path.endX) / 2}px`, '--gibha-mid-y': `${Math.min(reactionFx.path.startY, reactionFx.path.endY) - 100}px` } as React.CSSProperties}><span className={reactionFx.kind === 'rocket' ? 'gibha-path-rocket' : 'gibha-path-laugh'}>{reactionFx.kind === 'rocket' ? '🚀' : '😂'}</span>{reactionFx.kind === 'rocket' && <span className="gibha-path-explosion">💥</span>}</div>}{reactionFx && reactionFx.kind !== 'rocket' && !(reactionFx.kind === 'laugh' && reactionFx.targetId) && <div key={reactionFx.nonce} className="gibha-reaction-pop pointer-events-none absolute inset-0 z-50 grid place-items-center text-7xl">{{clap:'👏',laugh:'😂',think:'🤔',angry:'😡'}[reactionFx.kind]}</div>}{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
     </div>{chatPanel}
   </div>;
 
