@@ -240,16 +240,16 @@ export class ChallengeRoom {
     var questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     if (Array.isArray(game.gibhaBoardSlots)) return;
     game.gibhaBoardSlots = [];
-    var scanIndex = questionIndex;
-    while (game.gibhaBoardSlots.length < 6 && scanIndex < game.questions.length) {
+    game.gibhaPendingQuestions = [];
+    for (var scanIndex = questionIndex; scanIndex < game.questions.length; scanIndex += 1) {
       var question = game.questions[scanIndex];
       var option = question.options[question.correctAnswer];
       var optionKey = this.answerKey(option);
-      if (optionKey && !game.gibhaBoardSlots.some(function (slot) { return this.answerKey(slot.option) === optionKey; }, this)) game.gibhaBoardSlots.push({ questionIndex: scanIndex, option: option });
-      scanIndex += 1;
+      if (optionKey && game.gibhaBoardSlots.length < 6 && !game.gibhaBoardSlots.some(function (slot) { return this.answerKey(slot.option) === optionKey; }, this)) game.gibhaBoardSlots.push({ questionIndex: scanIndex, option: option });
+      else game.gibhaPendingQuestions.push(scanIndex);
     }
     while (game.gibhaBoardSlots.length < 6) game.gibhaBoardSlots.push(null);
-    game.gibhaNextQuestionIndex = scanIndex;
+    game.gibhaNextQuestionIndex = game.questions.length;
     game.gibhaBoardOptions = game.gibhaBoardSlots.map(function (slot) { return slot ? slot.option : ''; });
     game.gibhaQuestionQueue = game.gibhaBoardSlots.filter(Boolean).map(function (slot) { return slot.questionIndex; });
     game.gibhaRefillSlots = [];
@@ -258,14 +258,15 @@ export class ChallengeRoom {
     var emptySlots = game.gibhaBoardSlots.map(function (slot, index) { return slot ? -1 : index; }).filter(function (index) { return index >= 0; }).slice(0, 3);
     var filledSlots = [];
     emptySlots.forEach(function (slot) {
-      while ((game.gibhaNextQuestionIndex || 0) < game.questions.length) {
-        var questionIndex = game.gibhaNextQuestionIndex || 0;
+      var pending = game.gibhaPendingQuestions || [];
+      for (var position = 0; position < pending.length; position += 1) {
+        var questionIndex = pending[position];
         var question = game.questions[questionIndex];
         var option = question.options[question.correctAnswer];
-        game.gibhaNextQuestionIndex = questionIndex + 1;
         var optionKey = this.answerKey(option);
         if (!optionKey || game.gibhaBoardSlots.some(function (existing) { return existing && this.answerKey(existing.option) === optionKey; }, this)) continue;
         game.gibhaBoardSlots[slot] = { questionIndex: questionIndex, option: option };
+        pending.splice(position, 1);
         filledSlots.push(slot);
         break;
       }
@@ -536,8 +537,9 @@ export class ChallengeRoom {
       liveGame.reactionTurn = Number(liveGame.reactionTurn || 0);
       liveGame.reactionUses = liveGame.reactionUses || {};
       if (liveGame.reactionUses[sender.userId] === liveGame.reactionTurn) return;
-      var reactionTarget = payload.kind === 'rocket' ? liveGame.players.find(function (player) { return player.id === payload.targetId && player.id !== sender.userId; }) : null;
-      if (payload.kind === 'rocket' && !reactionTarget) return;
+      var needsTarget = payload.kind === 'rocket' || payload.kind === 'laugh';
+      var reactionTarget = needsTarget ? liveGame.players.find(function (player) { return player.id === payload.targetId && player.id !== sender.userId; }) : null;
+      if (needsTarget && !reactionTarget) return;
       liveGame.reactionUses[sender.userId] = liveGame.reactionTurn;
       await this.ctx.storage.put('game', liveGame);
       this.broadcast({ type: 'reaction', kind: payload.kind, from: sender.userId, targetId: reactionTarget ? reactionTarget.id : null, sentAt: Date.now(), turn: liveGame.reactionTurn });
@@ -684,7 +686,7 @@ export class ChallengeRoom {
           game.gibhaBoardSlots[chosen] = null;
           game.gibhaBoardOptions[chosen] = '';
           var remainingCards = game.gibhaBoardSlots.filter(Boolean).length;
-          if (remainingCards === 3) this.refillGibhaBoard(game);
+          if (remainingCards <= 3) this.refillGibhaBoard(game);
         }
         nextQuestionIndex = this.advanceGibhaQuestion(game, currentIndex, isCorrect);
       }
@@ -828,7 +830,7 @@ export class ChallengeRoom {
             game.gibhaBoardSlots[botSelected] = null;
             game.gibhaBoardOptions[botSelected] = '';
             var botRemainingCards = game.gibhaBoardSlots.filter(Boolean).length;
-            if (botRemainingCards === 3) this.refillGibhaBoard(game);
+            if (botRemainingCards <= 3) this.refillGibhaBoard(game);
           }
           botNextQuestionIndex = this.advanceGibhaQuestion(game, botCurrentIndex, botWasCorrect);
         }
