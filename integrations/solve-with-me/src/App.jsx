@@ -202,7 +202,7 @@ const shortExerciseTitle = problem => {
   return clean.split(/\s+/).slice(0, 7).join(' ') || 'تمرين'
 }
 
-function Exercises({ topic, onBack, onOpen }) {
+function Exercises({ topic, onBack, onOpen, embedded = false }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
@@ -214,7 +214,7 @@ function Exercises({ topic, onBack, onOpen }) {
     })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
   },[topic])
-  return <main className="page exercises-page"><div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>الموضوع</small><h1>{topic.name}</h1></div></div>
+  return <main className="page exercises-page"><div className="title-row">{!embedded&&<button className="icon-button" onClick={onBack}><ArrowRight/></button>}<div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
       <span className="exercise-order">{order+1}</span><div className="exercise-name"><MathText>{shortExerciseTitle(item.problem)}</MathText><small>السؤال {item.problem.number || item.questionIndex+1}{item.problem.page_number ? ` • صفحة ${item.problem.page_number}` : ''}</small></div><ChevronLeft/>
@@ -350,16 +350,17 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts }) {
+function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
   useEffect(()=>{fetch(`./data/${file}`).then(r=>r.json()).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
   useEffect(()=>{
+    if(resetProgress){setAnswers({});return}
     try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}
-  },[file,questionIndex])
+  },[file,questionIndex,resetProgress])
   useEffect(()=>{
-    if(questions.length)localStorage.setItem(`xxx_react_progress_${file}_${questionIndex}`,JSON.stringify(answers))
-  },[answers,file,questionIndex,questions.length])
+    if(!resetProgress&&questions.length)localStorage.setItem(`xxx_react_progress_${file}_${questionIndex}`,JSON.stringify(answers))
+  },[answers,file,questionIndex,questions.length,resetProgress])
   const problem=questions[questionIndex]
   const currentStep=useMemo(()=>problem?.steps.find(s=>s.inputs.some(i=>!answers[i.id])) || problem?.steps.at(-1),[problem,answers])
   useEffect(()=>{setActiveId(currentStep?.inputs.find(i=>!answers[i.id])?.id||null)},[currentStep,answers])
@@ -381,31 +382,35 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
 }
 
 export default function App(){
-  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState('subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
+  const params=useMemo(()=>new URLSearchParams(window.location.search),[])
+  const requestedSubject=String(params.get('subject')||'').toLowerCase()
+  const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
+  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
-    const params=new URLSearchParams(window.location.search)
-    const selected=subjects.find(item=>item.id===params.get('subject'))
+    const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
     if(!selected)return
     let cancelled=false
     fetch(selected.curriculum).then(r=>{if(!r.ok)throw new Error('Curriculum unavailable');return r.json()}).then(data=>{
       if(cancelled)return
-      setSubject(selected);setCurriculum(data);setView('chapters')
+      setSubject(selected);setCurriculum(data);setView(embeddedScience?'missing':'chapters')
       const number=Number(params.get('chapter'))
       const matched=data.find(ch=>Number(ch.id.match(/ch(\d+)/)?.[1])===number)
       if(!matched)return
-      setChapter(matched);setView('topics')
+      setChapter(matched);setView(embeddedScience?'missing':'topics')
       const lesson=Number(params.get('lesson'))
-      const found=matched.topics.find(t=>t.files.some(f=>(typeof f==='string'?f:f.file).match(new RegExp(`lesson${lesson}\\.json$`))))
+      const found=matched.topics.find(t=>t.files.some(f=>new RegExp(`(?:^|_)lesson${lesson}\\.json$`).test(typeof f==='string'?f:f.file)))
       if(found){setTopic(found);setView('exercises')}
     }).catch(error=>console.error('Could not open lesson:',error))
     return()=>{cancelled=true}
-  },[])
+  },[embeddedScience,params,requestedSubject])
   const home=()=>{setView('subjects');setSubject(null);setChapter(null);setTopic(null);setFile(null);setQuestionIndex(0)}
   return <><Header {...{apples,hearts}} onHome={home}/>
+    {view==='loading'&&<main className="page"><div className="loading">جاري فتح تمارين الدرس المحدد…</div></main>}
+    {view==='missing'&&<main className="page"><div className="loading">لا توجد تمارين مضافة لهذا الدرس حاليًا</div></main>}
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
+    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
 }
