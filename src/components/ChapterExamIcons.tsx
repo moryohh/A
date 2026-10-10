@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'lucide-react';
+import { Award, Camera, CheckCircle2, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'lucide-react';
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
@@ -591,6 +591,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       ? exam.payload.dawr
       : '';
   const answerKey = activeQuestionIndex * 100 + activePartIndex;
+  const isPartAnswered = (questionIndex: number, partIndex: number) => {
+    const key = questionIndex * 100 + partIndex;
+    return Boolean(answers[key]?.trim() || images[key]);
+  };
+  const isQuestionAnswered = (questionIndex: number) => {
+    const question = questions[questionIndex];
+    return Boolean(question?.parts.length) && question.parts.every((_, partIndex) => isPartAnswered(questionIndex, partIndex));
+  };
   const partStyles = [
     { card: 'border-sky-300 bg-sky-50/35', question: 'bg-sky-50 text-sky-950' },
     { card: 'border-emerald-300 bg-emerald-50/35', question: 'bg-emerald-50 text-emerald-950' },
@@ -802,7 +810,6 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-right">
               <p>جمهورية العراق - وزارة التربية</p>
-              <p className="mt-1 text-slate-500">{subjectName}</p>
             </div>
             <div className="min-w-0 flex-1" aria-hidden="true" />
             <button type="button" onClick={onClose} className="shrink-0 rounded-full border border-slate-200 bg-slate-100 p-2 text-slate-700 shadow-sm" aria-label="خروج من الامتحان">
@@ -818,25 +825,62 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
         </header>
 
         {questions.length > 0 && (
-          <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-stone-100 px-3 py-2" aria-label="التنقل بين أسئلة الامتحان">
-            {questions.map((question, index) => {
-              const isActive = index === activeQuestionIndex;
-              return (
-                <button
-                  key={`exam-question-tab-${index}`}
-                  type="button"
-                  onClick={() => openQuestion(index)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black transition ${
-                    isActive
-                      ? 'border-slate-950 bg-slate-950 text-white'
-                      : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
-                  }`}
-                  aria-current={isActive ? 'step' : undefined}
-                >
-                  {question.title || `س${index + 1}`}
-                </button>
-              );
-            })}
+          <nav className="border-b border-slate-200 bg-stone-100 px-3 py-2" aria-label="التنقل بين أسئلة وفروع الامتحان">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {questions.map((question, index) => {
+                const isActive = index === activeQuestionIndex;
+                const questionAnswered = isQuestionAnswered(index);
+                return (
+                  <div key={`exam-question-group-${index}`} className="shrink-0 rounded-2xl border border-violet-200 bg-violet-50/70 p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openQuestion(index)}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black transition ${
+                        questionAnswered
+                          ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                          : isActive
+                            ? 'border-slate-950 bg-slate-950 text-white'
+                            : 'border-violet-300 bg-white text-violet-950 hover:border-violet-500'
+                      }`}
+                      aria-current={isActive ? 'step' : undefined}
+                    >
+                      {questionAnswered && <CheckCircle2 className="h-3.5 w-3.5" />}
+                      {question.title || `س${index + 1}`}
+                    </button>
+                    {question.parts.length > 1 && (
+                      <div className="mt-1 flex items-center justify-center gap-1">
+                        {question.parts.map((part, partIndex) => {
+                          const partAnswered = isPartAnswered(index, partIndex);
+                          const partActive = isActive && partIndex === activePartIndex;
+                          return (
+                            <button
+                              key={`exam-part-tab-${index}-${partIndex}`}
+                              type="button"
+                              onClick={() => {
+                                setActiveQuestionIndex(index);
+                                setActivePartIndex(partIndex);
+                                setTouchDeltaX(0);
+                              }}
+                              className={`flex items-center gap-0.5 rounded-lg border px-2 py-1 text-[10px] font-black transition ${
+                                partAnswered
+                                  ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
+                                  : partActive
+                                    ? 'border-violet-500 bg-violet-200 text-violet-950'
+                                    : 'border-violet-200 bg-white text-violet-700 hover:border-violet-400'
+                              }`}
+                              aria-label={`${question.title || `السؤال ${index + 1}`} ${part.title || `الفرع ${partIndex + 1}`}`}
+                            >
+                              {partAnswered && <CheckCircle2 className="h-3 w-3" />}
+                              {part.title || `فرع ${partIndex + 1}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </nav>
         )}
 
