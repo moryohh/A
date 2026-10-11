@@ -24,9 +24,10 @@ function getSubjectNormalizedKey(subjectId: string): string {
 }
 
 /**
- * The chemistry/physics booklet is for memorisation content only. Numerical
- * exercises belong to "Solve with me", so remove them before any booklet JSON
- * reaches the UI. Other subjects are intentionally left untouched.
+ * Remove only pages explicitly marked as Solve With Me. Do not infer that a
+ * normal booklet question is a solve item from words such as "حل" or from an
+ * equation: the curriculum booklet legitimately contains explanations,
+ * examples and formulas that must remain visible.
  */
 export function filterBookletForMemorization(
   data: LessonBookletData,
@@ -35,34 +36,20 @@ export function filterBookletForMemorization(
   const subject = getSubjectNormalizedKey(subjectId || data?.lesson_info?.subject || '');
   if (subject !== 'chemistry' && subject !== 'physics') return data;
 
-  const explicitCalculationType = /(solve|exercise|calculation|numeric|numerical|math(?:ematical)?|problem|formula|equation|مس[أا]لة|حل|تمرين|حساب|معادلة|قانون|تطبيق\s*حسابي)/i;
-  const calculationWording = /(?:احسب|جد|أوجد|اوجد|حل|استخرج\s+(?:قيمة|مقدار)|عين\s+(?:قيمة|مقدار)|ما\s+(?:قيمة|مقدار)|أثبت\s+أن|اثبت\s+ان|كم\s+يساوي|ضعف\s+ما\s+كان)/iu;
-  // Inspect the answer too: some imported files incorrectly label a numerical
-  // problem as "explain", while its answer contains the actual equations.
-  const equationOrFormula = /(?:[A-Za-zΔΩρλμπ][A-Za-z0-9_.ΔΩρλμπ]*\s*(?:=|≈|∝|×|÷|\+|\-)|(?:=|≈|∝)\s*[A-Za-z0-9(Δ]|\b\d+(?:[.,]\d+)?\s*(?:V|A|C|F|J|W|N|Pa|Hz|m|cm|mm|kg|mol|kJ|eV)\b|\(\s*\d+\s*\/\s*\d+\s*\))/i;
+  const isSolveMarker = (value: unknown): boolean =>
+    /(?:^|[_\-\s])solv(?:e|ing)?(?:$|[_\-\s])|حل[_\-\s]*معي|حل[_\-\s]*تطبيقي/iu.test(String(value || ''));
 
-  const flattenText = (value: unknown): string => {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'string' || typeof value === 'number') return String(value);
-    if (Array.isArray(value)) return value.map(flattenText).join(' ');
-    if (typeof value === 'object') return Object.values(value as Record<string, unknown>).map(flattenText).join(' ');
-    return '';
-  };
-
-  const isCalculationItem = (item: any): boolean => {
-    const itemType = String(item?.type || '');
-    const questionType = String(item?.question_type || '');
-    if (explicitCalculationType.test(itemType) || explicitCalculationType.test(questionType)) return true;
-    const fullItemText = flattenText(item);
-    return calculationWording.test(fullItemText) || equationOrFormula.test(fullItemText);
+  const isSolvePage = (page: any): boolean => {
+    const markers = [page?.page_id, page?.section_id, page?.section, page?.page_type, page?.file_name, page?.type];
+    return markers.some(isSolveMarker);
   };
 
   return {
     ...data,
-    pages: (data.pages || []).map((page) => {
-      const items = (page.items || []).filter((item) => !isCalculationItem(item));
-      return { ...page, items, item_count: items.length };
-    }).filter((page) => page.items.length > 0),
+    pages: (data.pages || []).filter((page) => !isSolvePage(page)).map((page) => ({
+      ...page,
+      item_count: page.items?.length || 0,
+    })).filter((page) => page.items.length > 0),
   };
 }
 

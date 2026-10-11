@@ -47,6 +47,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [studyView, setStudyView] = useState<'booklet' | 'board'>('booklet');
+  const [hasBoardContent, setHasBoardContent] = useState(false);
 
   // Curriculum State
   const [curriculumData, setCurriculumData] = useState<LessonBookletData | null>(null);
@@ -81,6 +82,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
     setProgress(0);
     setCurriculumData(null);
     setStudyView('booklet');
+    setHasBoardContent(false);
 
     let isMounted = true;
     setIsLoadingCurriculum(true);
@@ -113,6 +115,41 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
           setIsLoadingCurriculum(false);
         }
       });
+
+    // The board is a separate exercise bundle. Expose it only when the
+    // current chapter/lesson has a real non-empty exercise file.
+    const boardSubject = String(openLessonContext?.subjectId || lesson.category || '').toLowerCase();
+    const boardChapter = openLessonContext?.chapterNumber;
+    const boardLesson = openLessonContext?.lessonNumber;
+    if ((boardSubject === 'chemistry' || boardSubject === 'physics') && boardChapter && boardLesson) {
+      const base = `${import.meta.env.BASE_URL}solve-with-me/`;
+      fetch(`${base}${boardSubject}-curriculum.json`)
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error('board index unavailable')))
+        .then(async (chapters) => {
+          const chapter = Array.isArray(chapters)
+            ? chapters.find((candidate: any) => Number(String(candidate?.id || '').match(/ch(\d+)/)?.[1]) === boardChapter)
+            : null;
+          const files = (chapter?.topics || [])
+            .flatMap((topic: any) => topic?.files || [])
+            .map((entry: any) => typeof entry === 'string' ? entry : entry?.file)
+            .filter((file: unknown): file is string => Boolean(file))
+            .filter((file: string) => new RegExp(`(?:^|_)lesson${boardLesson}\.json$`, 'i').test(file));
+          const results = await Promise.all(files.map(async (file: string) => {
+            try {
+              const response = await fetch(`${base}data/${encodeURIComponent(file)}`);
+              if (!response.ok) return false;
+              const data = await response.json();
+              return Array.isArray(data) ? data.length > 0 : Boolean(data && Object.keys(data).length);
+            } catch {
+              return false;
+            }
+          }));
+          if (isMounted) setHasBoardContent(results.some(Boolean));
+        })
+        .catch(() => {
+          if (isMounted) setHasBoardContent(false);
+        });
+    }
 
     return () => {
       isMounted = false;
@@ -380,10 +417,10 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
 
       <div className="grid grid-cols-2 gap-3" dir="ltr" role="tablist" aria-label="أدوات الدراسة">
         <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><BookOpen size={22} className={studyView === 'booklet' ? 'animate-pulse' : ''} /> الملزمة</button>
-        <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><Presentation size={22} className={studyView === 'board' ? 'animate-pulse' : ''} /> الصبورة — حل معي</button>
+        {hasBoardContent && <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><Presentation size={22} className={studyView === 'board' ? 'animate-pulse' : ''} /> الصبورة — حل معي</button>}
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
-      {studyView === 'board' && <iframe
+      {studyView === 'board' && hasBoardContent && <iframe
         key={`${lesson.id}-board`}
         src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
