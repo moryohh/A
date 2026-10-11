@@ -777,32 +777,9 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="space-y-2.5 text-xs text-gray-300">
-              <div className="bg-slate-800/80 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
-                <span className="text-gray-400">الفصل:</span>
-                <span className="font-bold text-white">{previewLesson.chapter.title}</span>
-              </div>
-              <div className="bg-slate-800/80 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
-                <span className="text-gray-400">حالة الدرس:</span>
-                <span className={`font-bold ${
-                  completedLessonIds.includes(previewLesson.lesson.id)
-                    ? 'text-emerald-400'
-                    : 'text-amber-400'
-                }`}>
-                  {completedLessonIds.includes(previewLesson.lesson.id) ? 'مكتمل ✓' : 'متاح للبدء'}
-                </span>
-              </div>
-              {previewLesson.lesson.duration && (
-                <div className="bg-slate-800/80 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
-                  <span className="text-gray-400">مدة الدرس:</span>
-                  <span className="font-bold text-white">{previewLesson.lesson.duration}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex gap-2 pt-2">
+            {/* Keep this preview intentionally minimal: the lesson content is
+                loaded from the lessons topic after entering the lesson. */}
+            <div className="pt-2">
               <button
                 onClick={() => {
                   const targetLesson = previewLesson.lesson;
@@ -813,21 +790,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>دخول الدرس الآن</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  const lessonId = previewLesson.lesson.id;
-                  setCompletedLessonIds((prev) =>
-                    prev.includes(lessonId)
-                      ? prev.filter((id) => id !== lessonId)
-                      : [...prev, lessonId]
-                  );
-                }}
-                className="px-3.5 py-3 bg-slate-800 hover:bg-slate-700 text-gray-200 font-bold rounded-2xl text-xs border border-white/10 transition-colors"
-                title="تبديل حالة الإكمال"
-              >
-                <Check className="w-4 h-4" />
               </button>
             </div>
           </div>
