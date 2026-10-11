@@ -47,7 +47,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [studyView, setStudyView] = useState<'booklet' | 'board'>('booklet');
-  const [hasBoardContent, setHasBoardContent] = useState(false);
+  const [, setHasBoardContent] = useState(false);
 
   // Curriculum State
   const [curriculumData, setCurriculumData] = useState<LessonBookletData | null>(null);
@@ -383,12 +383,32 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         </div>
       )}
 
-      <div className={`grid ${hasBoardContent ? 'grid-cols-2' : 'grid-cols-1'} gap-3`} dir="rtl" role="tablist" aria-label="أدوات الدراسة">
-        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`group flex min-h-[76px] items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-right font-black transition-all duration-300 active:scale-[0.98] ${studyView === 'booklet' ? 'border-emerald-300 bg-gradient-to-l from-emerald-500/25 to-cyan-500/15 text-emerald-200 shadow-[0_8px_26px_rgba(52,211,153,0.18)]' : 'border-white/15 bg-white/[0.03] text-gray-400 hover:border-emerald-300/50'}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/30"><BookOpen size={24} /></span><span><strong className="block text-sm">الملزمة</strong><small className="mt-0.5 block text-[10px] font-medium opacity-75">مفردات الدرس</small></span></button>
-        {hasBoardContent && <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`group flex min-h-[76px] items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-right font-black transition-all duration-300 active:scale-[0.98] ${studyView === 'board' ? 'border-cyan-300 bg-gradient-to-l from-cyan-500/25 to-indigo-500/15 text-cyan-200 shadow-[0_8px_26px_rgba(34,211,238,0.18)]' : 'border-white/15 bg-white/[0.03] text-gray-400 hover:border-cyan-300/50'}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-300/30"><Presentation size={24} /></span><span><strong className="block text-sm">الصبورة</strong><small className="mt-0.5 block text-[10px] font-medium opacity-75">حل معي</small></span></button>}
+      <div className="study-switcher mx-auto grid w-full max-w-[286px] grid-cols-2 gap-1.5 rounded-2xl border border-white/10 bg-slate-950/90 p-1.5 shadow-[0_8px_22px_rgba(2,6,23,0.38)]" dir="rtl" role="tablist" aria-label="أدوات الدراسة">
+        <button
+          role="tab"
+          id="board-tab"
+          aria-selected={studyView === 'board'}
+          aria-controls="study-panel"
+          onClick={() => setStudyView('board')}
+          className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'board' ? 'study-switch-active study-switch-board border-cyan-300 bg-gradient-to-br from-cyan-800 to-indigo-950 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.55)]' : 'border-cyan-900/60 bg-gradient-to-br from-slate-900 to-cyan-950/70 text-cyan-400/65'}`}
+        >
+          <Presentation className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />
+          <span className="text-[11px] leading-none">الصبورة</span>
+        </button>
+        <button
+          role="tab"
+          id="booklet-tab"
+          aria-selected={studyView === 'booklet'}
+          aria-controls="study-panel"
+          onClick={() => setStudyView('booklet')}
+          className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'booklet' ? 'study-switch-active study-switch-booklet border-emerald-300 bg-gradient-to-br from-emerald-800 to-teal-950 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.5)]' : 'border-emerald-900/60 bg-gradient-to-br from-slate-900 to-emerald-950/70 text-emerald-400/65'}`}
+        >
+          <BookOpen className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />
+          <span className="text-[11px] leading-none">الملزمة</span>
+        </button>
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
-      {studyView === 'board' && hasBoardContent && <iframe
+      {studyView === 'board' && <iframe
         key={`${lesson.id}-board`}
         src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
