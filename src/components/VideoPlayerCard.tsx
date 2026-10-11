@@ -379,15 +379,15 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
       </div>
 
       <div className="grid grid-cols-2 gap-3" dir="ltr" role="tablist" aria-label="أدوات الدراسة">
-        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'border-white/15 text-gray-400'}`}><BookOpen size={22} /> الملزمة</button>
-        <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'border-white/15 text-gray-400'}`}><Presentation size={22} /> الصبورة — حل معي</button>
+        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><BookOpen size={22} className={studyView === 'booklet' ? 'animate-pulse' : ''} /> الملزمة</button>
+        <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><Presentation size={22} className={studyView === 'board' ? 'animate-pulse' : ''} /> الصبورة — حل معي</button>
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
       {studyView === 'board' && <iframe
         key={`${lesson.id}-board`}
-        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
-        className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900"
+        className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
         style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
         allow="fullscreen; clipboard-write; web-share"
         allowFullScreen

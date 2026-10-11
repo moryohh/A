@@ -24,6 +24,49 @@ function getSubjectNormalizedKey(subjectId: string): string {
 }
 
 /**
+ * The chemistry/physics booklet is for memorisation content only. Numerical
+ * exercises belong to "Solve with me", so remove them before any booklet JSON
+ * reaches the UI. Other subjects are intentionally left untouched.
+ */
+export function filterBookletForMemorization(
+  data: LessonBookletData,
+  subjectId: string
+): LessonBookletData {
+  const subject = getSubjectNormalizedKey(subjectId || data?.lesson_info?.subject || '');
+  if (subject !== 'chemistry' && subject !== 'physics') return data;
+
+  const explicitCalculationType = /(solve|exercise|calculation|numeric|numerical|math(?:ematical)?|problem|formula|equation|مس[أا]لة|حل|تمرين|حساب|معادلة|قانون|تطبيق\s*حسابي)/i;
+  const calculationWording = /(?:احسب|جد|أوجد|اوجد|حل|استخرج\s+(?:قيمة|مقدار)|عين\s+(?:قيمة|مقدار)|ما\s+(?:قيمة|مقدار)|أثبت\s+أن|اثبت\s+ان|كم\s+يساوي|ضعف\s+ما\s+كان)/iu;
+  // Inspect the answer too: some imported files incorrectly label a numerical
+  // problem as "explain", while its answer contains the actual equations.
+  const equationOrFormula = /(?:[A-Za-zΔΩρλμπ][A-Za-z0-9_.ΔΩρλμπ]*\s*(?:=|≈|∝|×|÷|\+|\-)|(?:=|≈|∝)\s*[A-Za-z0-9(Δ]|\b\d+(?:[.,]\d+)?\s*(?:V|A|C|F|J|W|N|Pa|Hz|m|cm|mm|kg|mol|kJ|eV)\b|\(\s*\d+\s*\/\s*\d+\s*\))/i;
+
+  const flattenText = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (Array.isArray(value)) return value.map(flattenText).join(' ');
+    if (typeof value === 'object') return Object.values(value as Record<string, unknown>).map(flattenText).join(' ');
+    return '';
+  };
+
+  const isCalculationItem = (item: any): boolean => {
+    const itemType = String(item?.type || '');
+    const questionType = String(item?.question_type || '');
+    if (explicitCalculationType.test(itemType) || explicitCalculationType.test(questionType)) return true;
+    const fullItemText = flattenText(item);
+    return calculationWording.test(fullItemText) || equationOrFormula.test(fullItemText);
+  };
+
+  return {
+    ...data,
+    pages: (data.pages || []).map((page) => {
+      const items = (page.items || []).filter((item) => !isCalculationItem(item));
+      return { ...page, items, item_count: items.length };
+    }).filter((page) => page.items.length > 0),
+  };
+}
+
+/**
  * Extracts chapter and segment/lesson numbers from lesson identifiers or strings
  */
 export function extractChapterAndSegment(input: string): { chapter?: number; segment?: number } {
@@ -483,7 +526,7 @@ export async function fetchLessonCurriculum(
       try {
         const bundle = await getLessonContentBundle(ctx);
         if (bundle?.curriculumData?.pages && bundle.curriculumData.pages.length > 0) {
-          return { data: bundle.curriculumData as LessonBookletData };
+          return { data: filterBookletForMemorization(bundle.curriculumData as LessonBookletData, subjectId) };
         }
       } catch (e) {
         // ignore and fallback to direct
@@ -519,7 +562,7 @@ export async function fetchLessonCurriculum(
     if (matchedRows && matchedRows.length > 0) {
       const validRow = matchedRows.find((r) => r.content?.pages && r.content.pages.length > 0);
       if (validRow) {
-        const result = validRow.content as LessonBookletData;
+        const result = filterBookletForMemorization(validRow.content as LessonBookletData, subjectId);
         curriculumCache[cacheKey] = result;
         return { data: result };
       }
@@ -537,7 +580,7 @@ export async function fetchLessonCurriculum(
         .limit(1);
 
       if (directRows && directRows.length > 0 && directRows[0].content?.pages) {
-        const result = directRows[0].content as LessonBookletData;
+        const result = filterBookletForMemorization(directRows[0].content as LessonBookletData, subjectId);
         curriculumCache[cacheKey] = result;
         return { data: result };
       }

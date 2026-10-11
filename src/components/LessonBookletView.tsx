@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronDown,
-  ChevronUp,
-  HelpCircle,
-  CheckCircle2,
+  Eye,
+  EyeOff,
+  Sparkles,
   BookOpen,
   Loader2,
   Layers,
@@ -34,6 +34,12 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
 }) => {
   const { theme } = useAppTheme();
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
+
+  // Every lesson/page starts as a real booklet: answers stay hidden until the
+  // student deliberately opens them.
+  useEffect(() => {
+    setExpandedQuestions({});
+  }, [bookletData, lessonTitle]);
 
   const toggleQuestionAnswer = (qKey: string) => {
     setExpandedQuestions((prev) => ({
@@ -262,7 +268,7 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 my-2 text-right">
+    <div className="space-y-4 my-2 text-right animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Pure Scientific Material Container */}
       <div
         className={`border rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4 transition-all duration-300 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
@@ -359,20 +365,20 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
           // 3. Render QUESTION (المربعات الخاصة بالأسئلة والإجابات)
           if (item.type === 'question') {
             const qItem = item as BookletItemQuestion;
-            const isExpanded = expandedQuestions[uniqueKey] ?? true;
+            const isExpanded = expandedQuestions[uniqueKey] ?? false;
 
             return (
               <div
                 key={uniqueKey}
-                className={`rounded-2xl p-4 space-y-3 shadow-md border transition-all duration-300 ${
+                className={`group rounded-2xl p-4 space-y-3 shadow-md border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.995] ${
                   theme.isLight
                     ? 'bg-slate-50 border-slate-200/90'
                     : `${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`
                 }`}
               >
-                {/* Question Header & Toggle */}
+                {/* Question type */}
                 <div
-                  className={`flex items-center justify-between gap-2 border-b pb-2 ${
+                  className={`flex items-center justify-start gap-2 border-b pb-2 ${
                     theme.isLight ? 'border-slate-200' : 'border-white/10'
                   }`}
                 >
@@ -387,44 +393,51 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
                     {getQuestionTypeLabel(qItem.question_type)}
                   </span>
 
-                  <button
-                    onClick={() => toggleQuestionAnswer(uniqueKey)}
-                    className="text-xs hover:underline font-bold flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
-                    style={{ color: theme.colors.primary }}
-                  >
-                    <span>{isExpanded ? 'إخفاء الإجابة' : 'عرض الإجابة'}</span>
-                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
                 </div>
 
                 {/* Question Text */}
                 <div className="flex items-start gap-2">
-                  <HelpCircle
-                    className="w-4 h-4 shrink-0 mt-0.5"
-                    style={{ color: theme.colors.secondary }}
-                  />
                   <div className={`text-xs sm:text-sm font-black leading-snug ${theme.classes.textMain}`}>
                     {renderSafeNode(qItem.question, `q-${idx}`)}
                   </div>
                 </div>
 
+                {/* Distinct, full-surface answer reveal control */}
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleQuestionAnswer(uniqueKey)}
+                  className={`relative w-full overflow-hidden rounded-xl border px-4 py-3 text-sm font-black shadow-sm transition-all duration-300 active:scale-[0.97] hover:-translate-y-0.5 ${
+                    isExpanded
+                      ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-600'
+                      : 'border-sky-400/60 bg-gradient-to-l from-sky-500/20 via-cyan-400/15 to-indigo-500/15 text-sky-600 hover:shadow-[0_8px_24px_rgba(14,165,233,0.18)]'
+                  }`}
+                >
+                  <span className="absolute inset-y-0 -right-10 w-24 rotate-12 bg-white/15 blur-xl transition-transform duration-500 group-hover:translate-x-16" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {isExpanded ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5 animate-pulse" />}
+                    <span>{isExpanded ? 'إخفاء الإجابة' : 'عرض الإجابة'}</span>
+                    {!isExpanded && <Sparkles className="h-4 w-4" />}
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+
                 {/* Answer Box (الإجابة النموذجية الملونة) */}
                 {isExpanded && (
                   <div
-                    className={`p-3.5 rounded-xl space-y-1.5 border transition-all duration-300 ${
+                    className={`p-3.5 rounded-xl space-y-1.5 border transition-all duration-300 animate-in fade-in slide-in-from-top-2 zoom-in-95 ${
                       theme.isLight
                         ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-sm'
                         : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100'
                     }`}
                   >
                     <div
-                      className={`flex items-center gap-1.5 text-[11px] font-black border-b pb-1 ${
+                      className={`text-[11px] font-black border-b pb-1 ${
                         theme.isLight
                           ? 'text-emerald-700 border-emerald-200'
                           : 'text-emerald-400 border-emerald-500/20'
                       }`}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>الإجابة النموذجية:</span>
                     </div>
                     {renderAnswerContent(qItem.answer)}

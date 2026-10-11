@@ -14,11 +14,18 @@ function repairCommonEscapes(value: string): string {
   return value
     .replace(/\f(?=rac)/g, '\\frac')
     .replace(/\t(?=imes)/g, '\\times')
-    .replace(/\u000b(?=ec|sqrt)/g, '\\vec');
+    .replace(/\u000b(?=ec|sqrt)/g, '\\vec')
+    // Repair recurring OCR/JSON damage in chemistry and physics equations.
+    .replace(/\\fracrac\b/g, '\\frac')
+    .replace(/(?:\\)?leftrightarrow\b/g, '\\leftrightarrow')
+    .replace(/(?:\\)?(?:r?ightarrow)\b/g, '\\rightarrow')
+    .replace(/\bDelta\s*Hfirc\b/g, '\\Delta H_f^{\\circ}')
+    .replace(/\bDelta\s*H\b/g, '\\Delta H')
+    .replace(/\bDelta(?=[A-Za-z])/g, '\\Delta ');
 }
 
 function looksLikeLatex(value: string): boolean {
-  return /\\(?:frac|dfrac|tfrac|sqrt|pm|mp|cdot|times|div|leq|geq|neq|approx|Delta|alpha|beta|gamma|theta|lambda|mu|pi|rho|sigma|omega|sum|prod|int|mathrm|mathbf|text|left|right|overline|underline|vec|hat|bar)\b/.test(value);
+  return /\\(?:frac|dfrac|tfrac|sqrt|pm|mp|cdot|times|div|leq|geq|neq|approx|rightarrow|leftrightarrow|Delta|alpha|beta|gamma|theta|lambda|mu|pi|rho|sigma|omega|sum|prod|int|mathrm|mathbf|text|left|right|overline|underline|vec|hat|bar)\b/.test(value);
 }
 
 function isFormulaOnly(value: string): boolean {
