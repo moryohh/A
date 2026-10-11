@@ -1,7 +1,23 @@
-const ALLOWED_ORIGIN = "https://a-1q1.pages.dev";
+const PRIMARY_ORIGIN = "https://a-1q1.pages.dev";
+
+function allowedOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    const isOfficialPagesDomain =
+      host === "a-1q1.pages.dev" ||
+      host === "a-bjc.pages.dev" ||
+      host.endsWith(".a-bjc.pages.dev") ||
+      host === "duha-challenge-preview.pages.dev" ||
+      host.endsWith(".duha-challenge-preview.pages.dev");
+    return url.protocol === "https:" && isOfficialPagesDomain ? origin : PRIMARY_ORIGIN;
+  } catch {
+    return PRIMARY_ORIGIN;
+  }
+}
 
 function corsHeaders(origin) {
-  const allowed = origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN;
+  const allowed = allowedOrigin(origin);
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, content-type",

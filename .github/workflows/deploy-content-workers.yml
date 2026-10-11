@@ -1,0 +1,33 @@
+name: Deploy content workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/duha-content-worker.js'
+      - 'cloudflare/duha-content-r2-worker.js'
+      - 'cloudflare/wrangler.duha-content.toml'
+      - 'cloudflare/wrangler.duha-content-r2.toml'
+      - '.github/workflows/deploy-content-workers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy content index worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config cloudflare/wrangler.duha-content.toml
+      - name: Deploy content R2 worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config cloudflare/wrangler.duha-content-r2.toml
