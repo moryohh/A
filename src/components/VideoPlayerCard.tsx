@@ -41,6 +41,17 @@ function collectLessonTopics(value: unknown, output = new Set<string>()): Set<st
   return output;
 }
 
+function inferTopicFromBooklet(data: LessonBookletData | null): string | undefined {
+  for (const page of data?.pages || []) {
+    for (const item of page.items || []) {
+      if (item.type === 'title' && typeof item.content === 'string' && item.content.trim()) {
+        return item.content.trim();
+      }
+    }
+  }
+  return undefined;
+}
+
 interface VideoPlayerCardProps {
   lesson: EducationalLesson;
   openLessonContext?: OpenLessonContext | null;
@@ -88,6 +99,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   const lessonTopics = Array.from(new Set([
     openLessonContext?.lessonTopic,
     ...collectLessonTopics(curriculumData),
+    inferTopicFromBooklet(curriculumData),
   ].filter((topic): topic is string => Boolean(topic?.trim()))));
   const displayedTopic = lessonTopics.length > 0
     ? lessonTopics.join(' • ')

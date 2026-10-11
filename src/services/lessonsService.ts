@@ -433,6 +433,17 @@ export function getArabicChapterTitle(num: number, rawTitle?: string): string {
   return `الفصل ${ordinal}`;
 }
 
+function readIndexLessonTopic(row: any): string | undefined {
+  const nested = [row?.metadata, row?.details, row?.lesson_info, row?.index_metadata];
+  const candidates = [row?.lesson_topic, row?.lessonTopic];
+  nested.forEach((value) => {
+    if (value && typeof value === 'object') {
+      candidates.push(value.lesson_topic, value.lessonTopic, value.topic);
+    }
+  });
+  return candidates.find((value) => typeof value === 'string' && value.trim())?.trim();
+}
+
 function flattenContentText(value: any): string {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -649,13 +660,13 @@ export async function getSubjectIndex(
           lessonNumber: lesNum,
           lessonId: rawLessonId,
           title: formatArabicLessonTitle(row.title || `الدرس ${lesNum}`),
-          lessonTopic: String(row.lesson_topic || row.lessonTopic || '').trim() || undefined,
+          lessonTopic: readIndexLessonTopic(row),
           filesCount: Number(row.files_count || row.file_count) || undefined,
           files: {},
         };
       }
 
-      const indexedTopic = String(row.lesson_topic || row.lessonTopic || '').trim();
+      const indexedTopic = readIndexLessonTopic(row) || '';
       if (indexedTopic && !allLessonsMap[lessonKey].lessonTopic) {
         allLessonsMap[lessonKey].lessonTopic = indexedTopic;
       }
