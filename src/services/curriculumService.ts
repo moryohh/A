@@ -35,17 +35,26 @@ export function filterBookletForMemorization(
   const subject = getSubjectNormalizedKey(subjectId || data?.lesson_info?.subject || '');
   if (subject !== 'chemistry' && subject !== 'physics') return data;
 
-  const explicitCalculationType = /(solve|exercise|calculation|numeric|numerical|math(?:ematical)?|problem|مس[أا]لة|حل|تمرين|حساب|تطبيق\s*حسابي)/i;
-  const explicitMemorizationType = /(define|explain|compare|mention|enumerate|critical_thinking|true_false|mcq|fill_blank|تعريف|علل|تعليل|قارن|مقارنة|اذكر|عدد|صح|خطأ|اختر|أكمل)/i;
-  const calculationPrompt = /^\s*(?:احسب|جد|أوجد|اوجد|حل|استخرج\s+قيمة|عين\s+قيمة|ما\s+قيمة)(?=\s|[:：؟?]|$)/u;
+  const explicitCalculationType = /(solve|exercise|calculation|numeric|numerical|math(?:ematical)?|problem|formula|equation|مس[أا]لة|حل|تمرين|حساب|معادلة|قانون|تطبيق\s*حسابي)/i;
+  const calculationWording = /(?:احسب|جد|أوجد|اوجد|حل|استخرج\s+(?:قيمة|مقدار)|عين\s+(?:قيمة|مقدار)|ما\s+(?:قيمة|مقدار)|أثبت\s+أن|اثبت\s+ان|كم\s+يساوي|ضعف\s+ما\s+كان)/iu;
+  // Inspect the answer too: some imported files incorrectly label a numerical
+  // problem as "explain", while its answer contains the actual equations.
+  const equationOrFormula = /(?:[A-Za-zΔΩρλμπ][A-Za-z0-9_.ΔΩρλμπ]*\s*(?:=|≈|∝|×|÷|\+|\-)|(?:=|≈|∝)\s*[A-Za-z0-9(Δ]|\b\d+(?:[.,]\d+)?\s*(?:V|A|C|F|J|W|N|Pa|Hz|m|cm|mm|kg|mol|kJ|eV)\b|\(\s*\d+\s*\/\s*\d+\s*\))/i;
+
+  const flattenText = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (Array.isArray(value)) return value.map(flattenText).join(' ');
+    if (typeof value === 'object') return Object.values(value as Record<string, unknown>).map(flattenText).join(' ');
+    return '';
+  };
 
   const isCalculationItem = (item: any): boolean => {
     const itemType = String(item?.type || '');
     const questionType = String(item?.question_type || '');
-    if (explicitMemorizationType.test(questionType)) return false;
     if (explicitCalculationType.test(itemType) || explicitCalculationType.test(questionType)) return true;
-    const prompt = String(item?.question || item?.prompt || item?.content || '');
-    return calculationPrompt.test(prompt);
+    const fullItemText = flattenText(item);
+    return calculationWording.test(fullItemText) || equationOrFormula.test(fullItemText);
   };
 
   return {
