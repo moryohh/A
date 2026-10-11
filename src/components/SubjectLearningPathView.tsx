@@ -285,8 +285,6 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
         lessonKey: buildLessonKey(subject.id, chapterNumber, lessonItem.number),
         title: lessonItem.title,
         lessonTitle: lessonItem.title,
-        lessonTopic: lessonItem.lessonTopic,
-        filesCount: lessonItem.filesCount,
       };
 
       onPositionChange?.({
@@ -318,8 +316,6 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
         lessonKey: buildLessonKey(subject.id, fallbackChapterNumber, lessonItem.number),
         title: lessonItem.title,
         lessonTitle: lessonItem.title,
-        lessonTopic: lessonItem.lessonTopic,
-        filesCount: lessonItem.filesCount,
       };
       onSelectLesson(lessonItem.lessonData, fallbackContext);
     }

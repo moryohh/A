@@ -433,17 +433,6 @@ export function getArabicChapterTitle(num: number, rawTitle?: string): string {
   return `الفصل ${ordinal}`;
 }
 
-function readIndexLessonTopic(row: any): string | undefined {
-  const nested = [row?.metadata, row?.details, row?.lesson_info, row?.index_metadata];
-  const candidates = [row?.lesson_topic, row?.lessonTopic];
-  nested.forEach((value) => {
-    if (value && typeof value === 'object') {
-      candidates.push(value.lesson_topic, value.lessonTopic, value.topic);
-    }
-  });
-  return candidates.find((value) => typeof value === 'string' && value.trim())?.trim();
-}
-
 function flattenContentText(value: any): string {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -564,10 +553,7 @@ export async function getSubjectIndex(
       // 1. Try querying the dedicated View: `educational_content_index`
       const { data: viewData, error: viewError } = await supabase
         .from('educational_content_index')
-        // This is the lightweight index view (not the heavy content table).
-        // Select all index metadata so newer fields such as lesson_topic and
-        // files_count are available without breaking older index versions.
-        .select('*')
+        .select('record_id, subject_id, section_id, file_name, lesson_id, chapter_number, lesson_number, title, has_content')
         .in('subject_id', dbSubjects)
         .order('chapter_number', { ascending: true })
         .order('lesson_number', { ascending: true });
@@ -660,15 +646,8 @@ export async function getSubjectIndex(
           lessonNumber: lesNum,
           lessonId: rawLessonId,
           title: formatArabicLessonTitle(row.title || `الدرس ${lesNum}`),
-          lessonTopic: readIndexLessonTopic(row),
-          filesCount: Number(row.files_count || row.file_count) || undefined,
           files: {},
         };
-      }
-
-      const indexedTopic = readIndexLessonTopic(row) || '';
-      if (indexedTopic && !allLessonsMap[lessonKey].lessonTopic) {
-        allLessonsMap[lessonKey].lessonTopic = indexedTopic;
       }
 
       if (normalizedSection && rawRecordId) {
@@ -690,7 +669,6 @@ export async function getSubjectIndex(
 
     // Group into chapters
     Object.values(allLessonsMap).forEach((lesson) => {
-      lesson.filesCount = lesson.filesCount || Object.keys(lesson.files).length;
       const chNum = lesson.chapterNumber;
       if (!chapterGroups[chNum]) {
         chapterGroups[chNum] = {
@@ -1095,8 +1073,6 @@ export async function getSubjectChapters(
       id: l.lessonId,
       number: l.lessonNumber,
       title: l.title,
-      lessonTopic: l.lessonTopic,
-      filesCount: l.filesCount,
       duration: '20:00',
       status: l.lessonNumber === 1 && ch.chapterNumber === 1 ? 'in_progress' : 'available',
       progressPercentage: 0,

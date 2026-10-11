@@ -322,27 +322,3 @@ a,
 @media (prefers-reduced-motion: reduce) {
   .science-lab-balloon-drift { animation: none; }
 }
-@keyframes lesson-soft-glow {
-  0%, 100% { box-shadow: 0 0 18px rgba(34, 211, 238, .12); }
-  50% { box-shadow: 0 0 34px rgba(34, 211, 238, .28); }
-}
-
-@keyframes exam-invite {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.12); }
-}
-
-@keyframes close-breathe {
-  0%, 100% { box-shadow: 0 0 18px rgba(244, 63, 94, .38); }
-  50% { box-shadow: 0 0 34px rgba(244, 63, 94, .7); }
-}
-
-.lesson-topic-panel { animation: lesson-soft-glow 3.4s ease-in-out infinite; }
-.exam-launch-button { animation: exam-invite 2.4s ease-in-out infinite; }
-.lesson-close-button { animation: close-breathe 2.2s ease-in-out infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  .lesson-topic-panel,
-  .exam-launch-button,
-  .lesson-close-button { animation: none !important; }
-}

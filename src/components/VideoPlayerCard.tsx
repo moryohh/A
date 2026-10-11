@@ -13,8 +13,6 @@ import {
   VideoOff,
   BookOpen,
   Presentation,
-  GraduationCap,
-  Files,
 } from 'lucide-react';
 import { LessonBookletView } from './LessonBookletView';
 import { LessonBookletData } from '../data/lessonBooklet';
@@ -22,45 +20,6 @@ import { fetchLessonCurriculum } from '../services/curriculumService';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
 import { extractYoutubeId, formatArabicLessonTitle } from '../services/lessonsService';
 import { useAppTheme } from '../services/themeService';
-
-function collectLessonTopics(value: unknown, output = new Set<string>()): Set<string> {
-  if (!value || typeof value !== 'object') return output;
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectLessonTopics(item, output));
-    return output;
-  }
-  Object.entries(value as Record<string, unknown>).forEach(([key, child]) => {
-    if (/^lesson[_-]?topic$/i.test(key)) {
-      const entries = Array.isArray(child) ? child : [child];
-      entries.forEach((entry) => {
-        if (typeof entry === 'string' && entry.trim()) output.add(entry.trim());
-      });
-    }
-    if (child && typeof child === 'object') collectLessonTopics(child, output);
-  });
-  return output;
-}
-
-function inferTopicFromBooklet(data: LessonBookletData | null): string | undefined {
-  let firstText: string | undefined;
-  for (const page of data?.pages || []) {
-    for (const item of page.items || []) {
-      if (item.type === 'title' && typeof item.content === 'string' && item.content.trim()) {
-        return item.content.trim();
-      }
-      if (!firstText) {
-        const candidate = item.type === 'question' ? item.question : ('content' in item ? item.content : undefined);
-        if (typeof candidate === 'string' && candidate.trim()) firstText = candidate.trim();
-      }
-    }
-  }
-  if (!firstText) return undefined;
-  const concise = firstText
-    .split(/(?:ماذا|ما\s+المقصود|عرّف|عرف|علّل|علل|\?|؟)/u)[0]
-    .replace(/\s+/g, ' ')
-    .trim();
-  return (concise || firstText).slice(0, 90).trim();
-}
 
 interface VideoPlayerCardProps {
   lesson: EducationalLesson;
@@ -106,14 +65,6 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
     lesson.description
   );
   const hasValidVideo = Boolean(validYoutubeId);
-  const lessonTopics = Array.from(new Set([
-    openLessonContext?.lessonTopic,
-    ...collectLessonTopics(curriculumData),
-    inferTopicFromBooklet(curriculumData),
-  ].filter((topic): topic is string => Boolean(topic?.trim()))));
-  const displayedTopic = lessonTopics.length > 0
-    ? lessonTopics.join(' • ')
-    : formatArabicLessonTitle(openLessonContext?.lessonTitle || lesson.title);
 
   // Pause video if external isPaused prop is true
   useEffect(() => {
@@ -431,36 +382,6 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
           </div>
         </div>
       )}
-
-      <section className="lesson-topic-panel relative overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-l from-slate-950/95 via-sky-950/90 to-indigo-950/90 p-3.5 shadow-[0_12px_34px_rgba(14,165,233,0.18)]" aria-label="موضوع الدرس وإجراء الامتحان">
-        <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-cyan-400/20 blur-2xl" />
-        <div className="relative flex items-stretch gap-3" dir="rtl">
-          <div className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.09]">
-            <div className="mb-1.5 flex items-center gap-2 text-cyan-300">
-              <Sparkles className="h-4 w-4 animate-pulse" />
-              <span className="text-[10px] font-black tracking-wide">موضوع الدرس</span>
-              {openLessonContext?.filesCount ? (
-                <span className="mr-auto inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[9px] text-slate-300">
-                  <Files className="h-3 w-3" /> {openLessonContext.filesCount} ملفات
-                </span>
-              ) : null}
-            </div>
-            <p className="text-sm font-black leading-6 text-white">{displayedTopic}</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleNavigateToGames}
-            className="exam-launch-button group flex w-[108px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-amber-300/80 bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500 px-2 py-3 text-center text-slate-950 shadow-[0_0_24px_rgba(251,191,36,0.34)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.03] active:translate-y-0 active:scale-95"
-            aria-label="إجراء امتحان لهذا الدرس"
-          >
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950/90 text-amber-300 shadow-lg transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
-              <GraduationCap className="h-6 w-6" />
-            </span>
-            <strong className="text-[11px] font-black leading-4">إجراء امتحان</strong>
-          </button>
-        </div>
-      </section>
 
       <div className={`grid ${hasBoardContent ? 'grid-cols-2' : 'grid-cols-1'} gap-3`} dir="rtl" role="tablist" aria-label="أدوات الدراسة">
         <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`group flex min-h-[76px] items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-right font-black transition-all duration-300 active:scale-[0.98] ${studyView === 'booklet' ? 'border-emerald-300 bg-gradient-to-l from-emerald-500/25 to-cyan-500/15 text-emerald-200 shadow-[0_8px_26px_rgba(52,211,153,0.18)]' : 'border-white/15 bg-white/[0.03] text-gray-400 hover:border-emerald-300/50'}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/30"><BookOpen size={24} /></span><span><strong className="block text-sm">الملزمة</strong><small className="mt-0.5 block text-[10px] font-medium opacity-75">مفردات الدرس</small></span></button>
