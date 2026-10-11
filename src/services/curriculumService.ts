@@ -39,6 +39,19 @@ export function filterBookletForMemorization(
   const isSolveMarker = (value: unknown): boolean =>
     /(?:^|[_\-\s])solv(?:e|ing)?(?:$|[_\-\s])|حل[_\-\s]*معي|حل[_\-\s]*تطبيقي/iu.test(String(value || ''));
 
+  // `solv` is sometimes stored on the paragraph/item metadata (for example
+  // page_id = `..._solv`), not on the parent page. Inspect metadata keys only;
+  // never scan question text, answers, titles or formulas for the word "حل".
+  const hasSolveItemMarker = (value: unknown, key = ''): boolean => {
+    if (!value || typeof value !== 'object') return false;
+    if (Array.isArray(value)) return value.some((child) => hasSolveItemMarker(child, key));
+    return Object.entries(value as Record<string, unknown>).some(([childKey, child]) => {
+      const metadataKey = /(?:page|section|source|content|file|item|block|type)/i.test(childKey);
+      if (metadataKey && typeof child === 'string' && isSolveMarker(child)) return true;
+      return typeof child === 'object' && hasSolveItemMarker(child, childKey);
+    });
+  };
+
   const isSolvePage = (page: any): boolean => {
     const markers = [page?.page_id, page?.section_id, page?.section, page?.page_type, page?.file_name, page?.type];
     return markers.some(isSolveMarker);
@@ -46,10 +59,10 @@ export function filterBookletForMemorization(
 
   return {
     ...data,
-    pages: (data.pages || []).filter((page) => !isSolvePage(page)).map((page) => ({
-      ...page,
-      item_count: page.items?.length || 0,
-    })).filter((page) => page.items.length > 0),
+    pages: (data.pages || []).filter((page) => !isSolvePage(page)).map((page) => {
+      const items = (page.items || []).filter((item) => !hasSolveItemMarker(item));
+      return { ...page, items, item_count: items.length };
+    }).filter((page) => page.items.length > 0),
   };
 }
 
