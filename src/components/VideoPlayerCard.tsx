@@ -42,14 +42,24 @@ function collectLessonTopics(value: unknown, output = new Set<string>()): Set<st
 }
 
 function inferTopicFromBooklet(data: LessonBookletData | null): string | undefined {
+  let firstText: string | undefined;
   for (const page of data?.pages || []) {
     for (const item of page.items || []) {
       if (item.type === 'title' && typeof item.content === 'string' && item.content.trim()) {
         return item.content.trim();
       }
+      if (!firstText) {
+        const candidate = item.type === 'question' ? item.question : ('content' in item ? item.content : undefined);
+        if (typeof candidate === 'string' && candidate.trim()) firstText = candidate.trim();
+      }
     }
   }
-  return undefined;
+  if (!firstText) return undefined;
+  const concise = firstText
+    .split(/(?:ماذا|ما\s+المقصود|عرّف|عرف|علّل|علل|\?|؟)/u)[0]
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (concise || firstText).slice(0, 90).trim();
 }
 
 interface VideoPlayerCardProps {
