@@ -226,6 +226,8 @@ export interface SubjectChapterLesson {
   id: string;
   number: number;
   title: string;
+  lessonTopic?: string;
+  filesCount?: number;
   subtitle?: string;
   duration: string;
   status: 'completed' | 'in_progress' | 'available' | 'locked';
@@ -247,6 +249,8 @@ export interface LessonIndex {
   lessonNumber: number;
   lessonId: string;
   title: string;
+  lessonTopic?: string;
+  filesCount?: number;
   files: Partial<Record<LessonSectionType, LessonIndexFile>>;
 }
 
@@ -272,6 +276,8 @@ export interface OpenLessonContext {
   lessonKey?: string;
   title?: string;
   lessonTitle?: string;
+  lessonTopic?: string;
+  filesCount?: number;
 }
 
 export interface LearningPosition {

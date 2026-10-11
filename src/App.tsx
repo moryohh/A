@@ -1261,6 +1261,7 @@ function AppContent() {
             !(activeTab === 'home' && homeSubView === 'learning_path') &&
             (activeTab !== 'home' || homeSubView !== 'main_home')
           }
+          backButtonVariant={activeTab === 'home' && homeSubView === 'lesson_player' ? 'close' : 'back'}
           onBack={() => {
             if (activeTab === 'home') {
               if (homeSubView === 'lesson_player') {

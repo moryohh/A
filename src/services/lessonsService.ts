@@ -553,7 +553,10 @@ export async function getSubjectIndex(
       // 1. Try querying the dedicated View: `educational_content_index`
       const { data: viewData, error: viewError } = await supabase
         .from('educational_content_index')
-        .select('record_id, subject_id, section_id, file_name, lesson_id, chapter_number, lesson_number, title, has_content')
+        // This is the lightweight index view (not the heavy content table).
+        // Select all index metadata so newer fields such as lesson_topic and
+        // files_count are available without breaking older index versions.
+        .select('*')
         .in('subject_id', dbSubjects)
         .order('chapter_number', { ascending: true })
         .order('lesson_number', { ascending: true });
@@ -646,8 +649,15 @@ export async function getSubjectIndex(
           lessonNumber: lesNum,
           lessonId: rawLessonId,
           title: formatArabicLessonTitle(row.title || `الدرس ${lesNum}`),
+          lessonTopic: String(row.lesson_topic || row.lessonTopic || '').trim() || undefined,
+          filesCount: Number(row.files_count || row.file_count) || undefined,
           files: {},
         };
+      }
+
+      const indexedTopic = String(row.lesson_topic || row.lessonTopic || '').trim();
+      if (indexedTopic && !allLessonsMap[lessonKey].lessonTopic) {
+        allLessonsMap[lessonKey].lessonTopic = indexedTopic;
       }
 
       if (normalizedSection && rawRecordId) {
@@ -669,6 +679,7 @@ export async function getSubjectIndex(
 
     // Group into chapters
     Object.values(allLessonsMap).forEach((lesson) => {
+      lesson.filesCount = lesson.filesCount || Object.keys(lesson.files).length;
       const chNum = lesson.chapterNumber;
       if (!chapterGroups[chNum]) {
         chapterGroups[chNum] = {
@@ -1073,6 +1084,8 @@ export async function getSubjectChapters(
       id: l.lessonId,
       number: l.lessonNumber,
       title: l.title,
+      lessonTopic: l.lessonTopic,
+      filesCount: l.filesCount,
       duration: '20:00',
       status: l.lessonNumber === 1 && ch.chapterNumber === 1 ? 'in_progress' : 'available',
       progressPercentage: 0,

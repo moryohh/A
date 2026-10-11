@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, ArrowRight, Send } from 'lucide-react';
+import { Bell, ArrowRight, Send, X } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 
 interface HeaderProps {
@@ -12,6 +12,7 @@ interface HeaderProps {
   onOpenGames?: () => void;
   onOpenMessenger?: () => void;
   unreadMessagesCount?: number;
+  backButtonVariant?: 'back' | 'close';
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   onOpenMessenger,
   unreadMessagesCount = 0,
+  backButtonVariant = 'back',
 }) => {
   const { theme } = useAppTheme();
 
@@ -34,15 +36,20 @@ export const Header: React.FC<HeaderProps> = ({
         {showBackButton && onBack ? (
           <button
             onClick={onBack}
-            className={`px-3 py-1.5 rounded-xl ${theme.classes.cardBg} border ${theme.classes.cardBorder} flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-lg cursor-pointer`}
-            aria-label="رجوع للرئيسية"
-            title="الرجوع للصفحة الرئيسية"
+            className={backButtonVariant === 'close'
+              ? 'lesson-close-button group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-rose-300/80 bg-gradient-to-br from-rose-500 to-red-700 text-white shadow-[0_0_24px_rgba(244,63,94,0.55)] transition-all duration-300 hover:rotate-6 hover:scale-110 active:rotate-0 active:scale-90'
+              : `px-3 py-1.5 rounded-xl ${theme.classes.cardBg} border ${theme.classes.cardBorder} flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-lg cursor-pointer`}
+            aria-label={backButtonVariant === 'close' ? 'إغلاق الدرس' : 'رجوع للرئيسية'}
+            title={backButtonVariant === 'close' ? 'إغلاق الدرس والعودة للفصل' : 'الرجوع للصفحة الرئيسية'}
             style={{
               color: theme.colors.primary,
             }}
           >
-            <ArrowRight className="w-4 h-4" style={{ color: theme.colors.primary }} />
-            <span className={`text-xs font-bold ${theme.classes.textMain}`}>رجوع</span>
+            {backButtonVariant === 'close' ? (
+              <X className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={3} />
+            ) : (
+              <><ArrowRight className="w-4 h-4" style={{ color: theme.colors.primary }} /><span className={`text-xs font-bold ${theme.classes.textMain}`}>رجوع</span></>
+            )}
           </button>
         ) : (
           <div className="w-9 h-9 opacity-0 pointer-events-none" />
