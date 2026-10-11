@@ -385,7 +385,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
       {studyView === 'board' && <iframe
         key={`${lesson.id}-board`}
-        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
         className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900"
         style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}

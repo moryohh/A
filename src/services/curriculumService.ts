@@ -24,6 +24,40 @@ function getSubjectNormalizedKey(subjectId: string): string {
 }
 
 /**
+ * The chemistry/physics booklet is for memorisation content only. Numerical
+ * exercises belong to "Solve with me", so remove them before any booklet JSON
+ * reaches the UI. Other subjects are intentionally left untouched.
+ */
+export function filterBookletForMemorization(
+  data: LessonBookletData,
+  subjectId: string
+): LessonBookletData {
+  const subject = getSubjectNormalizedKey(subjectId || data?.lesson_info?.subject || '');
+  if (subject !== 'chemistry' && subject !== 'physics') return data;
+
+  const explicitCalculationType = /(solve|exercise|calculation|numeric|numerical|math(?:ematical)?|problem|مس[أا]لة|حل|تمرين|حساب|تطبيق\s*حسابي)/i;
+  const explicitMemorizationType = /(define|explain|compare|mention|enumerate|critical_thinking|true_false|mcq|fill_blank|تعريف|علل|تعليل|قارن|مقارنة|اذكر|عدد|صح|خطأ|اختر|أكمل)/i;
+  const calculationPrompt = /^\s*(?:احسب|جد|أوجد|اوجد|حل|استخرج\s+قيمة|عين\s+قيمة|ما\s+قيمة)(?=\s|[:：؟?]|$)/u;
+
+  const isCalculationItem = (item: any): boolean => {
+    const itemType = String(item?.type || '');
+    const questionType = String(item?.question_type || '');
+    if (explicitMemorizationType.test(questionType)) return false;
+    if (explicitCalculationType.test(itemType) || explicitCalculationType.test(questionType)) return true;
+    const prompt = String(item?.question || item?.prompt || item?.content || '');
+    return calculationPrompt.test(prompt);
+  };
+
+  return {
+    ...data,
+    pages: (data.pages || []).map((page) => {
+      const items = (page.items || []).filter((item) => !isCalculationItem(item));
+      return { ...page, items, item_count: items.length };
+    }).filter((page) => page.items.length > 0),
+  };
+}
+
+/**
  * Extracts chapter and segment/lesson numbers from lesson identifiers or strings
  */
 export function extractChapterAndSegment(input: string): { chapter?: number; segment?: number } {
@@ -483,7 +517,7 @@ export async function fetchLessonCurriculum(
       try {
         const bundle = await getLessonContentBundle(ctx);
         if (bundle?.curriculumData?.pages && bundle.curriculumData.pages.length > 0) {
-          return { data: bundle.curriculumData as LessonBookletData };
+          return { data: filterBookletForMemorization(bundle.curriculumData as LessonBookletData, subjectId) };
         }
       } catch (e) {
         // ignore and fallback to direct
@@ -519,7 +553,7 @@ export async function fetchLessonCurriculum(
     if (matchedRows && matchedRows.length > 0) {
       const validRow = matchedRows.find((r) => r.content?.pages && r.content.pages.length > 0);
       if (validRow) {
-        const result = validRow.content as LessonBookletData;
+        const result = filterBookletForMemorization(validRow.content as LessonBookletData, subjectId);
         curriculumCache[cacheKey] = result;
         return { data: result };
       }
@@ -537,7 +571,7 @@ export async function fetchLessonCurriculum(
         .limit(1);
 
       if (directRows && directRows.length > 0 && directRows[0].content?.pages) {
-        const result = directRows[0].content as LessonBookletData;
+        const result = filterBookletForMemorization(directRows[0].content as LessonBookletData, subjectId);
         curriculumCache[cacheKey] = result;
         return { data: result };
       }
