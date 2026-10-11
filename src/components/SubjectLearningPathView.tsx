@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EducationalLesson, SubjectChapter, SubjectChapterLesson, OpenLessonContext, LearningPosition, UserProfile } from '../types';
-import { getCurriculumForSubject } from '../data/mockCurriculums';
 import { getSubjectIndex, getSubjectChapters, getChapterLessons, getLessonDetails, formatArabicLessonTitle, buildLessonKey } from '../services/lessonsService';
 import { MapRewardsModal } from './MapRewardsModal';
 import { gameAudio } from '../utils/gameAudio';
@@ -192,8 +191,6 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
           if (currentReqId !== loadRequestIdRef.current) return;
           if (res.data && res.data.length > 0) {
             loadedChapters = res.data;
-          } else {
-            loadedChapters = getCurriculumForSubject(subject.id);
           }
           if (res.error) {
             setErrorMessage(res.error);
@@ -213,15 +210,11 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
       } catch (err: any) {
         console.error('Failed to load chapters:', err);
         if (currentReqId === loadRequestIdRef.current) {
-          const fallbackData = getCurriculumForSubject(subject.id);
-          setChapters(fallbackData);
-          const initChNum =
-            (learningPosition?.subjectId === subject.id && learningPosition?.chapterNumber) ||
-            fallbackData[0]?.number ||
-            1;
-          setSelectedChapterNumber(initChNum);
-          loadLessonsForChapterNumber(initChNum, fallbackData);
-          setErrorMessage('تعذر الاتصال بـ Supabase لجلب الفصول');
+          // Never display mock chapters when the canonical Supabase index is
+          // unavailable; fabricated lesson numbers can request unrelated data.
+          setChapters([]);
+          setSelectedChapterNumber(1);
+          setErrorMessage('تعذر الاتصال بفهرس Supabase لجلب الفصول والدروس');
         }
       } finally {
         if (currentReqId === loadRequestIdRef.current) {
@@ -301,14 +294,10 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
         lessonId: lessonItem.id,
       });
 
-      const res = await getLessonDetails(
-        subject.id,
-        chapterTitle,
-        lessonItem.title,
-        subject.name,
-        chapterNumber,
-        lessonItem.number
-      );
+      // Preserve the immutable lessonId from the canonical index. Rebuilding
+      // it from subject/chapter/lesson can detach the video record and the
+      // curriculum/game files from the selected lesson.
+      const res = await getLessonDetails(lessonContext);
 
       if (res.data) {
         onSelectLesson(res.data, lessonContext);
