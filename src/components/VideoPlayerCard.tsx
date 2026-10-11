@@ -383,41 +383,9 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         </div>
       )}
 
-      {/* Lesson Title & Info Block with Clean Teacher Name */}
-      <div
-        className={`rounded-2xl p-3.5 sm:p-4 text-right shadow-lg space-y-1 border transition-all duration-300 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
-        style={{
-          boxShadow: `0 4px 20px ${theme.colors.glow}`,
-        }}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-md border transition-colors"
-            style={{
-              backgroundColor: `${theme.colors.primary}20`,
-              borderColor: `${theme.colors.primary}40`,
-              color: theme.colors.primary,
-            }}
-          >
-            {formatArabicLessonTitle(lesson.subtitle || 'السادس الإعدادي - العراق')}
-          </span>
-          <span className={`text-xs font-semibold ${theme.classes.textMuted}`}>
-            {cleanedTeacherName}
-          </span>
-        </div>
-        <h2 className={`text-base sm:text-lg font-bold leading-snug ${theme.classes.textMain}`}>
-          {formatArabicLessonTitle(lesson.title)}
-        </h2>
-        {lesson.description && (
-          <p className={`text-xs pt-0.5 leading-relaxed ${theme.classes.textMuted}`}>
-            {formatArabicLessonTitle(lesson.description)}
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3" dir="ltr" role="tablist" aria-label="أدوات الدراسة">
-        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><BookOpen size={22} className={studyView === 'booklet' ? 'animate-pulse' : ''} /> الملزمة</button>
-        {hasBoardContent && <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><Presentation size={22} className={studyView === 'board' ? 'animate-pulse' : ''} /> الصبورة — حل معي</button>}
+      <div className={`grid ${hasBoardContent ? 'grid-cols-2' : 'grid-cols-1'} gap-3`} dir="rtl" role="tablist" aria-label="أدوات الدراسة">
+        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`group flex min-h-[76px] items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-right font-black transition-all duration-300 active:scale-[0.98] ${studyView === 'booklet' ? 'border-emerald-300 bg-gradient-to-l from-emerald-500/25 to-cyan-500/15 text-emerald-200 shadow-[0_8px_26px_rgba(52,211,153,0.18)]' : 'border-white/15 bg-white/[0.03] text-gray-400 hover:border-emerald-300/50'}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/30"><BookOpen size={24} /></span><span><strong className="block text-sm">الملزمة</strong><small className="mt-0.5 block text-[10px] font-medium opacity-75">مفردات الدرس</small></span></button>
+        {hasBoardContent && <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`group flex min-h-[76px] items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-right font-black transition-all duration-300 active:scale-[0.98] ${studyView === 'board' ? 'border-cyan-300 bg-gradient-to-l from-cyan-500/25 to-indigo-500/15 text-cyan-200 shadow-[0_8px_26px_rgba(34,211,238,0.18)]' : 'border-white/15 bg-white/[0.03] text-gray-400 hover:border-cyan-300/50'}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-300/30"><Presentation size={24} /></span><span><strong className="block text-sm">الصبورة</strong><small className="mt-0.5 block text-[10px] font-medium opacity-75">حل معي</small></span></button>}
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
       {studyView === 'board' && hasBoardContent && <iframe

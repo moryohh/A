@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ChevronDown,
   Eye,
   EyeOff,
-  Sparkles,
   BookOpen,
   Loader2,
   Layers,
@@ -276,42 +274,6 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
           boxShadow: `0 8px 30px ${theme.colors.glow}`,
         }}
       >
-        {/* Section Header */}
-        <div className={`flex items-center justify-between border-b ${theme.classes.cardBorder} pb-3`}>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-lg border flex items-center justify-center transition-colors"
-              style={{
-                backgroundColor: `${theme.colors.primary}20`,
-                borderColor: `${theme.colors.primary}40`,
-                color: theme.colors.primary,
-              }}
-            >
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className={`text-xs sm:text-sm font-black ${theme.classes.textMain}`}>
-                مفردات المنهج والكتاب المعتمد
-              </h3>
-              <div className={`text-[10px] ${theme.classes.textMuted}`}>
-                {lessonTitle ? lessonTitle : 'النصوص والتعاريف والأسئلة الوزارية الخاصة بالدرس'}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full font-bold border transition-colors"
-              style={{
-                backgroundColor: `${theme.colors.primary}18`,
-                borderColor: `${theme.colors.primary}35`,
-                color: theme.colors.primary,
-              }}
-            >
-              {allItems.length} فقرة منهجية
-            </span>
-          </div>
-        </div>
-
         <div className={`grid gap-4 ${hasBoardContent ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`} dir="ltr">
           <div dir="rtl" className="min-w-0">
         {allItems.map((item, idx) => {
@@ -417,8 +379,6 @@ export const LessonBookletView: React.FC<LessonBookletViewProps> = ({
                   <span className="relative flex items-center justify-center gap-2">
                     {isExpanded ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5 animate-pulse" />}
                     <span>{isExpanded ? 'إخفاء الإجابة' : 'عرض الإجابة'}</span>
-                    {!isExpanded && <Sparkles className="h-4 w-4" />}
-                    <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
 
