@@ -384,6 +384,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
 export default function App(){
   const params=useMemo(()=>new URLSearchParams(window.location.search),[])
   const requestedSubject=String(params.get('subject')||'').toLowerCase()
+  const requestedTopic=String(params.get('topicTitle')||'').trim()
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
   const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
@@ -400,7 +401,14 @@ export default function App(){
       setChapter(matched);setView(embeddedScience?'missing':'topics')
       const lesson=Number(params.get('lesson'))
       const isMath=selected.id==='math'
-      const found=matched.topics.find(t=>t.files.some(f=>{
+      const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').split(/[^\u0600-\u06ff\w]+/).filter(token=>token.length>2&&!['ال','الفصل','استخدام','باستخدام','شرح','معادلة','محاضرة'].includes(token))
+      const requestedTokens=new Set(topicTokens(requestedTopic))
+      const titleMatchedTopic=isMath&&requestedTokens.size
+        ? matched.topics.map(t=>({topic:t,score:topicTokens(t.name).filter(token=>requestedTokens.has(token)).length})).sort((a,b)=>b.score-a.score)[0]
+        : null
+      const found=titleMatchedTopic?.score>0
+        ? titleMatchedTopic.topic
+        : matched.topics.find(t=>t.files.some(f=>{
         const file=typeof f==='string'?f:f.file
         return isMath
           ? new RegExp(`(?:^|_)ch${number}_t${lesson}(?:_|\.json$)`, 'i').test(file)

@@ -97,6 +97,18 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
           <iframe key={lecture.id} className="aspect-video w-full bg-black" src={`https://www.youtube.com/embed/${lecture.youtubeId}?autoplay=1&rel=0&playsinline=1`} title={lecture.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
           <div className="p-4 space-y-2"><h2 className="font-bold leading-relaxed">{lecture.title}</h2><p className={`text-xs ${theme.classes.textMuted}`}>{teacherName} • {duration(lecture.durationSeconds)}</p><a href={lecture.url} target="_blank" rel="noopener noreferrer" className="inline-block text-xs underline" style={{ color: theme.colors.primary }}>فتح في يوتيوب</a></div>
         </div>}
+        {lecture && topic && <section className={`rounded-2xl overflow-hidden border ${theme.classes.cardBorder} ${theme.classes.cardBg} p-2 space-y-2`}>
+          <h2 className="px-2 pt-1 font-black text-sm">الصبورة — حل معي</h2>
+          <iframe
+            key={`${topic.topicId}-${lecture.id}-board`}
+            src={`/solve-with-me/index.html?embedded=1&subject=math&chapter=${topic.chapterNumber}&topicTitle=${encodeURIComponent(topic.title)}`}
+            title={`صبورة حل معي: ${topic.title}`}
+            className="w-full rounded-xl border border-cyan-500/30 bg-slate-900"
+            style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
+            allow="fullscreen; clipboard-write; web-share"
+            allowFullScreen
+          />
+        </section>}
         <h2 className="font-bold text-sm">محاضرات الموضوع بالترتيب</h2>
         {lectures.map((item) => <button key={item.id} onClick={() => setLecture(item)} aria-pressed={lecture?.id === item.id} className={cardClass} style={lecture?.id === item.id ? { borderColor: theme.colors.primary } : undefined}>
           <img src={item.thumbnailUrl} alt="" loading="lazy" className="w-24 aspect-video object-cover rounded-lg shrink-0" />
