@@ -404,7 +404,11 @@ export default function App(){
       const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').split(/[^\u0600-\u06ff\w]+/).filter(token=>token.length>2&&!['ال','الفصل','استخدام','باستخدام','شرح','معادلة','محاضرة'].includes(token))
       const requestedTokens=new Set(topicTokens(requestedTopic))
       const titleMatchedTopic=isMath&&requestedTokens.size
-        ? matched.topics.map(t=>({topic:t,score:topicTokens(t.name).filter(token=>requestedTokens.has(token)).length})).sort((a,b)=>b.score-a.score)[0]
+        ? matched.topics.map(t=>{
+            const tokens=topicTokens(t.name)
+            const score=tokens.filter(token=>requestedTokens.has(token)).length
+            return {topic:t,score,ratio:score/Math.max(tokens.length,1)}
+          }).sort((a,b)=>b.ratio-a.ratio||b.score-a.score||topicTokens(a.topic.name).length-topicTokens(b.topic.name).length)[0]
         : null
       const found=titleMatchedTopic?.score>0
         ? titleMatchedTopic.topic
