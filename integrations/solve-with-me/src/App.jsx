@@ -384,11 +384,11 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
 export default function App(){
   const params=useMemo(()=>new URLSearchParams(window.location.search),[])
   const requestedSubject=String(params.get('subject')||'').toLowerCase()
-  const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
+  const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
   const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
-    const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
+    const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('math')||requestedSubject.includes('رياض')?subjects.find(item=>item.id==='math'):requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
     if(!selected)return
     let cancelled=false
     fetch(selected.curriculum).then(r=>{if(!r.ok)throw new Error('Curriculum unavailable');return r.json()}).then(data=>{
@@ -399,7 +399,13 @@ export default function App(){
       if(!matched)return
       setChapter(matched);setView(embeddedScience?'missing':'topics')
       const lesson=Number(params.get('lesson'))
-      const found=matched.topics.find(t=>t.files.some(f=>new RegExp(`(?:^|_)lesson${lesson}\\.json$`).test(typeof f==='string'?f:f.file)))
+      const isMath=selected.id==='math'
+      const found=matched.topics.find(t=>t.files.some(f=>{
+        const file=typeof f==='string'?f:f.file
+        return isMath
+          ? new RegExp(`(?:^|_)ch${number}(?:_|$).*?(?:^|_)t${lesson}(?:_|\.json$)`, 'i').test(file)
+          : new RegExp(`(?:^|_)lesson${lesson}\.json$`).test(file)
+      }))
       if(found){setTopic(found);setView('exercises')}
     }).catch(error=>console.error('Could not open lesson:',error))
     return()=>{cancelled=true}

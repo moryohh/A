@@ -121,9 +121,11 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
     const boardSubject = String(openLessonContext?.subjectId || lesson.category || '').toLowerCase();
     const boardChapter = openLessonContext?.chapterNumber;
     const boardLesson = openLessonContext?.lessonNumber;
-    if ((boardSubject === 'chemistry' || boardSubject === 'physics') && boardChapter && boardLesson) {
+    const isMathBoard = boardSubject === 'mathematics' || boardSubject === 'math' || boardSubject.includes('رياض');
+    const boardIndexName = isMathBoard ? 'curriculum.json' : `${boardSubject}-curriculum.json`;
+    if ((isMathBoard || boardSubject === 'chemistry' || boardSubject === 'physics') && boardChapter && boardLesson) {
       const base = `${import.meta.env.BASE_URL}solve-with-me/`;
-      fetch(`${base}${boardSubject}-curriculum.json`)
+      fetch(`${base}${boardIndexName}`)
         .then((response) => response.ok ? response.json() : Promise.reject(new Error('board index unavailable')))
         .then(async (chapters) => {
           const chapter = Array.isArray(chapters)
@@ -133,7 +135,9 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
             .flatMap((topic: any) => topic?.files || [])
             .map((entry: any) => typeof entry === 'string' ? entry : entry?.file)
             .filter((file: unknown): file is string => Boolean(file))
-            .filter((file: string) => new RegExp(`(?:^|_)lesson${boardLesson}\.json$`, 'i').test(file));
+            .filter((file: string) => isMathBoard
+              ? new RegExp(`(?:^|_)ch${boardChapter}(?:_|$).*?(?:^|_)t${boardLesson}(?:_|\.json$)`, 'i').test(file)
+              : new RegExp(`(?:^|_)lesson${boardLesson}\.json$`, 'i').test(file));
           const results = await Promise.all(files.map(async (file: string) => {
             try {
               const response = await fetch(`${base}data/${encodeURIComponent(file)}`);
