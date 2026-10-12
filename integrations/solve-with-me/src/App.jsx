@@ -403,7 +403,7 @@ export default function App(){
       const found=matched.topics.find(t=>t.files.some(f=>{
         const file=typeof f==='string'?f:f.file
         return isMath
-          ? new RegExp(`(?:^|_)ch${number}(?:_|$).*?(?:^|_)t${lesson}(?:_|\.json$)`, 'i').test(file)
+          ? new RegExp(`(?:^|_)ch${number}_t${lesson}(?:_|\.json$)`, 'i').test(file)
           : new RegExp(`(?:^|_)lesson${lesson}\.json$`).test(file)
       }))
       if(found){setTopic(found);setView('exercises')}

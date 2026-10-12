@@ -136,7 +136,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
             .map((entry: any) => typeof entry === 'string' ? entry : entry?.file)
             .filter((file: unknown): file is string => Boolean(file))
             .filter((file: string) => isMathBoard
-              ? new RegExp(`(?:^|_)ch${boardChapter}(?:_|$).*?(?:^|_)t${boardLesson}(?:_|\.json$)`, 'i').test(file)
+              ? new RegExp(`(?:^|_)ch${boardChapter}_t${boardLesson}(?:_|\.json$)`, 'i').test(file)
               : new RegExp(`(?:^|_)lesson${boardLesson}\.json$`, 'i').test(file));
           const results = await Promise.all(files.map(async (file: string) => {
             try {
