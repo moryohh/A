@@ -153,10 +153,10 @@ function PracticeEquation({ step }) {
   return <div className="practice-equation" ref={hostRef} dir="ltr"><div className="practice-equation-content" ref={contentRef} style={{fontSize}}>{formulas.map((formula, index) => <div className="practice-equation-line" key={`${index}-${formula}`} dangerouslySetInnerHTML={{__html:renderFormula(formula)}} />)}</div></div>
 }
 
-function Header({ apples, hearts, onHome }) {
+function Header({ apples, hearts, onHome, onBack }) {
   return <header className="game-header">
     <div className="score"><span className="pill heart"><Heart size={17} fill="currentColor"/>{hearts}</span><span className="pill apple"><Apple size={17} fill="currentColor"/>{apples}</span></div>
-    <button className="icon-button" onClick={onHome}><Home size={18}/><span>الرئيسية</span></button>
+    <div className="header-left">{onBack&&<button className="header-back" onClick={onBack} aria-label="رجوع"><ArrowRight size={19}/></button>}<button className="icon-button" onClick={onHome}><Home size={18}/><span>الرئيسية</span></button></div>
   </header>
 }
 
@@ -214,7 +214,7 @@ function Exercises({ topic, onBack, onOpen, embedded = false }) {
     })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
   },[topic])
-  return <main className="page exercises-page"><div className="title-row">{!embedded&&<button className="icon-button" onClick={onBack}><ArrowRight/></button>}<div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>
+  return <main className="page exercises-page">{!embedded&&<div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>}
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
       <span className="exercise-order">{order+1}</span><div className="exercise-name"><MathText>{shortExerciseTitle(item.problem)}</MathText><small>السؤال {item.problem.number || item.questionIndex+1}{item.problem.page_number ? ` • صفحة ${item.problem.page_number}` : ''}</small></div><ChevronLeft/>
@@ -374,7 +374,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const activeIndex=problem.steps.indexOf(currentStep)
   const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
   return <main className="solver"><aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>
-    <div className="solution-shell"><div className="solver-nav"><strong>التمرين {questionIndex + 1}</strong><div className="progress"><span style={{width:`${progress}%`}}/><b>{progress}%</b></div></div>
+    <div className="solution-shell">
     <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<p><MathText>{step.explanation}</MathText></p>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} anchorRef={boardRef} onHint={boardHint} onHelp={help}/>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
     <Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)}/>
@@ -423,7 +423,7 @@ export default function App(){
     return()=>{cancelled=true}
   },[embeddedScience,params,requestedSubject])
   const home=()=>{setView('subjects');setSubject(null);setChapter(null);setTopic(null);setFile(null);setQuestionIndex(0)}
-  return <><Header {...{apples,hearts}} onHome={home}/>
+  return <><Header {...{apples,hearts}} onHome={home} onBack={embeddedScience?()=>setView('topics'):undefined}/>
     {view==='loading'&&<main className="page"><div className="loading">جاري فتح تمارين الدرس المحدد…</div></main>}
     {view==='missing'&&<main className="page"><div className="loading">لا توجد تمارين مضافة لهذا الدرس حاليًا</div></main>}
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
