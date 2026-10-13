@@ -373,7 +373,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
   const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
-  return <main className="solver"><aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>
+  return <main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
     <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<p><MathText>{step.explanation}</MathText></p>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} anchorRef={boardRef} onHint={boardHint} onHelp={help}/>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
