@@ -1,6 +1,7 @@
 -- Supabase storage for the interactive "Solve With Me" whiteboard.
 -- JSON payloads stay structurally equivalent to the source files; metadata
 -- and source-file SHA-256 hashes are stored beside them for deterministic verification.
+-- Browser clients receive read-only access; imports remain server-side only.
 
 alter table public.educational_data
   add column if not exists content_sha256 text,
@@ -28,4 +29,3 @@ on public.educational_data (
   ((content_metadata ->> 'lesson_number')::integer)
 )
 where section_id = 'solve_with_me';
-
