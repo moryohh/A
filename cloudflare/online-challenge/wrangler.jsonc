@@ -1,0 +1,13 @@
+{
+  "name": "duha-online-challenge",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-28",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "ChallengeRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChallengeRoom"] }],
+  "vars": {
+    "SUPABASE_URL": "https://qlfleszoyujelygwzdgu.supabase.co",
+    "ALLOWED_ORIGIN": "https://a-1q1.pages.dev"
+  }
+}
