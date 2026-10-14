@@ -8,3 +8,4 @@ coverage/
 !.env.example
 
 public/solve-with-me/
+solve-with-me-manifest.json

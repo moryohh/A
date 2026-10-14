@@ -5,6 +5,7 @@ import {
   HelpCircle, Home, Lightbulb, Palette, Pen, Redo2, Share2, Sparkles,
   Trash2, Undo2, X
 } from 'lucide-react'
+import { loadBoardFile } from './contentApi'
 
 // Some converted lesson files contain JSON-escaped LaTeX twice (for example
 // `\\\\frac` after parsing becomes `\\\\frac` instead of `\\frac`).  Collapse
@@ -202,18 +203,16 @@ const shortExerciseTitle = problem => {
   return clean.split(/\s+/).slice(0, 7).join(' ') || 'تمرين'
 }
 
-function Exercises({ topic, onBack, onOpen }) {
+function Exercises({ topic, subjectId, onBack, onOpen }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
     Promise.all(topic.files.map(async item => {
-      const info=fileInfo(item), response=await fetch(`./data/${info.file}`)
-      if(!response.ok) throw new Error(info.file)
-      const questions=await response.json()
+      const info=fileInfo(item), questions=await loadBoardFile(subjectId, info.file)
       return questions.map((problem,index)=>({ ...info, problem, questionIndex:index }))
     })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
-  },[topic])
+  },[topic,subjectId])
   return <main className="page exercises-page"><div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>الموضوع</small><h1>{topic.name}</h1></div></div>
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
@@ -350,10 +349,10 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts }) {
+function Solver({ file, subjectId, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
-  useEffect(()=>{fetch(`./data/${file}`).then(r=>r.json()).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
+  useEffect(()=>{loadBoardFile(subjectId,file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,subjectId,initialQuestionIndex])
   useEffect(()=>{
     try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}
   },[file,questionIndex])
@@ -406,6 +405,6 @@ export default function App(){
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
+    {view==='exercises'&&<Exercises topic={topic} subjectId={subject?.id} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} subjectId={subject?.id} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
 }
