@@ -10,7 +10,7 @@ import { ONLINE_TRUE_FALSE_CHARACTERS, OnlineTrueFalseCharacter, type OnlineTrue
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
-type Player = { id: string; team?: 'A' | 'B' | null; score: number; streak?: number; answered: boolean; connected: boolean; bot?: boolean; name?: string; avatar?: string; city?: string; school?: string; badge?: string; level?: number };
+type Player = { id: string; team?: 'A' | 'B' | null; score: number; streak?: number; answered: boolean; connected: boolean; bot?: boolean; name?: string; avatar?: string; character?: OnlineTrueFalseCharacterVariant | null; city?: string; school?: string; badge?: string; level?: number };
 type State = { type: 'state'; gameType: OnlineChallengeGameType; status: 'waiting' | 'playing' | 'finished' | 'closed' | 'abandoned'; round: number; total: number; turn?: string | null; activeTeam?: 'A' | 'B' | null; question: { question: string; options: string[] } | null; gibhaRefillSlots?: number[]; gibhaRefillVersion?: number; players: Player[]; winner: string | null; tie: boolean; endedReason?: string | null; leftPlayerId?: string | null; reconnectDeadline?: number | null; teamLives?: { A: number; B: number }; teamScores?: { A: number; B: number }; questionDeadline?: number | null; discussionPhase?: 'thinking' | 'recommended' | null; lifelines?: { fifty: boolean; audience: boolean; phone: boolean } | null };
 type RoundResult = { question?: { question: string; options: string[] }; answer?: number; selected?: number; correct?: boolean; answeredBy?: string; scores: Array<{ id: string; score: number }>; botSelected?: number; botCorrect?: boolean; stealAwarded?: boolean };
 type ChatMessage = { id: string; from: string; text: string; sentAt: number };
@@ -165,15 +165,16 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     return `Bearer ${data.session.access_token}`;
   }
 
-  async function challengeProfile(): Promise<{ name: string; avatar: string }> {
+  async function challengeProfile(): Promise<{ name: string; avatar: string; character: OnlineTrueFalseCharacterVariant }> {
     const guest = loadGuestSession();
-    if (guest) return { name: guest.name, avatar: '' };
+    if (guest) return { name: guest.name, avatar: '', character: trueFalseCharacter };
     const client = getSupabaseClient();
     const { data } = await client?.auth.getSession() || { data: { session: null } };
     const metadata = data.session?.user?.user_metadata || {};
     return {
       name: String(metadata.full_name || metadata.name || data.session?.user?.email?.split('@')[0] || 'طالب'),
       avatar: String(metadata.avatar_url || metadata.picture || ''),
+      character: trueFalseCharacter,
     };
   }
 
@@ -196,7 +197,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onmessage = (event) => {
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
-      if (payload.type === 'welcome') { meRef.current = payload.userId; setMe(payload.userId); }
+      if (payload.type === 'welcome') { meRef.current = payload.userId; setMe(payload.userId); sendSocket({ type: 'character', character: trueFalseCharacter }); }
       if (payload.type === 'audio_state') setRemoteTalking(Boolean(payload.enabled));
       if (payload.type === 'audio_signal') {
         void (async () => {
@@ -443,13 +444,14 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   function selectTrueFalseCharacter(value: OnlineTrueFalseCharacterVariant) {
     setTrueFalseCharacter(value);
     window.localStorage.setItem('online-true-false-character', value);
+    sendSocket({ type: 'character', character: value });
   }
   const turnIndicators = <div className="grid grid-cols-2 gap-3">
     {[
       { label: 'أنت', player: self, active: myTurn },
       { label: opponent?.name || 'المنافس', player: opponent, active: Boolean(opponent && !myTurn) },
-    ].map(({ label, player, active }) => <div key={label} className={`relative rounded-2xl border px-3 pb-3 pt-9 text-center transition-all duration-500 ${active ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_24px_rgba(250,204,21,.4)]' : 'border-cyan-400/20 bg-white/5'}`}>
-      <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 ${active ? 'opacity-100' : 'opacity-20 grayscale'}`}><span className={`block rotate-180 text-3xl ${active ? 'animate-pulse drop-shadow-[0_0_12px_rgba(250,204,21,1)]' : ''}`}>💡</span></div>
+    ].map(({ label, player, active }) => <div key={label} className={`relative rounded-2xl border px-3 pb-3 pt-10 text-center transition-all duration-500 ${active ? 'border-yellow-200 bg-yellow-300/20 shadow-[0_0_38px_rgba(253,224,71,.82),inset_0_0_22px_rgba(253,224,71,.16)]' : 'border-cyan-400/20 bg-white/5'}`}>
+      <div className={`pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 ${active ? 'opacity-100' : 'opacity-20 grayscale'}`}>{active && <span className="absolute left-1/2 top-1 h-16 w-24 -translate-x-1/2 rounded-full bg-yellow-200/45 blur-xl"/>}<span className={`relative block rotate-180 text-4xl ${active ? 'animate-pulse brightness-150 drop-shadow-[0_0_22px_rgba(255,245,120,1)]' : ''}`}>💡</span></div>
       <strong className="block truncate text-sm">{label}</strong><small className={active ? 'font-black text-amber-200' : 'text-cyan-200'}>{active ? 'الدور الآن' : `${player?.score || 0} نقطة`}</small>
     </div>)}
   </div>;
@@ -554,7 +556,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         {state.status === 'playing' && displayedQuestion && <>
           {turnIndicators}
           <div className="flex items-center justify-between rounded-2xl border border-cyan-300/20 bg-[#07142d]/90 px-3 py-2.5 text-xs"><span className="font-black text-cyan-400">السؤال {Math.min(state.round + 1, state.total)} من {state.total}</span><span className="flex items-center gap-1 text-cyan-300"><Sparkles className="h-3 w-3" />أنت {self?.score || 0} — المنافس {opponent?.score || 0}</span><span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono ${turnSeconds <= 5 ? 'border-rose-400 bg-rose-500/20 text-rose-300' : 'border-white/10 bg-white/5'}`}><Clock className="h-3 w-3" />{turnSeconds}ث</span></div>
-          <div className="rounded-[1.75rem] border border-white/80 bg-gradient-to-br from-[#effaff] to-[#fff8dc] shadow-[0_12px_35px_rgba(14,116,144,.18)]"><OnlineTrueFalseCharacter state={trueFalseCharacterState} variant={trueFalseCharacter} /></div>
+          <div className="grid grid-cols-2 gap-2 rounded-[1.75rem] border border-white/80 bg-gradient-to-br from-[#effaff] to-[#fff8dc] p-2 shadow-[0_12px_35px_rgba(14,116,144,.18)]">
+            {[
+              { player: self, label: 'أنت', variant: trueFalseCharacter },
+              { player: opponent, label: opponent?.name || 'المنافس', variant: opponent?.character || 'student2' },
+            ].map(item => { const reacting = roundResult?.answeredBy === item.player?.id; const characterState: OnlineTrueFalseCharacterState = reacting ? trueFalseCharacterState : 'idle'; return <div key={item.label} className={`relative overflow-hidden rounded-2xl border ${state.turn === item.player?.id ? 'border-yellow-300 shadow-[0_0_20px_rgba(250,204,21,.48)]' : 'border-sky-100'}`}><span className="absolute inset-x-2 top-2 z-20 truncate rounded-full bg-slate-900/70 px-2 py-1 text-center text-[10px] font-black text-white">{item.label}</span><OnlineTrueFalseCharacter state={characterState} variant={item.variant} /></div>; })}
+          </div>
           <div className="rounded-3xl border border-cyan-300/30 bg-gradient-to-br from-[#18345b] via-[#102653] to-[#0a1735] p-6 text-center text-lg font-black leading-9"><p className="mb-2 text-xs text-cyan-300">{roundResult ? answeredByMe ? 'إجابتك — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : myTurn ? 'دورك الآن' : `${opponent?.name || 'المنافس'} يفكّر…`}</p><ScientificText value={displayedQuestion.question} /></div>
           <div className="grid grid-cols-2 gap-3">{displayedQuestion.options.slice(0, 2).map((option, index) => { const chosen = roundResult?.selected === index; const correct = roundResult?.answer === index; const base = index === 0 ? 'from-emerald-500 to-teal-600 border-emerald-300' : 'from-rose-500 to-red-700 border-rose-300'; const result = roundResult ? correct ? 'ring-4 ring-emerald-300 brightness-125' : chosen ? 'ring-4 ring-rose-300 opacity-90' : 'opacity-40' : ''; return <button key={index} disabled={!connected || !myTurn || pendingAnswer || Boolean(roundResult)} onClick={() => answer(index)} className={`min-h-36 rounded-[1.75rem] border-2 bg-gradient-to-b p-4 text-xl font-black shadow-xl transition ${base} ${result} disabled:cursor-default`}><span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-white/15">{index === 0 ? <CheckCircle2 className="h-10 w-10"/> : <XCircle className="h-10 w-10"/>}</span><ScientificText value={option} />{chosen && <small className="mt-2 block">{answeredByMe ? 'اختيارك' : 'اختيار المنافس'}</small>}</button>; })}</div>
           {roundResult && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300' : 'border-rose-400 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✓' : 'إجابة خاطئة ✗'}<p className="mt-1 text-xs text-slate-200">الدور التالي بعد عرض النتيجة</p></div>}

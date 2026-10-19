@@ -139,6 +139,42 @@ test('temporary disconnect gets a 30 second grace period then a bot continues th
   assert.equal(messages.some(message => message.type === 'challenge_ended'), false);
 });
 
+test('host close starts grace period even while the closing socket is still listed', async () => {
+  const data = new Map();
+  let alarmAt = null;
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const guestSocket = { deserializeAttachment: () => ({ userId: 'guest' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async value => { alarmAt = value; },
+      deleteAlarm: async () => { alarmAt = null; },
+    },
+    getWebSockets: () => [hostSocket, guestSocket],
+  });
+  data.set('game', {
+    gameType: 'true_false', roomCode: '5678', hostId: 'host', status: 'playing', round: 0, questionIndex: 0, turn: 'host',
+    questions: [{ question: 'Question?', options: ['صح', 'خطأ'], correctAnswer: 0 }],
+    players: [{ id: 'host', score: 0, answer: null }, { id: 'guest', score: 0, answer: null }],
+  });
+
+  await room.handleDisconnect(hostSocket);
+  assert.equal(data.get('game').disconnectUserId, 'host');
+  assert.ok(alarmAt > Date.now());
+
+  const expired = data.get('game');
+  expired.disconnectDeadline = Date.now() - 1;
+  data.set('game', expired);
+  // The platform removes the closed socket before the alarm fires.
+  room.ctx.getWebSockets = () => [guestSocket];
+  await room.alarm();
+  assert.equal(data.get('game').players[0].id, 'bot:duha-challenge');
+  assert.equal(data.get('game').turn, 'bot:duha-challenge');
+  assert.ok(data.get('game').botAnswerAt > Date.now());
+});
+
 test('a bot joins only after the three-to-five-minute waiting deadline', async () => {
   const data = new Map();
   let alarmAt = null;

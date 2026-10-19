@@ -179,9 +179,10 @@ export class ChallengeRoom {
   sockets() { return this.ctx.getWebSockets(); }
   send(socket, payload) { try { socket.send(JSON.stringify(payload)); } catch (_) {} }
   broadcast(payload) { this.sockets().forEach(function (socket) { this.send(socket, payload); }, this); }
-  connected(userId) {
+  connected(userId, excludedSocket) {
     if (userId === BOT_ID || (typeof userId === 'string' && userId.startsWith(TEAM_BOT_PREFIX))) return true;
     return this.sockets().some(function (socket) {
+      if (socket === excludedSocket) return false;
       var attachment = socket.deserializeAttachment();
       return attachment && attachment.userId === userId;
     });
@@ -409,7 +410,7 @@ export class ChallengeRoom {
       gibhaRefillVersion: game.gameType === 'gibha_sah' ? game.gibhaRefillVersion || 0 : undefined,
       players: game.players.map(function (p) {
         var profile = p.profile || (this.isBot(p) ? game.botProfile : null);
-        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
+        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length >= 2 && winner === null,
@@ -450,6 +451,7 @@ export class ChallengeRoom {
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
         name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
         avatar: typeof ticketBody.profile.avatar === 'string' && ticketBody.profile.avatar.length <= 800 ? ticketBody.profile.avatar : '',
+        character: ['anime', 'student', 'student2'].includes(ticketBody.profile.character) ? ticketBody.profile.character : 'anime',
       } : null;
       await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, profile: profile, expires: Date.now() + 60000 });
       return json({ ticket: ticket, joined: game.players.some(function (p) { return p.id !== ticketBody.userId; }) }, 200, '');
@@ -488,7 +490,7 @@ export class ChallengeRoom {
           var humans = this.teamHumans(game).length;
           team = humans === 0 || humans === 1 ? 'A' : 'B';
         }
-        game.players.push({ id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null });
+        game.players.push({ id: userId, team: team, score: 0, streak: 0, answer: null, character: ticketRecord.profile && ticketRecord.profile.character, profile: ticketRecord.profile || null });
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
         if (game.gameType === 'gibha_sah' && game.players.length === 4) game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
@@ -502,7 +504,10 @@ export class ChallengeRoom {
         }
       }
       var currentPlayer = game.players.find(function (player) { return player.id === userId; });
-      if (currentPlayer && ticketRecord.profile) currentPlayer.profile = ticketRecord.profile;
+      if (currentPlayer && ticketRecord.profile) {
+        currentPlayer.profile = ticketRecord.profile;
+        currentPlayer.character = ticketRecord.profile.character || currentPlayer.character;
+      }
       if (game.disconnectUserId === userId) {
         delete game.disconnectUserId;
         delete game.disconnectDeadline;
@@ -531,6 +536,14 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
     var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
+    if (payload && payload.type === 'character' && sender && ['anime', 'student', 'student2'].includes(payload.character) && liveGame) {
+      var characterPlayer = liveGame.players.find(function (player) { return player.id === sender.userId && !this.isBot(player); }, this);
+      if (!characterPlayer) return;
+      characterPlayer.character = payload.character;
+      await this.ctx.storage.put('game', liveGame);
+      this.broadcast(this.view(liveGame));
+      return;
+    }
     if (payload && payload.type === 'reaction' && sender && liveGame && liveGame.gameType === 'gibha_sah' && liveGame.status === 'playing') {
       var reactionKinds = ['clap', 'laugh', 'think', 'angry', 'rocket'];
       if (!reactionKinds.includes(payload.kind)) return;
@@ -721,7 +734,9 @@ export class ChallengeRoom {
     if (!game || game.status === 'closed' || game.status === 'finished' || game.status === 'abandoned') return;
     var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
     var userId = attachment && attachment.userId;
-    if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId)) return;
+    // A closing socket can remain in getWebSockets() briefly. Exclude the socket
+    // that raised this event, otherwise the reconnect grace period never starts.
+    if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId, socket)) return;
     game.disconnectUserId = userId;
     game.disconnectDeadline = Date.now() + 30000;
     await this.ctx.storage.put('game', game);
