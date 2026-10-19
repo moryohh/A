@@ -313,7 +313,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           const correct = payload.selected === payload.answer;
           if (roomGameTypeRef.current === 'true_false') {
             if (correct) gameAudio.playTrueFalseCorrect();
-            else { gameAudio.playTrueFalseWrong(); gameAudio.playGameLoss(); }
+            else gameAudio.playTrueFalseWrong();
           } else if (roomGameTypeRef.current === 'gibha_sah') {
             if (correct) gameAudio.playCardSolved();
             else gameAudio.playGibhaWrong();
