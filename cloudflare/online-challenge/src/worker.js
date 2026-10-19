@@ -50,6 +50,8 @@ function validGameType(value) {
 var BOT_ID = 'bot:duha-challenge';
 var TEAM_BOT_PREFIX = 'bot:team:';
 var BOT_ANSWER_DELAY_MS = 2000;
+var TRUE_FALSE_TURN_MS = 20000;
+var CHARACTER_VARIANTS = ['anime', 'student', 'student2'];
 var BOT_PROFILES = [
   { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
   { id: 'opp-2', name: 'فاطمة العبيدي', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', city: 'الموصل - نينوى', school: 'ثانوية المتفوقات', badge: 'عالمة المستقبل 🔬', level: 14 },
@@ -188,6 +190,22 @@ export class ChallengeRoom {
     });
   }
   isBot(player) { return Boolean(player && typeof player.id === 'string' && (player.id === BOT_ID || player.id.startsWith(TEAM_BOT_PREFIX))); }
+  assignCharacter(game, player) {
+    if (!player || player.character) return player && player.character;
+    var used = game.players.map(function (item) { return item.character; }).filter(Boolean);
+    var available = CHARACTER_VARIANTS.filter(function (variant) { return !used.includes(variant); });
+    var pool = available.length ? available : CHARACTER_VARIANTS;
+    player.character = pool[Math.floor(Math.random() * pool.length)];
+    return player.character;
+  }
+  beginSoloTurn(game) {
+    delete game.questionDeadline;
+    delete game.botAnswerAt;
+    var active = game.players.find(function (player) { return player.id === game.turn; });
+    if (!active || game.status !== 'playing') return;
+    if (this.isBot(active)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
+    else if (game.gameType === 'true_false') game.questionDeadline = Date.now() + TRUE_FALSE_TURN_MS;
+  }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
     this.sockets().forEach(function (socket) {
@@ -360,9 +378,9 @@ export class ChallengeRoom {
     if (game.gameType === 'millionaire_team' && wasTurn) {
       game.turn = player.id;
       game.botDiscussionAt = Date.now() + randomDelay(3000, 7000);
-    } else if (game.gameType !== 'millionaire_team') {
-      if (wasTurn) game.turn = player.id;
-      game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
+    } else if (game.gameType !== 'millionaire_team' && wasTurn) {
+      game.turn = player.id;
+      this.beginSoloTurn(game);
     }
     await this.ctx.storage.put('game', game);
     await this.updateRegistry('playing', game);
@@ -451,7 +469,6 @@ export class ChallengeRoom {
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
         name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
         avatar: typeof ticketBody.profile.avatar === 'string' && ticketBody.profile.avatar.length <= 800 ? ticketBody.profile.avatar : '',
-        character: ['anime', 'student', 'student2'].includes(ticketBody.profile.character) ? ticketBody.profile.character : 'anime',
       } : null;
       await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, profile: profile, expires: Date.now() + 60000 });
       return json({ ticket: ticket, joined: game.players.some(function (p) { return p.id !== ticketBody.userId; }) }, 200, '');
@@ -490,13 +507,16 @@ export class ChallengeRoom {
           var humans = this.teamHumans(game).length;
           team = humans === 0 || humans === 1 ? 'A' : 'B';
         }
-        game.players.push({ id: userId, team: team, score: 0, streak: 0, answer: null, character: ticketRecord.profile && ticketRecord.profile.character, profile: ticketRecord.profile || null });
+        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null };
+        game.players.push(joinedPlayer);
+        this.assignCharacter(game, joinedPlayer);
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
         if (game.gameType === 'gibha_sah' && game.players.length === 4) game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') {
           game.turn = game.players[0].id;
           delete game.botJoinAt;
+          this.beginSoloTurn(game);
         }
         if (game.gameType === 'gibha_sah' && game.status === 'playing') {
           game.turn = game.players[0].id;
@@ -506,8 +526,8 @@ export class ChallengeRoom {
       var currentPlayer = game.players.find(function (player) { return player.id === userId; });
       if (currentPlayer && ticketRecord.profile) {
         currentPlayer.profile = ticketRecord.profile;
-        currentPlayer.character = ticketRecord.profile.character || currentPlayer.character;
       }
+      this.assignCharacter(game, currentPlayer);
       if (game.disconnectUserId === userId) {
         delete game.disconnectUserId;
         delete game.disconnectDeadline;
@@ -536,14 +556,6 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
     var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
-    if (payload && payload.type === 'character' && sender && ['anime', 'student', 'student2'].includes(payload.character) && liveGame) {
-      var characterPlayer = liveGame.players.find(function (player) { return player.id === sender.userId && !this.isBot(player); }, this);
-      if (!characterPlayer) return;
-      characterPlayer.character = payload.character;
-      await this.ctx.storage.put('game', liveGame);
-      this.broadcast(this.view(liveGame));
-      return;
-    }
     if (payload && payload.type === 'reaction' && sender && liveGame && liveGame.gameType === 'gibha_sah' && liveGame.status === 'playing') {
       var reactionKinds = ['clap', 'laugh', 'think', 'angry', 'rocket'];
       if (!reactionKinds.includes(payload.kind)) return;
@@ -712,7 +724,7 @@ export class ChallengeRoom {
       game.players.forEach(function (item) { item.answer = null; });
       game.reactionTurn = Number(game.reactionTurn || 0) + 1;
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else if (game.players.some(function (item) { return item.id === game.turn && this.isBot(item); }, this)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
+      else this.beginSoloTurn(game);
       var roundPayload = { type: 'round_result', question: { question: currentQuestion.question, options: resultOptions }, selected: chosen, correct: isCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId };
       // Never disclose Gibha Sah's correct card after a mistake.
       if (game.gameType !== 'gibha_sah' || isCorrect) roundPayload.answer = correctAnswer;
@@ -761,11 +773,15 @@ export class ChallengeRoom {
           var gibhaProfile = BOT_PROFILES[(game.players.length - 1) % BOT_PROFILES.length];
           game.players.push({ id: TEAM_BOT_PREFIX + 'gibha:' + crypto.randomUUID(), score: 0, streak: 0, answer: null, profile: gibhaProfile });
         }
-      } else game.players.push({ id: BOT_ID, score: 0, answer: null });
+      } else {
+        var waitingBot = { id: BOT_ID, score: 0, answer: null };
+        game.players.push(waitingBot);
+        this.assignCharacter(game, waitingBot);
+      }
       game.status = 'playing';
       delete game.botJoinAt;
       if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
-      else if (game.gameType !== 'gibha_sah') game.botAnswerAt = now + (game.gameType === 'millionaire' ? randomDelay(10000, 30000) : BOT_ANSWER_DELAY_MS);
+      else if (game.gameType !== 'gibha_sah') this.beginSoloTurn(game);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
@@ -790,6 +806,25 @@ export class ChallengeRoom {
       await this.finishTeamRound(game, -1, game.turn, true);
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
+    }
+    if (game.gameType === 'true_false' && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
+      var timedOutPlayer = game.players.find(function (player) { return player.id === game.turn; });
+      var timedOutIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
+      var timedOutQuestion = game.questions[timedOutIndex];
+      if (timedOutPlayer && timedOutQuestion && !this.isBot(timedOutPlayer)) {
+        var timedOutId = timedOutPlayer.id;
+        game.round = timedOutIndex + 1;
+        game.questionIndex = game.round;
+        game.turn = game.players.find(function (player) { return player.id !== timedOutId; })?.id || null;
+        game.players.forEach(function (player) { player.answer = null; });
+        if (game.questionIndex >= game.questions.length) {
+          game.status = 'finished';
+          delete game.questionDeadline;
+        } else this.beginSoloTurn(game);
+        this.broadcast({ type: 'round_result', question: { question: timedOutQuestion.question, options: timedOutQuestion.options }, answer: timedOutQuestion.correctAnswer, selected: -1, correct: false, timedOut: true, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }), answeredBy: timedOutId });
+        this.broadcast(this.view(game));
+        if (game.status === 'finished') await this.updateRegistry('ended', game);
+      }
     }
     if (game.disconnectUserId && game.disconnectDeadline && now >= game.disconnectDeadline) {
       var disconnectedId = game.disconnectUserId;
@@ -858,11 +893,12 @@ export class ChallengeRoom {
         game.players.forEach(function (item) { item.answer = null; });
         game.reactionTurn = Number(game.reactionTurn || 0) + 1;
         if (game.questionIndex >= game.questions.length) game.status = 'finished';
+        else this.beginSoloTurn(game);
         var botRoundPayload = { type: 'round_result', question: { question: botQuestion.question, options: botResultOptions }, selected: botSelected, correct: botWasCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: bot.id };
         if (game.gameType !== 'gibha_sah' || botWasCorrect) botRoundPayload.answer = botCorrect;
         this.broadcast(botRoundPayload);
       }
-      delete game.botAnswerAt;
+      if (game.botAnswerAt && game.botAnswerAt <= now) delete game.botAnswerAt;
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
       await this.scheduleBotAnswer(game);

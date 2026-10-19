@@ -175,6 +175,42 @@ test('host close starts grace period even while the closing socket is still list
   assert.ok(data.get('game').botAnswerAt > Date.now());
 });
 
+test('true false timeout gives no point and advances the turn', async () => {
+  const data = new Map();
+  let alarmAt = null;
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const guestSocket = { deserializeAttachment: () => ({ userId: 'guest' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => { alarmAt = null; } },
+    getWebSockets: () => [hostSocket, guestSocket],
+  });
+  data.set('game', {
+    gameType: 'true_false', roomCode: '2468', hostId: 'host', status: 'playing', round: 0, questionIndex: 0, turn: 'host', questionDeadline: Date.now() - 1,
+    questions: [{ question: 'Q1?', options: ['صح', 'خطأ'], correctAnswer: 0 }, { question: 'Q2?', options: ['صح', 'خطأ'], correctAnswer: 1 }],
+    players: [{ id: 'host', score: 0, answer: null, character: 'anime' }, { id: 'guest', score: 0, answer: null, character: 'student' }],
+  });
+
+  await room.alarm();
+  const game = data.get('game');
+  assert.equal(game.round, 1);
+  assert.equal(game.turn, 'guest');
+  assert.deepEqual(game.players.map(player => player.score), [0, 0]);
+  assert.ok(game.questionDeadline > Date.now());
+  assert.equal(messages.some(message => message.type === 'round_result' && message.timedOut === true && message.selected === -1), true);
+  assert.ok(alarmAt > Date.now());
+});
+
+test('true false assigns different random characters to two players', () => {
+  const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
+  const game = { players: [{ id: 'host' }, { id: 'guest' }] };
+  room.assignCharacter(game, game.players[0]);
+  room.assignCharacter(game, game.players[1]);
+  assert.ok(['anime', 'student', 'student2'].includes(game.players[0].character));
+  assert.ok(['anime', 'student', 'student2'].includes(game.players[1].character));
+  assert.notEqual(game.players[0].character, game.players[1].character);
+});
+
 test('a bot joins only after the three-to-five-minute waiting deadline', async () => {
   const data = new Map();
   let alarmAt = null;
@@ -202,7 +238,7 @@ test('a bot joins only after the three-to-five-minute waiting deadline', async (
   await room.alarm();
   assert.equal(data.get('game').status, 'playing');
   assert.equal(data.get('game').players[1].id, 'bot:duha-challenge');
-  assert.ok(data.get('game').botAnswerAt > Date.now());
+  assert.ok(data.get('game').questionDeadline > Date.now());
   assert.equal(messages.some(message => message.type === 'bot_joined'), true);
 });
 
