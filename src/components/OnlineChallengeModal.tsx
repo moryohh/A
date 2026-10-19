@@ -6,7 +6,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
-import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
+import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -59,6 +59,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const roundRef = useRef<number | null>(null);
   const roomGameTypeRef = useRef<OnlineChallengeGameType>(gameType);
   const resultUntilRef = useRef(0);
+  const stateRef = useRef<State | null>(null);
   const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,6 +188,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       setPendingAnswer(false);
       setRoundResult(null);
       setResultRevealed(false);
+      stateRef.current = payload;
       setState(payload);
     };
     ws.onmessage = (event) => {
@@ -289,7 +291,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'round_result') {
-        resultUntilRef.current = Date.now() + (roomGameTypeRef.current === 'millionaire' || roomGameTypeRef.current === 'millionaire_team' ? 5000 : 3000);
+        const isCorrect = payload.correct ?? payload.selected === payload.answer;
+        const answeringCharacter = stateRef.current?.players.find(player => player.id === payload.answeredBy)?.character || 'anime';
+        const resultDuration = roomGameTypeRef.current === 'true_false'
+          ? onlineTrueFalseResultDuration(answeringCharacter, isCorrect ? 'correct' : 'wrong') + 1500
+          : roomGameTypeRef.current === 'millionaire' || roomGameTypeRef.current === 'millionaire_team' ? 5000 : 3000;
+        resultUntilRef.current = Date.now() + resultDuration;
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
         setResultRevealed(false);
         setRoundResult({ question: payload.question, answer: payload.answer, selected: payload.selected, correct: payload.correct ?? payload.selected === payload.answer, answeredBy: payload.answeredBy, scores: payload.scores || [], botSelected: payload.botSelected, botCorrect: payload.botCorrect, stealAwarded: payload.stealAwarded });
