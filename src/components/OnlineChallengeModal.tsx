@@ -6,6 +6,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
+import { ONLINE_TRUE_FALSE_CHARACTERS, OnlineTrueFalseCharacter, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -47,6 +48,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [rocketTargeting, setRocketTargeting] = useState(false);
   const [laughTargeting, setLaughTargeting] = useState(false);
   const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number; path?: ReactionPath } | null>(null);
+  const [trueFalseCharacter, setTrueFalseCharacter] = useState<OnlineTrueFalseCharacterVariant>(() => {
+    const saved = window.localStorage.getItem('online-true-false-character');
+    return saved === 'student' || saved === 'student2' || saved === 'anime' ? saved : 'anime';
+  });
   const gibhaBoardRef = useRef<HTMLDivElement | null>(null);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
@@ -434,6 +439,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const canRecommend = myTeamActive && !myTurn && state?.status === 'playing';
   const activeCaptain = state?.players.find(player => player.id === state.turn);
   const answeredByMe = roundResult?.answeredBy === me;
+  const trueFalseCharacterState: OnlineTrueFalseCharacterState = roundResult ? (roundResult.selected === roundResult.answer ? 'correct' : 'wrong') : 'idle';
+  function selectTrueFalseCharacter(value: OnlineTrueFalseCharacterVariant) {
+    setTrueFalseCharacter(value);
+    window.localStorage.setItem('online-true-false-character', value);
+  }
   const turnIndicators = <div className="grid grid-cols-2 gap-3">
     {[
       { label: 'أنت', player: self, active: myTurn },
@@ -536,12 +546,15 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   if (room && state && isTrueFalse) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/90 p-2 text-white sm:p-5" dir="rtl">
     <audio ref={remoteAudioRef} autoPlay playsInline />
     <div className="relative mx-auto min-h-full w-full max-w-lg overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] shadow-[0_0_40px_rgba(34,211,238,.25)]">
-      <header className="flex items-center justify-between border-b border-white/10 p-4"><div className="flex items-center gap-2.5"><div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 via-cyan-300 to-rose-400 p-1"><div className="flex h-full w-full items-center justify-center rounded-xl bg-[#08152e]"><TrueFalseAuthenticIcon className="h-12 w-12" /></div></div><p className="text-xs text-slate-300">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-xl border border-white/10 bg-white/5 p-2"><X className="h-5 w-5" /></button></header>
+      <header className="flex items-center justify-between border-b border-white/10 p-4"><div className="flex items-center gap-2.5"><div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 via-cyan-300 to-rose-400 p-1"><div className="flex h-full w-full items-center justify-center rounded-xl bg-[#08152e]"><TrueFalseAuthenticIcon className="h-12 w-12" /></div></div><div><h2 className="font-black">صح أم خطأ — أونلاين</h2><p className="text-xs text-slate-300">{lessonTitle}</p></div></div><button onClick={() => void closeModal()} className="rounded-xl border border-white/10 bg-white/5 p-2"><X className="h-5 w-5" /></button></header>
       {opponentControls}
-      <main className="space-y-4 p-4">{waitingOrReconnect}
+      <main className="space-y-4 p-4">
+        <div className="flex flex-wrap justify-center gap-2" aria-label="اختيار الشخصية">{ONLINE_TRUE_FALSE_CHARACTERS.map(character => <button key={character.value} type="button" onClick={() => selectTrueFalseCharacter(character.value)} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${trueFalseCharacter === character.value ? 'border-cyan-300 bg-cyan-500 text-white shadow-md' : 'border-cyan-300/30 bg-white/5 text-cyan-100'}`} aria-pressed={trueFalseCharacter === character.value}>{character.label}</button>)}</div>
+        {waitingOrReconnect}
         {state.status === 'playing' && displayedQuestion && <>
           {turnIndicators}
           <div className="flex items-center justify-between rounded-2xl border border-cyan-300/20 bg-[#07142d]/90 px-3 py-2.5 text-xs"><span className="font-black text-cyan-400">السؤال {Math.min(state.round + 1, state.total)} من {state.total}</span><span className="flex items-center gap-1 text-cyan-300"><Sparkles className="h-3 w-3" />أنت {self?.score || 0} — المنافس {opponent?.score || 0}</span><span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono ${turnSeconds <= 5 ? 'border-rose-400 bg-rose-500/20 text-rose-300' : 'border-white/10 bg-white/5'}`}><Clock className="h-3 w-3" />{turnSeconds}ث</span></div>
+          <div className="rounded-[1.75rem] border border-white/80 bg-gradient-to-br from-[#effaff] to-[#fff8dc] shadow-[0_12px_35px_rgba(14,116,144,.18)]"><OnlineTrueFalseCharacter state={trueFalseCharacterState} variant={trueFalseCharacter} /></div>
           <div className="rounded-3xl border border-cyan-300/30 bg-gradient-to-br from-[#18345b] via-[#102653] to-[#0a1735] p-6 text-center text-lg font-black leading-9"><p className="mb-2 text-xs text-cyan-300">{roundResult ? answeredByMe ? 'إجابتك — المنافس يشاهد' : `إجابة ${opponent?.name || 'المنافس'} — أنت تشاهد` : myTurn ? 'دورك الآن' : `${opponent?.name || 'المنافس'} يفكّر…`}</p><ScientificText value={displayedQuestion.question} /></div>
           <div className="grid grid-cols-2 gap-3">{displayedQuestion.options.slice(0, 2).map((option, index) => { const chosen = roundResult?.selected === index; const correct = roundResult?.answer === index; const base = index === 0 ? 'from-emerald-500 to-teal-600 border-emerald-300' : 'from-rose-500 to-red-700 border-rose-300'; const result = roundResult ? correct ? 'ring-4 ring-emerald-300 brightness-125' : chosen ? 'ring-4 ring-rose-300 opacity-90' : 'opacity-40' : ''; return <button key={index} disabled={!connected || !myTurn || pendingAnswer || Boolean(roundResult)} onClick={() => answer(index)} className={`min-h-36 rounded-[1.75rem] border-2 bg-gradient-to-b p-4 text-xl font-black shadow-xl transition ${base} ${result} disabled:cursor-default`}><span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-white/15">{index === 0 ? <CheckCircle2 className="h-10 w-10"/> : <XCircle className="h-10 w-10"/>}</span><ScientificText value={option} />{chosen && <small className="mt-2 block">{answeredByMe ? 'اختيارك' : 'اختيار المنافس'}</small>}</button>; })}</div>
           {roundResult && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300' : 'border-rose-400 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✓' : 'إجابة خاطئة ✗'}<p className="mt-1 text-xs text-slate-200">الدور التالي بعد عرض النتيجة</p></div>}
