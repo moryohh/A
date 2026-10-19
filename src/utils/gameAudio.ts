@@ -5,6 +5,7 @@
 
 
 const GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/game-session-theme.mp3`;
+const ONLINE_GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/online-game-session-theme.mp3`;
 const GAME_LOSS_AUDIO = `${import.meta.env.BASE_URL}audio/game-loss.mp3`;
 const TRUE_FALSE_CORRECT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct.mp3`;
 const TRUE_FALSE_CORRECT_ALT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct-alt.mp3`;
@@ -19,6 +20,8 @@ class GameAudioEngine {
   private isMuted: boolean = false;
   private externalPlayers = new Map<string, HTMLAudioElement>();
   private gameSessionThemeRequested = false;
+  private trueFalseCorrectIndex = 0;
+  private trueFalseWrongIndex = 0;
 
   private getContext(): AudioContext | null {
     if (this.isMuted) return null;
@@ -103,9 +106,20 @@ class GameAudioEngine {
     this.stopExternal('game-session-theme');
   }
 
+  public playOnlineGameSessionTheme() {
+    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.55, true);
+  }
+
+  public stopOnlineGameSessionTheme() {
+    this.stopExternal('online-game-session-theme');
+  }
+
   public setGameSessionThemeRate(rate: number) {
-    const player = this.externalPlayers.get('game-session-theme');
-    if (player) player.playbackRate = Math.max(0.75, Math.min(1.4, rate));
+    const playbackRate = Math.max(0.75, Math.min(1.4, rate));
+    const offlinePlayer = this.externalPlayers.get('game-session-theme');
+    const onlinePlayer = this.externalPlayers.get('online-game-session-theme');
+    if (offlinePlayer) offlinePlayer.playbackRate = playbackRate;
+    if (onlinePlayer) onlinePlayer.playbackRate = playbackRate;
   }
 
   public playGameLoss() {
@@ -445,7 +459,8 @@ class GameAudioEngine {
       { key: 'true-false-correct-alt', url: TRUE_FALSE_CORRECT_ALT_AUDIO },
       { key: 'true-false-correct-applause', url: TRUE_FALSE_CORRECT_APPLAUSE_AUDIO },
     ];
-    const sound = sounds[Math.floor(Math.random() * sounds.length)];
+    const sound = sounds[this.trueFalseCorrectIndex % sounds.length];
+    this.trueFalseCorrectIndex = (this.trueFalseCorrectIndex + 1) % sounds.length;
     this.playExternal(
       sound.key,
       sound.url,
@@ -460,7 +475,8 @@ class GameAudioEngine {
       { key: 'true-false-wrong', url: TRUE_FALSE_WRONG_AUDIO },
       { key: 'true-false-wrong-alt', url: TRUE_FALSE_WRONG_ALT_AUDIO },
     ];
-    const sound = sounds[Math.floor(Math.random() * sounds.length)];
+    const sound = sounds[this.trueFalseWrongIndex % sounds.length];
+    this.trueFalseWrongIndex = (this.trueFalseWrongIndex + 1) % sounds.length;
     this.playExternal(sound.key, sound.url, 0.9, false);
   }
 

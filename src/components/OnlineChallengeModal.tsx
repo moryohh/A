@@ -383,7 +383,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const next = !musicMuted;
     setMusicMuted(next);
     gameAudio.setMuted(next);
-    if (!next && isGibhaSah && state?.status === 'playing') gameAudio.playGameSessionTheme();
+    if (!next && isGibhaSah && state?.status === 'playing') gameAudio.playOnlineGameSessionTheme();
   }
 
   async function create() {
@@ -457,9 +457,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   </div>;
   useEffect(() => {
     const themed = (isTrueFalse || isGibhaSah) && room && state?.status !== 'finished';
-    if (themed) gameAudio.playGameSessionTheme();
-    else gameAudio.stopGameSessionTheme();
-    return () => gameAudio.stopGameSessionTheme();
+    if (themed) gameAudio.playOnlineGameSessionTheme();
+    else gameAudio.stopOnlineGameSessionTheme();
+    return () => gameAudio.stopOnlineGameSessionTheme();
   }, [isTrueFalse, isGibhaSah, room, state?.status]);
 
   useEffect(() => {
