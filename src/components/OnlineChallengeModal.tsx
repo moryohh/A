@@ -43,7 +43,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [teamRecommendation, setTeamRecommendation] = useState<{ from: string; option: number } | null>(null);
   const [gibhaPowerResult, setGibhaPowerResult] = useState<{ kind: 'fifty' | 'freeze' | 'reveal'; keep?: number[]; seconds?: number; option?: number | null } | null>(null);
   const [usedGibhaPowers, setUsedGibhaPowers] = useState<Array<'fifty' | 'freeze' | 'reveal'>>([]);
-  const [musicMuted, setMusicMuted] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(() => gameAudio.getMuted());
   const [reactionUsed, setReactionUsed] = useState(false);
   const [rocketTargeting, setRocketTargeting] = useState(false);
   const [laughTargeting, setLaughTargeting] = useState(false);
@@ -383,7 +383,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const next = !musicMuted;
     setMusicMuted(next);
     gameAudio.setMuted(next);
-    if (!next && isGibhaSah && state?.status === 'playing') gameAudio.playOnlineGameSessionTheme();
+    if (!next && (isTrueFalse || isGibhaSah) && room && state?.status !== 'finished') {
+      gameAudio.playOnlineGameSessionTheme();
+    }
   }
 
   async function create() {
@@ -520,7 +522,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     <div className="flex gap-1.5"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2.5 text-cyan-300"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2.5 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2.5 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>
   </div>;
 
-  const trueFalseControls = <div className="flex items-center gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>;
+  const trueFalseControls = <div className="flex items-center gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" onClick={toggleMusic} aria-label={musicMuted ? 'تشغيل أصوات اللعبة' : 'كتم أصوات اللعبة'} className={`rounded-full border p-2 ${musicMuted ? 'border-rose-400/60 bg-rose-500/15 text-rose-300' : 'border-white/20 bg-white/5 text-white'}`}>{musicMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button></div>;
 
   const waitingOrReconnect = <>{state?.status === 'waiting' && <div className="rounded-2xl border border-cyan-400/30 bg-white/5 p-5 text-center"><p>{isGibhaSah ? 'بانتظار اكتمال أربعة لاعبين…' : 'بانتظار اللاعب الثاني…'}</p><p className="mt-3">رمز الغرفة: <b className="select-all text-xl text-amber-300">{room}</b></p><button onClick={() => void navigator.clipboard.writeText(room)} className="mt-3 rounded-xl bg-sky-700 px-4 py-2">نسخ الرمز</button></div>}{!connected && state?.status !== 'finished' && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-3 font-bold">إعادة الاتصال بالغرفة</button>}{state?.reconnectDeadline && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-sm text-amber-200">انقطع اتصال المنافس؛ ننتظر عودته ثم تستمر المباراة.</p>}</>;
 
