@@ -11,6 +11,7 @@ interface ChapterExamIconsProps {
   chapterNumber: number;
   className?: string;
   onScoreUpdate?: (points: number) => void;
+  openPickerRequest?: number;
 }
 
 type QuestionEntry = { title: string; text: string; answer?: string };
@@ -1084,7 +1085,7 @@ function ministryExamLabel(exam: CurriculumExamIndexRecord, index: number) {
   return year ? `سنة ${year} — الدور ${round}` : `نموذج وزاري ${index + 1} — الدور ${round}`;
 }
 
-export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate }) => {
+export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate, openPickerRequest = 0 }) => {
   const [monthly, setMonthly] = useState<CurriculumExamIndexRecord[]>([]);
   const [ministry, setMinistry] = useState<CurriculumExamIndexRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
@@ -1119,6 +1120,12 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
       }
     }
   };
+
+  useEffect(() => {
+    if (openPickerRequest > 0) void openExamPicker();
+    // The numeric request changes only when an external exam button is pressed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPickerRequest]);
 
   const openSelectedExam = async (exam: CurriculumExamIndexRecord) => {
     setIsLoading(true);

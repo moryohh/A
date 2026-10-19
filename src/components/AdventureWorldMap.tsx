@@ -18,6 +18,7 @@ import {
   Sparkles,
   Gift,
   BookOpen,
+  ClipboardCheck,
   ChevronDown,
   Layers,
   X,
@@ -99,6 +100,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
     lesson: SubjectChapterLesson;
     chapter: SubjectChapter;
   } | null>(null);
+  const [examPickerRequest, setExamPickerRequest] = useState(0);
 
   const currentChapter = chapters[selectedChapterIndex] || chapters[0];
 
@@ -600,6 +602,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               chapterNumber={currentChapter.number}
               className="absolute right-[10%] top-[9%]"
               onScoreUpdate={onScoreUpdate}
+              openPickerRequest={examPickerRequest}
             />
           )}
 
@@ -779,17 +782,36 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
 
             {/* Keep this preview intentionally minimal: the lesson content is
                 loaded from the lessons topic after entering the lesson. */}
-            <div className="pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={() => {
                   const targetLesson = previewLesson.lesson;
                   setPreviewLesson(null);
                   onSelectLesson(targetLesson);
                 }}
-                className="flex-1 py-3 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-black rounded-2xl text-xs sm:text-sm shadow-lg shadow-sky-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                className="group relative min-h-[92px] overflow-hidden rounded-2xl border border-sky-200/40 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 p-3 text-white shadow-[0_12px_32px_rgba(14,165,233,.32)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(14,165,233,.42)] active:scale-95"
               >
-                <Play className="w-4 h-4 fill-white" />
-                <span>دخول الدرس الآن</span>
+                <span className="absolute -left-4 -top-5 h-16 w-16 rounded-full bg-white/20 blur-xl" />
+                <span className="relative flex flex-col items-center gap-2">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/30 bg-white/15 shadow-inner"><BookOpen className="h-5 w-5" /></span>
+                  <span className="text-xs font-black sm:text-sm">بدء الدرس</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewLesson(null);
+                  setExamPickerRequest((request) => request + 1);
+                }}
+                className="group relative min-h-[92px] overflow-hidden rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-600 p-3 text-white shadow-[0_12px_32px_rgba(249,115,22,.3)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(249,115,22,.42)] active:scale-95"
+                aria-label={`فتح الامتحانات الشهرية والوزارية لمادة ${subjectName}`}
+              >
+                <span className="absolute -right-4 -top-5 h-16 w-16 rounded-full bg-yellow-100/30 blur-xl" />
+                <span className="relative flex flex-col items-center gap-2">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/30 bg-white/15 shadow-inner"><ClipboardCheck className="h-5 w-5" /></span>
+                  <span className="text-xs font-black sm:text-sm">الامتحانات</span>
+                  <span className="-mt-1 text-[9px] font-bold text-amber-50/90">شهرية ووزارية</span>
+                </span>
               </button>
             </div>
           </div>
