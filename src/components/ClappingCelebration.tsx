@@ -21,6 +21,7 @@ export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ 
       className={className}
       aria-label={ariaLabel}
       rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
+      onDOMLoaded={() => lottieRef.current?.setSpeed(0.5)}
       onComplete={() => {
         const animation = lottieRef.current;
         if (!animation || reversingRef.current) return;
@@ -68,7 +69,7 @@ export const ClappingCelebration: React.FC<ClappingCelebrationProps> = ({
       aria-live="polite"
       aria-label={label}
     >
-      <div className="relative flex flex-col items-center motion-safe:animate-[celebrationEnter_1.8s_ease-out_both]">
+      <div className="relative flex flex-col items-center motion-safe:animate-[celebrationEnter_3.6s_ease-out_both]">
         <span className="absolute inset-2 rounded-full bg-amber-300/25 blur-2xl" />
         <ClappingHandsAnimation className={compact ? 'h-28 w-28' : 'h-40 w-40'} />
         <span className="-mt-5 rounded-full border border-amber-200/50 bg-slate-950/80 px-4 py-1.5 text-xs font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,.35)] backdrop-blur-md">
