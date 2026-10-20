@@ -19,10 +19,18 @@ async function table(name, select = '*', orderColumn = 'id') {
 }
 async function post(path, payload) {
   for (let attempt = 1; attempt <= 12; attempt += 1) {
-    const response = await fetch(`${SYNC_URL}${path}`, {
-      method: 'POST', headers: { authorization: `Bearer ${SYNC_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch(`${SYNC_URL}${path}`, {
+        method: 'POST', headers: { authorization: `Bearer ${SYNC_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      if (attempt === 12) throw error;
+      console.warn(`${path}: temporary network failure on attempt ${attempt}; retrying`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      continue;
+    }
     if (response.ok) return response.json();
     const message = await response.text();
     if (![404, 429].includes(response.status) && response.status < 500) {
