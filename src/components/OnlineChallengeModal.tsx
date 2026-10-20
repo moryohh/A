@@ -278,7 +278,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce: Date.now(), path });
         if (payload.kind === 'rocket') { gameAudio.playClick(1050); window.setTimeout(() => gameAudio.playGibhaWrong(), 650); }
         else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
-        window.setTimeout(() => setReactionFx(null), payload.kind === 'rocket' ? 2300 : payload.kind === 'laugh' && payload.targetId ? 1900 : 1100);
+        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2300 : payload.kind === 'laugh' && payload.targetId ? 1900 : 1100);
       }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
@@ -296,7 +296,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         const isCorrect = payload.correct ?? payload.selected === payload.answer;
         const answeringCharacter = stateRef.current?.players.find(player => player.id === payload.answeredBy)?.character || 'anime';
         const resultDuration = roomGameTypeRef.current === 'true_false'
-          ? onlineTrueFalseResultDuration(answeringCharacter, isCorrect ? 'correct' : 'wrong') + 1500
+          ? Math.max(isCorrect ? 4000 : 0, onlineTrueFalseResultDuration(answeringCharacter, isCorrect ? 'correct' : 'wrong') + 1500)
           : roomGameTypeRef.current === 'millionaire' || roomGameTypeRef.current === 'millionaire_team' ? 5000 : 3000;
         resultUntilRef.current = Date.now() + resultDuration;
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
