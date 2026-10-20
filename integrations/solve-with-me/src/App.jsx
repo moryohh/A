@@ -352,6 +352,39 @@ function QuestionImages({ problem }) {
 function Solver({ file, subjectId, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
+  const boardAudioRef=useRef(null)
+  const [boardThemeStarted,setBoardThemeStarted]=useState(false)
+
+  const startBoardTheme=()=>{
+    let player=boardAudioRef.current
+    if(!player){
+      player=new Audio(`${window.location.origin}/audio/game-session-theme.mp3`)
+      player.preload='auto'
+      player.loop=true
+      player.volume=0.5
+      boardAudioRef.current=player
+    }
+    setBoardThemeStarted(true)
+    void player.play().catch(()=>{})
+  }
+
+  useEffect(()=>()=>{
+    const player=boardAudioRef.current
+    if(player){player.pause();player.currentTime=0}
+  },[])
+
+  useEffect(()=>{
+    if(!boardThemeStarted)return
+    const board=boardRef.current
+    const player=boardAudioRef.current
+    if(!board||!player)return
+    const observer=new IntersectionObserver(([entry])=>{
+      if(entry.isIntersecting)void player.play().catch(()=>{})
+      else player.pause()
+    },{threshold:0.15})
+    observer.observe(board)
+    return()=>observer.disconnect()
+  },[boardThemeStarted,currentStep?.step_id])
   useEffect(()=>{loadBoardFile(subjectId,file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,subjectId,initialQuestionIndex])
   useEffect(()=>{
     try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}
@@ -366,7 +399,7 @@ function Solver({ file, subjectId, initialQuestionIndex = 0, onBack, apples, set
   if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
   const inputById=id=>problem.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
-  const choose=value=>{if(value===choice.correct_value){setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
+  const choose=value=>{if(value===choice.correct_value){startBoardTheme();setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
   const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
