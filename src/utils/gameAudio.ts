@@ -126,6 +126,15 @@ class GameAudioEngine {
     this.stopExternal('online-game-session-theme');
   }
 
+  public playExamSessionTheme() {
+    // Exams are intentionally reduced by 75%, leaving 25% of normal game volume.
+    this.playExternal('exam-session-theme', GAME_SESSION_AUDIO, 0.25, true);
+  }
+
+  public stopExamSessionTheme() {
+    this.stopExternal('exam-session-theme');
+  }
+
   public setGameSessionThemeRate(rate: number) {
     const playbackRate = Math.max(0.75, Math.min(1.4, rate));
     const offlinePlayer = this.externalPlayers.get('game-session-theme');
@@ -147,10 +156,10 @@ class GameAudioEngine {
         if (shouldResumeTheme && this.gameSessionThemeRequested && !this.isMuted) {
           if (themePlayer) {
             themePlayer.loop = true;
-            themePlayer.volume = 0.55;
+            themePlayer.volume = 1;
             void themePlayer.play().catch(() => {});
           } else {
-            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.55, true);
+            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 1, true);
           }
         }
       };
