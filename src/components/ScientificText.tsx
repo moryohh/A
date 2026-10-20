@@ -64,10 +64,20 @@ export const ScientificText: React.FC<ScientificTextProps> = ({value, className 
   const raw = repairCommonEscapes(String(value));
   if (!raw.trim()) return null;
 
-  if (display || isFormulaOnly(raw)) {
+  const hasExplicitDelimiters = /(\$\$[\s\S]*?\$\$|\$[^$\n]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\])/.test(raw);
+  const displayValue = raw.trim()
+    .replace(/^\$\$([\s\S]*)\$\$/, '$1')
+    .replace(/^\$([^$]*)\$/, '$1')
+    .replace(/^\\\[([\s\S]*)\\\]$/, '$1')
+    .replace(/^\\\(([\s\S]*)\\\)$/, '$1')
+    .trim();
+
+  // Explicit delimiters must be split first. Passing the surrounding $ signs
+  // into KaTeX makes otherwise valid equations fall back to raw code.
+  if (display || (isFormulaOnly(raw) && !hasExplicitDelimiters)) {
     return (
       <span className={`scientific-math block overflow-x-auto py-1 text-center ${className}`} dir="ltr">
-        <BlockMath math={raw} errorColor="#f87171" renderError={() => <MathFallback value={raw} />} />
+        <BlockMath math={display ? displayValue : raw} errorColor="#f87171" renderError={() => <MathFallback value={raw} />} />
       </span>
     );
   }
