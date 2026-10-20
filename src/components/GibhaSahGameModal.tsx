@@ -122,6 +122,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
   const [celebrationBurst, setCelebrationBurst] = useState<'correct' | 'combo' | 'wrong' | null>(null);
   const [clapPlayKey, setClapPlayKey] = useState(0);
+  const [clapActive, setClapActive] = useState(false);
 
   // Scores
   const [team1Score, setTeam1Score] = useState(0);
@@ -156,7 +157,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     handleRestartInternal(round.questions);
   }, [isOpen, customConfig, lessonId, lessonTitle, category]);
 
-  // Play the supplied 24-second game bed while the game is open.
+  // Play the supplied game bed while the game is open.
   useEffect(() => {
     if (isOpen && soundEnabled) gameAudio.playGameSessionTheme();
     else gameAudio.stopGameSessionTheme();
@@ -639,6 +640,8 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
             type="button"
             onClick={() => {
               setClapPlayKey((value) => value + 1);
+              setClapActive(true);
+              window.setTimeout(() => setClapActive(false), 1600);
               playAudio('click');
             }}
             className="h-12 w-12 overflow-hidden rounded-full border border-amber-200/50 bg-slate-950/45 shadow-[0_0_16px_rgba(251,191,36,.24)] transition-transform active:scale-90"
@@ -649,7 +652,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
               key={clapPlayKey}
               animationData={clappingHands}
               autoplay={clapPlayKey > 0}
-              loop={false}
+              loop={clapActive}
               className="h-full w-full scale-125"
               rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
             />
