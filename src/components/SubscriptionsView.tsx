@@ -12,6 +12,12 @@ import {
   MonitorCheck,
   UsersRound,
   Swords,
+  Gamepad2,
+  DoorOpen,
+  Dice5,
+  Sparkles,
+  GraduationCap,
+  ChevronDown,
 } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { registerCourseReminder } from '../services/communityService';
@@ -139,7 +145,6 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [challengeGame, setChallengeGame] = useState<ChallengeGame | ''>('');
   const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
-  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | RoomStatus>('all');
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [challengeMessage, setChallengeMessage] = useState('');
 
@@ -147,8 +152,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const visibleRooms = activeRooms.filter((room) =>
     (!challengeSubject || room.subject === selectedChallengeSubject?.name || room.subject === challengeSubject) &&
     (!challengeChapter || room.chapter === Number(challengeChapter)) &&
-    (!challengeGame || room.gameType === challengeGame) &&
-    (roomStatusFilter === 'all' || (room.status || 'waiting') === roomStatusFilter)
+    (!challengeGame || room.gameType === challengeGame)
   );
 
   React.useEffect(() => {
@@ -273,32 +277,59 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
       {activeSection === 'challenge' && (
         <div className="space-y-4">
-        <section className={`relative overflow-hidden rounded-3xl border p-5 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
-          <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-sky-400/20 blur-3xl" />
-          <div className="relative flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300"><Swords className="h-6 w-6" /></div>
-            <div>
-              <h1 className={`text-xl font-black ${theme.classes.textMain}`}>مركز التحدّي الجماعي</h1>
-              <p className={`mt-1 text-xs leading-6 ${theme.classes.textMuted}`}>استعرض الغرف النشطة، استخدم الفلتر، وانضم إلى تحدّي مناسب لك.</p>
+        <section className="relative overflow-hidden rounded-[28px] border border-cyan-300/45 bg-[radial-gradient(circle_at_50%_-20%,rgba(56,189,248,.35),transparent_42%),linear-gradient(145deg,#071a3a_0%,#0b1e55_52%,#241052_100%)] p-4 text-white shadow-[0_24px_65px_rgba(30,64,175,.28)] sm:p-5">
+          <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 15% 20%, white 0 1px, transparent 1.5px), radial-gradient(circle at 82% 15%, #67e8f9 0 1.5px, transparent 2px)', backgroundSize: '54px 54px, 78px 78px' }} />
+          <div className="pointer-events-none absolute -left-10 top-10 h-36 w-36 rounded-full bg-cyan-400/15 blur-3xl" />
+          <div className="pointer-events-none absolute -right-12 bottom-0 h-40 w-40 rounded-full bg-violet-500/20 blur-3xl" />
+          <div className="relative mb-4 flex flex-col items-center">
+            <div className="relative grid h-16 w-16 place-items-center rounded-full border border-cyan-200/40 bg-gradient-to-br from-cyan-400/25 to-violet-500/25 shadow-[0_0_34px_rgba(34,211,238,.35)] motion-safe:animate-[pulse_2.4s_ease-in-out_infinite]">
+              <span className="absolute inset-1 rounded-full border border-white/10" />
+              <Swords className="h-8 w-8 text-cyan-100 drop-shadow-[0_0_10px_rgba(103,232,249,.8)]" />
+              <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-amber-300 motion-safe:animate-pulse" />
             </div>
+            <h1 className="mt-2 text-xl font-black tracking-tight text-white">إنشاء غرفة لعب</h1>
+            <p className="mt-1 text-[10px] font-bold text-cyan-100/70">اختر المادة والفصل واللعبة ثم ابدأ التحدّي</p>
           </div>
-          <div className="relative mt-5 space-y-3 rounded-2xl border border-sky-400/20 bg-slate-900/35 p-3">
-            <p className="text-sm font-black text-sky-100">إنشاء غرفة تحدّي</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <select value={challengeSubject} onChange={(event) => { setChallengeSubject(event.target.value); setChallengeChapter(''); }} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
-              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
-              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame | '')} className="rounded-xl bg-slate-800 p-3 text-xs text-white"><option value="">كل الألعاب / اختر للإنشاء</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
-            </div>
-            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="w-full rounded-2xl bg-gradient-to-l from-sky-600 to-cyan-500 px-4 py-3 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50">{challengeBusy ? 'جارٍ تجهيز الدرس…' : 'أنشئ غرفة من درس عشوائي'}</button>
+          <div className="relative space-y-2.5 rounded-3xl border border-white/10 bg-black/15 p-2.5 shadow-inner backdrop-blur-sm">
+            <label className="relative flex items-center overflow-hidden rounded-2xl border border-cyan-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-400/20">
+              <BookOpen className="mr-3 h-5 w-5 shrink-0 text-cyan-300" />
+              <select value={challengeSubject} onChange={(event) => { setChallengeSubject(event.target.value); setChallengeChapter(''); }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-cyan-200" />
+            </label>
+            <label className="relative flex items-center overflow-hidden rounded-2xl border border-blue-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-400/20">
+              <GraduationCap className="mr-3 h-5 w-5 shrink-0 text-blue-300" />
+              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none disabled:opacity-45"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-blue-200" />
+            </label>
+            <label className="relative flex items-center overflow-hidden rounded-2xl border border-violet-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-400/20">
+              <Gamepad2 className="mr-3 h-5 w-5 shrink-0 text-violet-300" />
+              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame | '')} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">كل الألعاب / اختر للإنشاء</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
+            </label>
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">
+              <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
+              <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
+              {challengeBusy ? 'جارٍ تجهيز الدرس…' : 'أنشئ غرفة من درس عشوائي'}
+            </button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
           </div>
-          <div className="relative mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="فلترة حالات الغرف">
-            {([['all', 'الكل'], ['waiting', 'بانتظار لاعب'], ['playing', 'جارية'], ['ended', 'منتهية']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setRoomStatusFilter(value)} className={`rounded-xl px-2 py-2 text-xs font-black transition ${roomStatusFilter === value ? 'bg-sky-500 text-white' : 'bg-slate-800/80 text-slate-300'}`}>{label}</button>)}
-          </div>
         </section>
-        <section className={`rounded-3xl border p-4 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
-          <div className="mb-3 flex items-center justify-between"><span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black text-emerald-300">تتحدث تلقائياً</span><h2 className={`text-base font-black ${theme.classes.textMain}`}>الغرف المتاحة للدخول</h2></div>
-          <div className="space-y-2">
+        <section className={`overflow-hidden rounded-3xl border shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+          <div className="relative overflow-hidden border-b border-cyan-300/20 bg-gradient-to-l from-[#0a1d49] via-[#102b67] to-[#261052] px-4 py-4 text-white">
+            <div className="pointer-events-none absolute -left-8 -top-10 h-28 w-28 rounded-full bg-violet-400/20 blur-2xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-200/35 bg-cyan-400/15 shadow-[0_0_22px_rgba(34,211,238,.25)]">
+                <DoorOpen className="h-6 w-6 text-cyan-200" />
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.9)] motion-safe:animate-ping" />
+              </div>
+              <div>
+                <h2 className="text-base font-black">الغرف المتاحة للدخول</h2>
+                <p className="text-[10px] font-bold text-cyan-100/65">اختر غرفة نشطة وانضم إلى المنافسة</p>
+              </div>
+            </div>
+            <div className="absolute inset-x-4 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-300 to-violet-400" />
+          </div>
+          <div className="space-y-2 p-4">
             {visibleRooms.length === 0 ? <p className={`rounded-2xl bg-black/15 p-4 text-center text-xs ${theme.classes.textMuted}`}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
               const status = room.status || 'waiting';
               const ended = status === 'ended';
