@@ -26,7 +26,7 @@ export const ClappingCelebration: React.FC<ClappingCelebrationProps> = ({
             key={position}
             animationData={clappingHands}
             autoplay
-            loop={false}
+            loop
             className={`absolute ${position} h-20 w-20 sm:h-24 sm:w-24 ${index % 2 ? '-rotate-12' : 'rotate-12'} drop-shadow-[0_0_14px_rgba(251,191,36,.45)]`}
             rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
           />
