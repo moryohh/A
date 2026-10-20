@@ -33,6 +33,45 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Synchronize educational content to R2 and D1
+        shell: bash
+        run: |
+          set -euo pipefail
+          SYNC_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$SYNC_TOKEN"
+          python3 - "$SYNC_TOKEN" <<'PY'
+          import json, sys
+          from pathlib import Path
+          config = {
+            'name': 'duha-content-sync',
+            'main': str(Path.cwd() / 'cloudflare/duha-content-sync-worker.js'),
+            'compatibility_date': '2026-10-20',
+            'vars': {'SYNC_TOKEN': sys.argv[1]},
+            'r2_buckets': [{'binding': 'CONTENT_R2', 'bucket_name': 'duha-educational-content'}],
+            'd1_databases': [{'binding': 'CONTENT_DB', 'database_name': 'duha-content-index', 'database_id': '88f179a9-4cab-4649-8981-fece0c155ba2'}],
+          }
+          Path('/tmp/wrangler-content-sync.json').write_text(json.dumps(config))
+          PY
+          npx wrangler@4 deploy --config /tmp/wrangler-content-sync.json
+          CONTENT_SYNC_URL="https://duha-content-sync.rafos72171.workers.dev" CONTENT_SYNC_TOKEN="$SYNC_TOKEN" node scripts/sync-content-to-cloudflare.mjs
+
+      - name: Deploy read-only content APIs
+        run: |
+          npx wrangler@4 deploy --config cloudflare/wrangler.duha-content.toml
+          npx wrangler@4 deploy --config cloudflare/wrangler.duha-content-r2.toml
+
+      - name: Remove temporary content writer
+        if: always()
+        run: npx wrangler@4 delete duha-content-sync --force || true
+
+      - name: Verify content replicas
+        run: |
+          set -euo pipefail
+          curl --fail --silent https://duha-content-r2.rafos72171.workers.dev/manifest-educational > /tmp/manifest.json
+          node -e "const m=require('/tmp/manifest.json'); if(m.count < 3500) process.exit(1); console.log('R2 educational records:',m.count)"
+          curl --fail --silent 'https://duha-content-index.rafos72171.workers.dev/content?section=solve_with_me&limit=1' > /tmp/index.json
+          node -e "const m=require('/tmp/index.json'); if(!m.items?.length) process.exit(1); console.log('D1 solve-with-me index verified')"
+
       - name: Check TypeScript
         run: npm run lint
 

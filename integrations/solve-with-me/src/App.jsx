@@ -202,14 +202,32 @@ const shortExerciseTitle = problem => {
   return clean.split(/\s+/).slice(0, 7).join(' ') || 'تمرين'
 }
 
+const CONTENT_INDEX_API='https://duha-content-index.rafos72171.workers.dev'
+const CONTENT_R2_API='https://duha-content-r2.rafos72171.workers.dev'
+const boardFileCache=new Map()
+async function loadBoardFile(file){
+  if(boardFileCache.has(file))return boardFileCache.get(file)
+  const promise=(async()=>{
+    const indexResponse=await fetch(`${CONTENT_INDEX_API}/content?section=solve_with_me&q=${encodeURIComponent(file)}&limit=20`)
+    if(!indexResponse.ok)throw new Error('تعذر تحميل فهرس الصبورة')
+    const payload=await indexResponse.json()
+    const row=(payload.items||[]).find(item=>item.file_name===file||item.file_name.endsWith(`/${file}`))
+    if(!row)throw new Error(`ملف الصبورة غير مفهرس: ${file}`)
+    const response=await fetch(`${CONTENT_R2_API}/educational/${encodeURIComponent(row.source_id)}`)
+    if(!response.ok)throw new Error(`تعذر تحميل ملف الصبورة: ${file}`)
+    const envelope=await response.json()
+    return Object.prototype.hasOwnProperty.call(envelope,'content')?envelope.content:envelope
+  })()
+  boardFileCache.set(file,promise)
+  return promise
+}
+
 function Exercises({ topic, onBack, onOpen, embedded = false }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
     Promise.all(topic.files.map(async item => {
-      const info=fileInfo(item), response=await fetch(`./data/${info.file}`)
-      if(!response.ok) throw new Error(info.file)
-      const questions=await response.json()
+      const info=fileInfo(item), questions=await loadBoardFile(info.file)
       return questions.map((problem,index)=>({ ...info, problem, questionIndex:index }))
     })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
@@ -353,7 +371,7 @@ function QuestionImages({ problem }) {
 function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
-  useEffect(()=>{fetch(`./data/${file}`).then(r=>r.json()).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
+  useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
   useEffect(()=>{
     if(resetProgress){setAnswers({});return}
     try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}

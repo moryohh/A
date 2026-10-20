@@ -1,7 +1,11 @@
-const ALLOWED_ORIGIN = "https://a-1q1.pages.dev";
+function allowedOrigin(origin) {
+  if (origin === "https://a-1q1.pages.dev") return origin;
+  if (/^https:\/\/[a-z0-9-]+\.duha-challenge-preview\.pages\.dev$/.test(origin)) return origin;
+  return "https://a-1q1.pages.dev";
+}
 
 function corsHeaders(origin) {
-  const allowed = origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN;
+  const allowed = allowedOrigin(origin);
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, content-type",
@@ -46,8 +50,11 @@ export default {
     const where = predicates.length ? `WHERE ${predicates.join(" AND ")}` : "";
 
     const result = await env.CONTENT_DB.prepare(
-      `SELECT source_table, source_id, subject_id, section_id, title, file_name, content_path, updated_at
-       FROM content_index ${where} ORDER BY updated_at DESC LIMIT ?`
+      `SELECT source_table, source_id, subject_id, section_id, title, file_name,
+              lesson_id, chapter_number, lesson_number, has_content,
+              content_path, updated_at
+       FROM educational_content_index_v2 ${where}
+       ORDER BY chapter_number, lesson_number, updated_at DESC LIMIT ?`
     ).bind(...params, limit).all();
 
     return json({ items: result.results || [], count: result.results?.length || 0, read_only: true }, 200, origin);

@@ -10,6 +10,10 @@ export interface CloudflareContentIndexItem {
   file_name: string;
   content_path: string;
   updated_at?: string | null;
+  lesson_id?: string | null;
+  chapter_number?: number | null;
+  lesson_number?: number | null;
+  has_content?: boolean | number | null;
 }
 
 export function isCloudflareContentConfigured(): boolean {

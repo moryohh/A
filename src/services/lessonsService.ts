@@ -12,7 +12,7 @@ import {
   TeacherStory,
 } from '../types';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
-import { fetchCloudflareEducationalRecord } from './cloudflareContentService';
+import { fetchCloudflareContentIndex, fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
 // In-Memory Cache Store for Lazy-Loaded Data
 const subjectIndexCache = new Map<string, SubjectIndex>();
@@ -544,11 +544,33 @@ export async function getSubjectIndex(
   let rawRows: any[] = [];
   let fetchError: any = null;
 
-  // The canonical lesson/chapter list must remain the lightweight Supabase
-  // index. Cloudflare is used only after a lesson is selected, for the exact
-  // record IDs supplied by this index. This prevents D1/R2 metadata from
-  // inventing lessons or changing the ordering shown to students.
-  if (supabase && isSupabaseConfigured()) {
+  // D1 is the fast, lightweight primary index. It is populated from the same
+  // canonical Supabase rows and contains no heavy JSON payloads.
+  try {
+    const cloudflareRows = (await Promise.all(
+      dbSubjects.map((subject) => fetchCloudflareContentIndex(subject))
+    )).flat();
+    if (cloudflareRows.length > 0) {
+      rawRows = cloudflareRows.map((row) => ({
+        record_id: row.source_id,
+        subject_id: row.subject_id,
+        section_id: row.section_id,
+        file_name: row.file_name,
+        lesson_id: row.lesson_id,
+        chapter_number: row.chapter_number,
+        lesson_number: row.lesson_number,
+        title: row.title,
+        has_content: row.has_content,
+      }));
+    }
+  } catch (err) {
+    console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase:', err);
+    fetchError = err;
+  }
+
+  // Supabase remains a safe fallback if Cloudflare is unavailable or has not
+  // finished a deployment yet.
+  if (rawRows.length === 0 && supabase && isSupabaseConfigured()) {
     try {
       // 1. Try querying the dedicated View: `educational_content_index`
       const { data: viewData, error: viewError } = await supabase
