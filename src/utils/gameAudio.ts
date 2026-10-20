@@ -110,7 +110,7 @@ class GameAudioEngine {
   public playGameSessionTheme() {
     // The external player loops the compressed game theme while the game is open.
     this.gameSessionThemeRequested = true;
-    this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.7, true);
+    this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.3, true);
   }
 
   public stopGameSessionTheme() {
@@ -119,7 +119,7 @@ class GameAudioEngine {
   }
 
   public playOnlineGameSessionTheme() {
-    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.7, true);
+    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.3, true);
   }
 
   public stopOnlineGameSessionTheme() {
@@ -156,10 +156,10 @@ class GameAudioEngine {
         if (shouldResumeTheme && this.gameSessionThemeRequested && !this.isMuted) {
           if (themePlayer) {
             themePlayer.loop = true;
-            themePlayer.volume = 0.7;
+            themePlayer.volume = 0.3;
             void themePlayer.play().catch(() => {});
           } else {
-            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.7, true);
+            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.3, true);
           }
         }
       };
