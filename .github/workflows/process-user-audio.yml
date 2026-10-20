@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: preview-online-challenge
+      - name: Install audio tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Trim, fade and compress supplied audio
         env:
           SOURCE_URL: "https://sdmntpritalynorth.oaiusercontent.com/files/00000000-2bec-8246-9262-8b6e57c9482c/raw?se=2026-10-20T20%3A22%3A59Z&sp=r&sv=2026-02-06&sr=b&scid=ae43a5f0-1266-40f0-9398-9c97d91a2b1f&skoid=061609b8-1cdb-4a5b-9e68-c7ab9a523a8f&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-20T05%3A41%3A31Z&ske=2026-10-21T05%3A41%3A31Z&sks=b&skv=2026-02-06&sig=vtPkUp0AuUBlFSK8tuYs2fP4Lvlc%2BKpEJtjmkFUoePw%3D"
