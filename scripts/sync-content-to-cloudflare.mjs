@@ -18,12 +18,19 @@ async function table(name, select = '*', orderColumn = 'id') {
   }
 }
 async function post(path, payload) {
-  const response = await fetch(`${SYNC_URL}${path}`, {
-    method: 'POST', headers: { authorization: `Bearer ${SYNC_TOKEN}`, 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
-  return response.json();
+  for (let attempt = 1; attempt <= 12; attempt += 1) {
+    const response = await fetch(`${SYNC_URL}${path}`, {
+      method: 'POST', headers: { authorization: `Bearer ${SYNC_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (response.ok) return response.json();
+    const message = await response.text();
+    if (![404, 429].includes(response.status) && response.status < 500) {
+      throw new Error(`${path}: ${response.status} ${message}`);
+    }
+    if (attempt === 12) throw new Error(`${path}: ${response.status} ${message}`);
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
 }
 async function batches(path, rows, size = 20) {
   for (let index = 0; index < rows.length; index += size) {
