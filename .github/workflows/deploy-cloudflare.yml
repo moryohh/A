@@ -2,7 +2,7 @@ name: Deploy A to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, preview-online-challenge]
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
   deployments: write
 
 concurrency:
-  group: cloudflare-pages-production
+  group: cloudflare-pages-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -44,5 +44,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=a --branch=main --commit-dirty=true
+          command: pages deploy dist --project-name=a --branch=${{ github.ref_name }} --commit-dirty=true
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
