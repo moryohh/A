@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FlaskConical, X } from 'lucide-react';
 import { SubjectChapter } from '../types';
+import { gameAudio } from '../utils/gameAudio';
 
 const PhysicsScientificCanvas = React.lazy(() =>
   import('../physicsLab/components/InteractiveScientificCanvas').then(({ InteractiveScientificCanvas }) => ({ default: InteractiveScientificCanvas }))
@@ -147,6 +148,11 @@ export const ScienceLaboratoryModal: React.FC<ScienceLaboratoryModalProps> = ({
   const available = subjectId === 'biology' && [1, 2, 3].includes(chapterNumber);
   const chapterName = ['الأول', 'الثاني', 'الثالث'][chapterNumber - 1] || String(chapterNumber);
   const contentType = ['biology', 'physics'].includes(subjectId) ? 'الرسومات' : 'التجارب';
+
+  useEffect(() => {
+    gameAudio.playExternal('scientific-drawings-theme', `${import.meta.env.BASE_URL}audio/game-session-theme.mp3`, 0.55, true);
+    return () => gameAudio.stopExternal('scientific-drawings-theme');
+  }, []);
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
