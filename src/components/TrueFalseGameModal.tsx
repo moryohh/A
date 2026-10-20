@@ -20,6 +20,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { TrueFalseAuthenticIcon } from './GameIcons';
 import { getTrueFalseReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
+import { ClappingAnimation } from './ClappingAnimation';
 
 interface TrueFalseGameModalProps {
   isOpen: boolean;
@@ -46,9 +47,7 @@ function buildTrueFalseRound(source: TrueFalseGameConfig): TrueFalseGameConfig {
   const pool = Array.from(new Map(rawPool.map((question) => [question.question.trim(), question])).values());
   if (pool.length === 0) return source;
   const target = 12;
-  const selected = pool.length > target
-    ? shuffleTrueFalse(pool).slice(0, target)
-    : Array.from({ length: target }, (_, idx) => pool[idx % pool.length]);
+  const selected = shuffleTrueFalse(pool).slice(0, target);
   return {
     ...source,
     questions: selected.map((question, idx) => ({
@@ -280,32 +279,27 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
         <div className="absolute -bottom-24 -left-16 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent opacity-80 pointer-events-none" />
 
-        {/* Lightweight answer celebration: visual feedback only, never changes the lesson content. */}
+        {/* Correct answers use four clapping animations kept around the edges, away from the player. */}
         {feedbackBurst && (
           <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden" aria-hidden="true">
-            <div
-              className={`game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-4 py-2 text-sm font-black shadow-2xl animate-in zoom-in-95 fade-in duration-200 ${
-                feedbackBurst === 'wrong'
-                  ? 'bg-rose-500/90 text-white shadow-rose-500/30'
-                  : 'bg-emerald-400/95 text-emerald-950 shadow-emerald-400/30'
-              }`}
-            >
-              {feedbackBurst === 'wrong' ? 'حاول مرة أخرى' : feedbackBurst === 'streak' ? 'سلسلة رائعة!' : 'أحسنت!'}
-            </div>
-            {feedbackBurst !== 'wrong' &&
-              Array.from({ length: 10 }).map((_, index) => (
-                <span
-                  key={`burst-${index}`}
-                  className={`absolute top-24 h-3 w-1.5 rounded-full animate-bounce ${
-                    index % 2 === 0 ? 'bg-amber-300' : 'bg-cyan-300'
-                  }`}
-                  style={{
-                    left: `${12 + index * 8}%`,
-                    transform: `rotate(${index * 18 - 80}deg)`,
-                    animationDelay: `${index * 35}ms`,
-                  }}
-                />
-              ))}
+            {feedbackBurst === 'wrong' ? (
+              <div className="game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-rose-500/90 px-4 py-2 text-sm font-black text-white shadow-2xl shadow-rose-500/30 animate-in zoom-in-95 fade-in duration-200">
+                حاول مرة أخرى
+              </div>
+            ) : (
+              <>
+                {[
+                  'left-2 top-20',
+                  'right-2 top-20',
+                  'left-2 bottom-24',
+                  'right-2 bottom-24',
+                ].map((position, index) => (
+                  <div key={position} className={`absolute ${position} ${index % 2 ? '-rotate-12' : 'rotate-12'}`}>
+                    <ClappingAnimation autoplay className="h-16 w-16 sm:h-20 sm:w-20 drop-shadow-[0_0_14px_rgba(251,191,36,.45)]" />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
