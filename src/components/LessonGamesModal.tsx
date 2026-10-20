@@ -454,6 +454,8 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     onClick={() => {
                       if (!canOpenDailyExam) return;
                       gameAudio.playGameStart();
+                      // Start during the user's tap so Android browsers cannot block it.
+                      gameAudio.playExamSessionTheme();
                       setActiveGameMode('daily_exam');
                     }}
                     disabled={!canOpenDailyExam}
