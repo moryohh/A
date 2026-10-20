@@ -15,6 +15,8 @@ import {
   Loader2,
   Database,
   FileText,
+  User,
+  Users,
 } from 'lucide-react';
 import { EducationalGame, NotificationExamAnswer, OpenLessonContext } from '../types';
 import { MillionaireGameModal } from './MillionaireGameModal';
@@ -26,6 +28,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { fetchLessonGamesData, LessonGamesBundle } from '../services/gamesService';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
+import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
 
 interface LessonGamesModalProps {
   isOpen: boolean;
@@ -65,10 +68,11 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   playerId,
 }) => {
   const { theme } = useAppTheme();
-  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick'
+  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
   const [activeGameMode, setActiveGameMode] = useState<
-    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick'
+    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
   >('menu');
+  const [onlineGameType, setOnlineGameType] = useState<OnlineChallengeGameType>('millionaire');
 
   // Dynamic Supabase Games Bundle (Lazy-loaded on demand only when modal opens)
   const [gamesBundle, setGamesBundle] = useState<LessonGamesBundle | null>(null);
@@ -211,6 +215,55 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   };
 
   const totalPointsAvailable = games.reduce((acc, g) => acc + g.points, 0);
+
+  const onlineGame = (() : { title: string; questions: OnlineChallengeQuestion[] } => {
+    if (onlineGameType === 'true_false') return {
+      title: 'صواب أم خطأ',
+      questions: (gamesBundle?.trueFalseConfig.questions || []).slice(0, 10).map((question) => ({
+        question: question.question,
+        options: ['صح', 'خطأ'],
+        correctAnswer: question.isCorrect ? 0 : 1,
+      })),
+    };
+    if (onlineGameType === 'gibha_sah') {
+      const cards = gamesBundle?.gibhaSahConfig.cards || [];
+      return {
+        title: 'جبتها صح',
+        questions: cards.length >= 2 && cards.length <= 12
+          ? (gamesBundle?.gibhaSahConfig.questions || []).slice(0, 10).flatMap((question) => {
+              const correctAnswer = cards.findIndex((card) => card.number === question.correctCardNumber);
+              return correctAnswer >= 0 ? [{
+                question: question.question,
+                options: cards.map((card) => card.label),
+                correctAnswer,
+              }] : [];
+            })
+          : [],
+      };
+    }
+    return {
+      title: 'من سيربح المليون',
+      questions: (gamesBundle?.mcqConfig.questions || []).slice(0, 10).map((question) => ({
+        question: question.question,
+        options: [...question.options],
+        correctAnswer: question.correctAnswer,
+      })),
+    };
+  })();
+
+  const openOnlineGame = (gameType: OnlineChallengeGameType) => {
+    setOnlineGameType(gameType);
+    gameAudio.playGameStart();
+    setActiveGameMode('online');
+  };
+
+  if (activeGameMode === 'online') return <OnlineChallengeModal
+    onClose={() => setActiveGameMode('menu')}
+    questions={onlineGame.questions}
+    lessonTitle={lessonTitle}
+    gameType={onlineGameType}
+    gameTitle={onlineGame.title}
+  />;
 
   // Render Millionaire Modal (MCQ)
   if (activeGameMode === 'millionaire') {
@@ -380,7 +433,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <button
+                  <p className="mt-3 text-[10px] font-bold text-amber-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenDailyExam) return;
                       gameAudio.playGameStart();
@@ -412,11 +465,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       setActiveGameMode('millionaire');
                     }}
                     disabled={!canOpenMillionaire}
-                    className="w-full mt-3 py-2 px-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-black font-black rounded-xl text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <span>{hasMillionaireQuestions ? 'ابدأ الآن' : 'غير متوفر'}</span>
-                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  </button>
+                    <User className="w-4 h-4"/><span>{hasMillionaireQuestions ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('millionaire')} disabled={!canOpenMillionaire || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
 
                 {/* 3. BOTTOM RIGHT: صواب أم خطأ */}
@@ -430,18 +482,17 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <button
+                  <p className="mt-3 text-[10px] font-bold text-emerald-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenTrueFalse) return;
                       gameAudio.playGameStart();
                       setActiveGameMode('true_false');
                     }}
                     disabled={!canOpenTrueFalse}
-                    className="w-full mt-3 py-2 px-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-black font-black rounded-xl text-xs shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <span>{hasTrueFalseQuestions ? 'ابدأ الآن' : 'غير متوفر'}</span>
-                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  </button>
+                    <User className="w-4 h-4"/><span>{hasTrueFalseQuestions ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('true_false')} disabled={!canOpenTrueFalse || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
 
                 {/* 4. BOTTOM LEFT: جبتها صح */}
@@ -455,18 +506,17 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     </h4>
                   </div>
 
-                  <button
+                  <p className="mt-3 text-[10px] font-bold text-cyan-100">اختر طريقة اللعب</p><div className="mt-1.5 grid w-full grid-cols-1 gap-2"><button
                     onClick={() => {
                       if (!canOpenGibhaSah) return;
                       gameAudio.playGameStart();
                       setActiveGameMode('gibha_sah');
                     }}
                     disabled={!canOpenGibhaSah}
-                    className="w-full mt-3 py-2 px-2.5 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 hover:from-cyan-300 hover:to-teal-200 text-black font-black rounded-xl text-xs shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <span>{hasGibhaSahCards ? 'ابدأ الآن' : 'غير متوفر'}</span>
-                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  </button>
+                    <User className="w-4 h-4"/><span>{hasGibhaSahCards ? 'لعب فردي' : 'غير متوفر'}</span>
+                  </button><button onClick={() => openOnlineGame('gibha_sah')} disabled={!canOpenGibhaSah || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL} className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"><Users className="w-4 h-4"/><span>لعب جماعي</span></button></div>
                 </div>
               </div>
             </div>
