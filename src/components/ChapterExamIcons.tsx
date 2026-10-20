@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, Camera, CheckCircle2, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'lucide-react';
+import { Award, CalendarDays, Camera, CheckCircle2, ChevronLeft, DoorOpen, FileText, GraduationCap, ImageIcon, Loader2, Sparkles, X } from 'lucide-react';
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
@@ -1090,6 +1090,7 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
   const [ministry, setMinistry] = useState<CurriculumExamIndexRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
   const [selectedKind, setSelectedKind] = useState<'monthly' | 'ministry'>('monthly');
+  const [pickerCategory, setPickerCategory] = useState<'monthly' | 'ministry'>('monthly');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -1143,52 +1144,66 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
     }
   };
 
-  const renderExamColumn = (
-    title: string,
-    description: string,
+  const renderExamList = (
     exams: CurriculumExamIndexRecord[],
     emptyMessage: string,
-    accentClass: string,
-  ) => (
-    <section className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3">
-        <p className={`text-[11px] font-black ${accentClass}`}>{description}</p>
-        <h3 className="text-lg font-black text-white">{title}</h3>
-      </div>
-      <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white/80">{exams.length} امتحان متاح</div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
+  ) => {
+    const cardThemes = pickerCategory === 'monthly'
+      ? [
+          'from-sky-500/30 via-blue-600/20 to-indigo-500/30 border-sky-300/45 shadow-sky-500/15',
+          'from-violet-500/30 via-fuchsia-600/15 to-purple-500/30 border-violet-300/45 shadow-violet-500/15',
+          'from-cyan-500/30 via-teal-600/15 to-emerald-500/25 border-cyan-300/45 shadow-cyan-500/15',
+          'from-rose-500/25 via-pink-600/15 to-orange-500/25 border-rose-300/40 shadow-rose-500/15',
+        ]
+      : [
+          'from-amber-500/30 via-orange-600/20 to-yellow-500/25 border-amber-300/50 shadow-amber-500/15',
+          'from-orange-500/30 via-red-600/15 to-amber-500/25 border-orange-300/45 shadow-orange-500/15',
+          'from-yellow-500/25 via-amber-600/15 to-orange-500/25 border-yellow-300/45 shadow-yellow-500/15',
+          'from-fuchsia-500/25 via-purple-600/15 to-amber-500/20 border-fuchsia-300/40 shadow-fuchsia-500/15',
+        ];
+
+    return (
+      <section className="min-h-0 flex-1 overflow-hidden">
+        <div className="h-full space-y-3 overflow-y-auto overscroll-contain px-1 pb-5 pt-1 custom-scrollbar">
         {isLoading ? (
-          <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">جاري تحميل الامتحانات...</p>
+          <div className="grid min-h-40 place-items-center rounded-3xl border border-white/10 bg-white/5"><Loader2 className="h-9 w-9 animate-spin text-cyan-300" /></div>
         ) : loadError ? (
           <p className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4 text-center text-xs font-bold leading-6 text-red-100">{loadError}</p>
         ) : exams.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">{emptyMessage}</p>
         ) : exams.map((exam, index) => {
           const displayName = exam.exam_type === 'monthly' ? `الامتحان ${index + 1}` : ministryExamLabel(exam, index);
+          const theme = cardThemes[index % cardThemes.length];
           return (
             <button
               key={exam.id}
               type="button"
               onClick={() => openSelectedExam(exam)}
               disabled={isLoading}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:border-sky-300/50 hover:bg-sky-500/15 disabled:opacity-45"
+              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+              className={`exam-card-enter group relative flex min-h-[82px] w-full items-center gap-4 overflow-hidden rounded-[22px] border bg-gradient-to-l p-3.5 text-right shadow-lg transition duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:opacity-45 ${theme}`}
             >
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-black leading-6 text-white">{displayName}</span>
-                <span className="block text-[10px] font-bold text-white/55">اضغط لتحميل هذا الامتحان فقط</span>
+              <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-white/90 via-cyan-300 to-transparent" />
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/25 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,.2)] backdrop-blur-md transition duration-300 group-hover:rotate-[-6deg] group-hover:scale-110">
+                {exam.exam_type === 'monthly' ? <FileText className="h-6 w-6" /> : <GraduationCap className="h-7 w-7" />}
               </span>
-              <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
+              <span className="min-w-0 flex-1 truncate text-sm font-black leading-7 text-white sm:text-base">{displayName}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/20 bg-black/15 text-white/90 transition duration-300 group-hover:-translate-x-1 group-hover:bg-white/15">
+                <ChevronLeft className="h-5 w-5" />
+              </span>
+              <span className="exam-card-shine pointer-events-none absolute inset-y-0 -right-1/3 w-1/3 skew-x-[-18deg] bg-gradient-to-l from-transparent via-white/15 to-transparent" />
             </button>
           );
         })}
-      </div>
-    </section>
-  );
+        </div>
+      </section>
+    );
+  };
 
   return (
     <>
       <div className={`${className || 'absolute left-3 top-3'} z-40`} dir="rtl">
-        <style>{`@keyframes satelliteFloat{0%,100%{transform:translateY(-5px) rotate(-2deg)}50%{transform:translateY(7px) rotate(2deg)}}`}</style>
+        <style>{`@keyframes satelliteFloat{0%,100%{transform:translateY(-5px) rotate(-2deg)}50%{transform:translateY(7px) rotate(2deg)}}@keyframes examCardEnter{0%{opacity:0;transform:translateY(18px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}@keyframes examCardShine{0%,65%{transform:translateX(0)}100%{transform:translateX(-440%)}}.exam-card-enter{animation:examCardEnter .48s cubic-bezier(.2,.8,.2,1) both}.exam-card-enter:hover .exam-card-shine{animation:examCardShine .8s ease-out}`}</style>
         <button type="button" onClick={openExamPicker} disabled={isLoading} className="group rounded-3xl transition hover:scale-105 disabled:opacity-60" aria-label={`فتح فهرس امتحانات الفصل ${chapterNumber}`}>
           <ExamSatellite loading={isLoading} />
         </button>
@@ -1196,32 +1211,37 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
 
       {isPickerOpen && !selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm" dir="rtl">
-          <div className="flex h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl">
-            <header className="flex items-center justify-between border-b border-white/10 p-4">
-              <div>
+          <div className="relative flex h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-[30px] border border-cyan-300/25 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,.16),transparent_35%),linear-gradient(180deg,#07142f,#030817)] text-white shadow-[0_0_60px_rgba(14,165,233,.22)]">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
+            <header className="relative flex items-center justify-between border-b border-white/10 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/30 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.18)]"><Sparkles className="h-6 w-6" /></span>
+                <div>
                 <p className="text-[10px] font-bold text-sky-300">{subjectName}</p>
-                <h2 className="text-base font-black">اختر نموذج الامتحان</h2>
+                <h2 className="text-lg font-black">اختر نموذج الامتحان</h2>
+                </div>
               </div>
-              <button type="button" onClick={() => setIsPickerOpen(false)} className="rounded-full bg-white/10 p-2" aria-label="خروج">
+              <button type="button" onClick={() => setIsPickerOpen(false)} className="rounded-2xl border border-white/10 bg-white/10 p-2.5 transition hover:rotate-90 hover:bg-white/15" aria-label="خروج">
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="grid min-h-0 flex-1 grid-cols-[1fr_auto_1fr] gap-3 p-4">
-              {renderExamColumn(
-                'شهري',
-                'نماذج الفصل المتوفرة',
-                monthly,
-                'لا توجد امتحانات شهرية لهذا الفصل حاليًا.',
-                'text-amber-300',
-              )}
-              <div className="w-px bg-white/10" aria-hidden="true" />
-              {renderExamColumn(
-                'وزاري',
-                'أسئلة السنوات والأدوار',
-                ministry,
-                'لا توجد امتحانات وزارية لهذا الموضوع حاليًا.',
-                'text-sky-300',
-              )}
+            <div className="relative flex min-h-0 flex-1 flex-col p-4">
+              <div className="mb-4 grid grid-cols-2 gap-3" role="tablist" aria-label="نوع الامتحان">
+                <button type="button" role="tab" aria-selected={pickerCategory === 'monthly'} onClick={() => setPickerCategory('monthly')} className={`group relative min-h-[88px] overflow-hidden rounded-[22px] border p-3 text-right transition duration-300 ${pickerCategory === 'monthly' ? 'scale-[1.02] border-violet-300/70 bg-gradient-to-l from-violet-600 to-indigo-600 shadow-[0_10px_30px_rgba(124,58,237,.35)]' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
+                  <CalendarDays className={`mb-2 h-7 w-7 transition group-hover:scale-110 ${pickerCategory === 'monthly' ? 'text-violet-100' : 'text-violet-300'}`} />
+                  <span className="block text-base font-black">شهري</span>
+                  {pickerCategory === 'monthly' && <span className="absolute bottom-0 right-4 h-1 w-12 rounded-t-full bg-white shadow-[0_0_12px_white]" />}
+                </button>
+                <button type="button" role="tab" aria-selected={pickerCategory === 'ministry'} onClick={() => setPickerCategory('ministry')} className={`group relative min-h-[88px] overflow-hidden rounded-[22px] border p-3 text-right transition duration-300 ${pickerCategory === 'ministry' ? 'scale-[1.02] border-amber-300/70 bg-gradient-to-l from-amber-500 to-orange-600 shadow-[0_10px_30px_rgba(245,158,11,.3)]' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
+                  <GraduationCap className={`mb-2 h-8 w-8 transition group-hover:-rotate-6 group-hover:scale-110 ${pickerCategory === 'ministry' ? 'text-amber-50' : 'text-amber-300'}`} />
+                  <span className="block text-base font-black">وزاري</span>
+                  {pickerCategory === 'ministry' && <span className="absolute bottom-0 right-4 h-1 w-12 rounded-t-full bg-white shadow-[0_0_12px_white]" />}
+                </button>
+              </div>
+              {pickerCategory === 'monthly'
+                ? renderExamList(monthly, 'لا توجد امتحانات شهرية لهذا الفصل حاليًا.')
+                : renderExamList(ministry, 'لا توجد امتحانات وزارية لهذا الموضوع حاليًا.')}
             </div>
           </div>
         </div>
