@@ -34,6 +34,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Synchronize educational content to R2 and D1
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
@@ -56,15 +57,17 @@ jobs:
           CONTENT_SYNC_URL="https://duha-content-sync.rafos72171.workers.dev" CONTENT_SYNC_TOKEN="$SYNC_TOKEN" node scripts/sync-content-to-cloudflare.mjs
 
       - name: Deploy read-only content APIs
+        if: github.event_name == 'workflow_dispatch'
         run: |
           npx wrangler@4 deploy --config cloudflare/wrangler.duha-content.toml
           npx wrangler@4 deploy --config cloudflare/wrangler.duha-content-r2.toml
 
       - name: Remove temporary content writer
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         run: npx wrangler@4 delete duha-content-sync --force || true
 
       - name: Verify content replicas
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           curl --fail --silent https://duha-content-r2.rafos72171.workers.dev/manifest-educational > /tmp/manifest.json
