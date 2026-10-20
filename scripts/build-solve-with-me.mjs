@@ -22,6 +22,8 @@ try {
   for (const file of ['curriculum.json', 'chemistry-curriculum.json', 'physics-curriculum.json']) {
     await cp(join(content, file), join(output, file));
   }
+  // Keep a local fallback so every lesson still opens if the remote index/R2 lookup misses a record.
+  await cp(join(content, 'data'), join(output, 'data'), { recursive: true });
 } finally {
   await rm(scratch, { recursive: true, force: true });
 }
