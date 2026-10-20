@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Lottie from 'lottie-react';
 import {
   X,
   RotateCcw,
@@ -27,8 +26,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { getImageChoiceReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
 import { DEFAULT_COMMUNITY_AVATAR } from './CommunityAvatar';
-import { ClappingCelebration } from './ClappingCelebration';
-import clappingHands from '../assets/animations/clapping-hands.json';
+import { ClappingCelebration, ClappingHandsAnimation } from './ClappingCelebration';
 
 interface GibhaSahGameModalProps {
   isOpen: boolean;
@@ -122,7 +120,6 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
   const [celebrationBurst, setCelebrationBurst] = useState<'correct' | 'combo' | 'wrong' | null>(null);
   const [clapPlayKey, setClapPlayKey] = useState(0);
-  const [clapActive, setClapActive] = useState(false);
 
   // Scores
   const [team1Score, setTeam1Score] = useState(0);
@@ -363,7 +360,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       const solvedCountAfterAnswer = solvedCardNumbers.length + 1;
       const isCombo = solvedCountAfterAnswer % 3 === 0;
       setCelebrationBurst(isCombo ? 'combo' : 'correct');
-      window.setTimeout(() => setCelebrationBurst(null), isCombo ? 900 : 650);
+      window.setTimeout(() => setCelebrationBurst(null), 4000);
       playAudio('correct');
       if (isCombo) playAudio('combo');
       setFeedbackStatus('correct');
@@ -640,21 +637,16 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
             type="button"
             onClick={() => {
               setClapPlayKey((value) => value + 1);
-              setClapActive(true);
-              window.setTimeout(() => setClapActive(false), 1600);
               playAudio('click');
             }}
             className="h-12 w-12 overflow-hidden rounded-full border border-amber-200/50 bg-slate-950/45 shadow-[0_0_16px_rgba(251,191,36,.24)] transition-transform active:scale-90"
             title="تصفيق"
             aria-label="تشغيل حركة التصفيق"
           >
-            <Lottie
+            <ClappingHandsAnimation
               key={clapPlayKey}
-              animationData={clappingHands}
               autoplay={clapPlayKey > 0}
-              loop={clapActive}
               className="h-full w-full scale-125"
-              rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
             />
           </button>
         </div>
