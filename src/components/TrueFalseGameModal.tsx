@@ -201,7 +201,7 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
     onAssessmentResult?.(isCorrect ? 1 : 0, 1);
 
     setFeedbackBurst(isCorrect ? 'correct' : 'wrong');
-    window.setTimeout(() => setFeedbackBurst(null), 700);
+    window.setTimeout(() => setFeedbackBurst(null), 1800);
 
     if (isCorrect) {
       playAudio('correct');
@@ -216,7 +216,7 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
           setTimeout(() => {
             setFeedbackBurst('streak');
             playAudio('streak');
-            window.setTimeout(() => setFeedbackBurst(null), 700);
+            window.setTimeout(() => setFeedbackBurst(null), 1800);
           }, 300);
         }
         return next;
