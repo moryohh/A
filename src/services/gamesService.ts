@@ -344,8 +344,8 @@ function parsePhToGibhaSah(
         .map((round: any) => [round.question.trim(), round])
     ).values()
   );
-  // Fewer than five valid questions means this lesson cannot form a valid game.
-  if (validRounds.length < 5) {
+  // Keep every valid unique question. A short lesson is completed from following lesson files.
+  if (validRounds.length === 0) {
     return {
       lessonId,
       subject: category,
@@ -357,7 +357,7 @@ function parsePhToGibhaSah(
     };
   }
 
-  const cardsCount = 10;
+  const cardsCount = Math.min(10, validRounds.length);
   const shuffle = <T,>(values: T[]): T[] => {
     const result = [...values];
     for (let i = result.length - 1; i > 0; i -= 1) {
@@ -375,9 +375,7 @@ function parsePhToGibhaSah(
     points: 100,
     answerLabel: getRoundAnswer(round),
   }));
-  const selectedPool = questionPool.length > cardsCount
-    ? shuffle(questionPool).slice(0, cardsCount)
-    : Array.from({ length: cardsCount }, (_, idx) => questionPool[idx % questionPool.length]);
+  const selectedPool = shuffle(questionPool).slice(0, cardsCount);
   const cards: GibhaSahCard[] = selectedPool.map((question, idx) => ({
     id: idx + 1,
     number: idx + 1,
@@ -403,6 +401,62 @@ function parsePhToGibhaSah(
     cards,
     questions,
     questionPool,
+  };
+}
+
+
+async function completeGibhaFromFollowingLessons(
+  context: OpenLessonContext,
+  currentConfig: GibhaSahGameConfig
+): Promise<GibhaSahGameConfig> {
+  const lessonTitle = context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`;
+  const dbSubjects = getDbSubjectIds(getSubjectNormalizedKey(context.subjectId));
+  const pooled: GibhaSahQuestion[] = [];
+  const seenQuestions = new Set<string>();
+  const seenAnswers = new Set<string>();
+
+  const addConfig = (config: GibhaSahGameConfig) => {
+    const source = config.questionPool?.length ? config.questionPool : config.questions;
+    for (const question of source) {
+      const questionKey = question.question.trim();
+      const answerKey = String(question.answerLabel || config.cards.find((card) => card.number === question.correctCardNumber)?.label || '').trim();
+      if (!questionKey || !answerKey || seenQuestions.has(questionKey) || seenAnswers.has(answerKey)) continue;
+      seenQuestions.add(questionKey);
+      seenAnswers.add(answerKey);
+      pooled.push({ ...question, answerLabel: answerKey });
+      if (pooled.length >= 10) break;
+    }
+  };
+
+  addConfig(currentConfig);
+  for (let offset = 1; offset <= 20 && pooled.length < 10; offset += 1) {
+    const nextLessonNumber = context.lessonNumber + offset;
+    const nextContent = await fetchExactSectionContent(
+      'ph',
+      dbSubjects,
+      context.chapterNumber,
+      nextLessonNumber,
+      buildLessonKey(context.subjectId, context.chapterNumber, nextLessonNumber)
+    );
+    if (!nextContent) continue;
+    addConfig(parsePhToGibhaSah(nextContent, context.lessonId, lessonTitle, context.subjectId));
+  }
+
+  if (pooled.length === 0) return currentConfig;
+  const merged = parsePhToGibhaSah(
+    {
+      lesson_info: { subject: currentConfig.subject || context.subjectId },
+      rounds: pooled.map((question) => ({ question: question.question, correct_answer: question.answerLabel })),
+    },
+    context.lessonId,
+    lessonTitle,
+    context.subjectId
+  );
+  return {
+    ...merged,
+    subtitle: pooled.length >= 10
+      ? 'أسئلة فريدة من الدرس، ويُستكمل النقص من الدروس التالية'
+      : `${pooled.length} أسئلة فريدة متاحة من هذا الدرس والدروس التالية`,
   };
 }
 
@@ -456,7 +510,7 @@ export async function fetchLessonGamesData(
         const trueFalseConfig = parseTrueFalseConfig(exactTrueFalseData, actualLessonId, actualLessonTitle, actualCategory);
 
         const currentGibhaSahConfig = parsePhToGibhaSah(exactPhData, actualLessonId, actualLessonTitle, actualCategory);
-        const gibhaSahConfig = currentGibhaSahConfig;
+        const gibhaSahConfig = await completeGibhaFromFollowingLessons(ctx, currentGibhaSahConfig);
 
         return {
           mcqConfig,
@@ -526,10 +580,10 @@ export async function fetchLessonGamesData(
             lessonTitle: actualLessonTitle,
           }
         : null;
-    // Exact section lookup already tries Cloudflare then the exact Supabase
-    // record. Do not use a nearest lesson as a substitute for missing data.
     const mcqConfig = currentMcqConfig;
-    const gibhaSahConfig = currentGibhaSahConfig;
+    const gibhaSahConfig = standardContext
+      ? await completeGibhaFromFollowingLessons(standardContext, currentGibhaSahConfig)
+      : currentGibhaSahConfig;
 
     const bundle: LessonGamesBundle = {
       mcqConfig,
