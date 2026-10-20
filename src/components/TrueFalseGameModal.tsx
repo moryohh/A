@@ -20,6 +20,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { TrueFalseAuthenticIcon } from './GameIcons';
 import { getTrueFalseReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
+import { ClappingCelebration } from './ClappingCelebration';
 
 interface TrueFalseGameModalProps {
   isOpen: boolean;
@@ -274,6 +275,11 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#020617]/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200 font-cairo select-none overscroll-contain">
+      <ClappingCelebration
+        show={feedbackBurst === 'streak' || (isCompleted && accuracy >= 70)}
+        label={isCompleted ? 'أكملت التحدي بنجاح!' : 'سلسلة إجابات رائعة!'}
+        compact={!isCompleted}
+      />
       <div className="bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] border-2 border-cyan-400/30 w-full max-w-lg rounded-[30px] p-3 sm:p-5 shadow-[0_0_70px_rgba(14,165,233,0.24)] text-right relative max-h-[94vh] flex flex-col text-white overflow-hidden">
         {/* Lightweight ambient color, kept static enough for smooth scrolling. */}
         <div className="absolute -top-20 -right-16 w-56 h-56 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none" />

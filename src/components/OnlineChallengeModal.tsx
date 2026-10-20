@@ -7,6 +7,7 @@ import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
 import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
+import { ClappingCelebration } from './ClappingCelebration';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -437,6 +438,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const chatPartner = isMillionaireTeam ? teammate : opponent;
   const isTrueFalse = (state?.gameType || gameType) === 'true_false';
   const isGibhaSah = (state?.gameType || gameType) === 'gibha_sah';
+  const didIWin = state?.status === 'finished' && !state.tie && (isMillionaireTeam ? state.winner === myTeam : state.winner === me);
   const millionairePrizes = ['250', '500', '1 000', '5 000', '10 000', '25 000', '50 000', '100 000', '250 000', '500 000', '1 000 000'];
   const displayedQuestion = roundResult?.question || state?.question;
   const myTurn = state?.turn === me;
@@ -550,6 +552,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   };
 
   if (room && state && isTrueFalse) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/90 p-2 text-white sm:p-5" dir="rtl">
+    <ClappingCelebration show={didIWin} label="مبروك — فزت بالتحدي!" />
     <audio ref={remoteAudioRef} autoPlay playsInline />
     <div className="relative mx-auto min-h-full w-full max-w-lg overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] shadow-[0_0_40px_rgba(34,211,238,.25)]">
       <header className="flex items-center gap-2 border-b border-white/10 p-3"><div className="flex min-w-0 flex-1 items-center gap-2"><div className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-emerald-400 via-cyan-300 to-rose-400 p-1"><div className="flex h-full w-full items-center justify-center rounded-xl bg-[#08152e]"><TrueFalseAuthenticIcon className="h-10 w-10" /></div></div><div className="min-w-0"><h2 className="truncate text-sm font-black">صح أم خطأ — أونلاين</h2><p className="truncate text-[10px] text-slate-300">{lessonTitle}</p></div></div>{trueFalseControls}<button onClick={() => void closeModal()} aria-label="إغلاق" className="rounded-xl border-2 border-rose-400/70 bg-rose-500/20 p-2.5 text-rose-200 shadow-[0_0_14px_rgba(244,63,94,.35)]"><X className="h-7 w-7" /></button></header>
@@ -572,6 +575,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   </div>;
 
   if (room && state && isGibhaSah) return <div className="fixed inset-0 z-[90] overflow-hidden bg-[#020818] text-white" dir="rtl">
+    <ClappingCelebration show={didIWin} label="مبروك — فزت بالتحدي!" />
     <audio ref={remoteAudioRef} autoPlay playsInline />
     <div ref={gibhaBoardRef} className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border-x-2 border-cyan-500/40 bg-[radial-gradient(circle_at_center,rgba(15,67,113,.42),rgba(2,8,24,.98)_70%),linear-gradient(90deg,rgba(34,211,238,.07)_1px,transparent_1px),linear-gradient(rgba(34,211,238,.07)_1px,transparent_1px)] bg-[size:auto,32px_32px,32px_32px] shadow-[0_0_45px_rgba(6,182,212,.28)]">
       <header className="flex h-11 shrink-0 items-center justify-between border-b border-cyan-400/20 px-3"><div className="min-w-0"><b className="block truncate text-sm text-cyan-200">جبتها صح — تحدّي 4 لاعبين</b><p className="truncate text-[10px] text-slate-400">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-full bg-white/5 p-1.5"><X className="h-5 w-5" /></button></header>
@@ -603,6 +607,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   </div>;
 
   if (room && state && isMillionaire) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/95 p-2 text-white sm:p-5" dir="rtl">
+    <ClappingCelebration show={didIWin} label={isMillionaireTeam ? 'مبروك — فاز فريقكم!' : 'مبروك — فزت بالتحدي!'} />
     <audio ref={remoteAudioRef} autoPlay playsInline />
     <div className="mx-auto min-h-full w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-[#2049a4] bg-[radial-gradient(circle_at_center,#0b1b51,#03091e_72%)] shadow-[0_0_40px_rgba(32,73,164,.6)]">
       <header className="flex items-center justify-between border-b border-blue-500/30 bg-[#03091e] p-4">
@@ -654,6 +659,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   </div>;
 
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4 text-white" dir="rtl">
+    <ClappingCelebration show={Boolean(didIWin)} label="مبروك — فزت بالتحدي!" />
     <div className="w-full max-w-xl rounded-3xl border border-sky-400/30 bg-[#0b1930] p-5 shadow-2xl">
       <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black">{gameTitle} — لعب جماعي</h2><p className="text-xs text-sky-200">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-lg bg-white/10 px-3 py-1">إغلاق</button></div>
       <p className="mb-4 text-sm text-sky-200">تجربة بين لاعبين، بلا نقاط للمستويات حالياً.</p>

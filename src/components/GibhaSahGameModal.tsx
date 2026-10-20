@@ -26,6 +26,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { getImageChoiceReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
 import { DEFAULT_COMMUNITY_AVATAR } from './CommunityAvatar';
+import { ClappingCelebration } from './ClappingCelebration';
 
 interface GibhaSahGameModalProps {
   isOpen: boolean;
@@ -547,6 +548,11 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       id="gibha-sah-modal-root"
       className="fixed inset-0 z-50 bg-[#020617]/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200 font-cairo select-none overscroll-contain"
     >
+      <ClappingCelebration
+        show={celebrationBurst === 'combo' || isFinished}
+        label={isFinished ? 'تحدٍ مكتمل — أحسنتم!' : 'سلسلة ثلاثية رائعة!'}
+        compact={!isFinished}
+      />
       <div
         id="gibha-sah-container"
         className="bg-gradient-to-b from-[#102b58] via-[#081a3b] to-[#040b20] border-2 border-cyan-300/30 w-full max-w-xl sm:max-w-2xl rounded-[32px] shadow-[0_0_80px_rgba(14,165,233,0.25)] text-right relative max-h-[96vh] flex flex-col text-white overflow-hidden"

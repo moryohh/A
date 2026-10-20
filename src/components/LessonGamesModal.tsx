@@ -28,6 +28,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { fetchGibhaSahOnlineQuestions, fetchLessonGamesData, fetchMillionaireTeamQuestions, LessonGamesBundle } from '../services/gamesService';
 import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
+import { ClappingCelebration } from './ClappingCelebration';
 import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
 
 interface LessonGamesModalProps {
@@ -348,6 +349,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 animate-in fade-in duration-200 font-cairo select-none">
+      <ClappingCelebration show={activeGameMode === 'quick' && isCompleted} label="أحسنت — أكملت التحدي!" />
       <div
         className="w-full max-w-md rounded-3xl p-4 sm:p-5 shadow-2xl text-right relative max-h-[90vh] flex flex-col border-2 transition-all duration-300"
         style={{

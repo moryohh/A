@@ -29,6 +29,7 @@ import {
   Smile,
   Check,
 } from 'lucide-react';
+import { ClappingCelebration } from './ClappingCelebration';
 import { MillionaireGameConfig, MillionaireQuestion, StudentGameResult } from '../types';
 import { getMillionaireGameForLesson } from '../data/mockMillionaire';
 import { gameAudio } from '../utils/gameAudio';
@@ -1262,6 +1263,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none font-cairo"
       dir="rtl"
     >
+      <ClappingCelebration show={gameState === 'victory'} label="ألف مبروك — ربحت المليون!" />
       {/* Outer Studio Frame */}
       <div className="relative w-full max-w-5xl h-[92vh] sm:h-[88vh] bg-gradient-to-b from-[#020617] via-[#050e2d] to-[#020617] rounded-3xl border-2 border-[#1e4193] shadow-[0_0_50px_rgba(30,65,147,0.5)] flex flex-col overflow-hidden text-white">
         {/* Subtle Background Glows */}
