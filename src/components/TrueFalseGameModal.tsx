@@ -47,9 +47,7 @@ function buildTrueFalseRound(source: TrueFalseGameConfig): TrueFalseGameConfig {
   const pool = Array.from(new Map(rawPool.map((question) => [question.question.trim(), question])).values());
   if (pool.length === 0) return source;
   const target = 12;
-  const selected = pool.length > target
-    ? shuffleTrueFalse(pool).slice(0, target)
-    : Array.from({ length: target }, (_, idx) => pool[idx % pool.length]);
+  const selected = shuffleTrueFalse(pool).slice(0, target);
   return {
     ...source,
     questions: selected.map((question, idx) => ({
@@ -276,9 +274,14 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-[#020617]/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200 font-cairo select-none overscroll-contain">
       <ClappingCelebration
-        show={feedbackBurst === 'streak' || (isCompleted && accuracy >= 70)}
-        label={isCompleted ? 'أكملت التحدي بنجاح!' : 'سلسلة إجابات رائعة!'}
-        compact={!isCompleted}
+        show={isCompleted && accuracy >= 70}
+        label="أكملت التحدي بنجاح!"
+      />
+      <ClappingCelebration
+        show={feedbackBurst === 'correct' || feedbackBurst === 'streak'}
+        label={feedbackBurst === 'streak' ? 'سلسلة إجابات رائعة!' : 'أحسنت!'}
+        compact
+        edge
       />
       <div className="bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] border-2 border-cyan-400/30 w-full max-w-lg rounded-[30px] p-3 sm:p-5 shadow-[0_0_70px_rgba(14,165,233,0.24)] text-right relative max-h-[94vh] flex flex-col text-white overflow-hidden">
         {/* Lightweight ambient color, kept static enough for smooth scrolling. */}
@@ -286,32 +289,12 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
         <div className="absolute -bottom-24 -left-16 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent opacity-80 pointer-events-none" />
 
-        {/* Lightweight answer celebration: visual feedback only, never changes the lesson content. */}
-        {feedbackBurst && (
+        {/* Wrong answers keep a small red notice; correct answers use edge clapping above. */}
+        {feedbackBurst === 'wrong' && (
           <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden" aria-hidden="true">
-            <div
-              className={`game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full px-4 py-2 text-sm font-black shadow-2xl animate-in zoom-in-95 fade-in duration-200 ${
-                feedbackBurst === 'wrong'
-                  ? 'bg-rose-500/90 text-white shadow-rose-500/30'
-                  : 'bg-emerald-400/95 text-emerald-950 shadow-emerald-400/30'
-              }`}
-            >
-              {feedbackBurst === 'wrong' ? 'حاول مرة أخرى' : feedbackBurst === 'streak' ? 'سلسلة رائعة!' : 'أحسنت!'}
+            <div className="game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-rose-500/90 px-4 py-2 text-sm font-black text-white shadow-2xl shadow-rose-500/30 animate-in zoom-in-95 fade-in duration-200">
+              حاول مرة أخرى
             </div>
-            {feedbackBurst !== 'wrong' &&
-              Array.from({ length: 10 }).map((_, index) => (
-                <span
-                  key={`burst-${index}`}
-                  className={`absolute top-24 h-3 w-1.5 rounded-full animate-bounce ${
-                    index % 2 === 0 ? 'bg-amber-300' : 'bg-cyan-300'
-                  }`}
-                  style={{
-                    left: `${12 + index * 8}%`,
-                    transform: `rotate(${index * 18 - 80}deg)`,
-                    animationDelay: `${index * 35}ms`,
-                  }}
-                />
-              ))}
           </div>
         )}
 
