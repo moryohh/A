@@ -217,29 +217,64 @@ async function getNearestLessonGibhaSahConfig(
   context: OpenLessonContext,
   currentConfig: GibhaSahGameConfig
 ): Promise<GibhaSahGameConfig> {
-  if (currentConfig.questions.length > 0) return currentConfig;
-
+  const lessonTitle = context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`;
   const dbSubjects = getDbSubjectIds(getSubjectNormalizedKey(context.subjectId));
-  const nearest = await fetchNearestSectionContent(
-    'ph',
-    dbSubjects,
-    context.chapterNumber,
-    context.lessonNumber,
-    (content) => parsePhToGibhaSah(content, context.lessonId, context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`, context.subjectId).questions.length > 0
-  );
-  if (!nearest) return currentConfig;
+  const pooled: GibhaSahQuestion[] = [];
+  const seenQuestions = new Set<string>();
+  const seenAnswers = new Set<string>();
 
-  const nearestConfig = parsePhToGibhaSah(
-    nearest.content,
+  const addConfig = (config: GibhaSahGameConfig) => {
+    const source = config.questionPool?.length ? config.questionPool : config.questions;
+    for (const question of source) {
+      const questionKey = question.question.trim();
+      const answerKey = String(question.answerLabel || config.cards.find((card) => card.number === question.correctCardNumber)?.label || '').trim();
+      if (!questionKey || !answerKey || seenQuestions.has(questionKey) || seenAnswers.has(answerKey)) continue;
+      seenQuestions.add(questionKey);
+      seenAnswers.add(answerKey);
+      pooled.push({ ...question, answerLabel: answerKey });
+      if (pooled.length >= 10) break;
+    }
+  };
+
+  addConfig(currentConfig);
+
+  // Complete a short PH file only from the following lessons in the same chapter.
+  if (pooled.length < 10 && context.lessonNumber !== undefined) {
+    for (let offset = 1; offset <= 20 && pooled.length < 10; offset += 1) {
+      const nextLessonNumber = context.lessonNumber + offset;
+      const nextContent = await fetchExactSectionContent(
+        'ph',
+        dbSubjects,
+        context.chapterNumber,
+        nextLessonNumber,
+        `${context.lessonId}-next-${nextLessonNumber}`
+      );
+      if (!nextContent) continue;
+      addConfig(parsePhToGibhaSah(nextContent, context.lessonId, lessonTitle, context.subjectId));
+    }
+  }
+
+  if (pooled.length === 0) return currentConfig;
+
+  const mergedConfig = parsePhToGibhaSah(
+    {
+      lesson_info: { subject: currentConfig.subject || context.subjectId },
+      rounds: pooled.map((question) => ({
+        question: question.question,
+        correct_answer: question.answerLabel,
+      })),
+    },
     context.lessonId,
-    context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`,
+    lessonTitle,
     context.subjectId
   );
+
   return {
-    ...nearestConfig,
+    ...mergedConfig,
     lessonId: context.lessonId,
-    title: `لعبة جِيبْهَا صَح 🎯 - ${context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`}`,
-    subtitle: `أسئلة ملف PH قريب داخل الفصل نفسه (الدرس ${nearest.lessonNumber})`,
+    subtitle: pooled.length >= 10
+      ? 'أسئلة فريدة من الدرس، ويُستكمل النقص من الدروس التالية'
+      : `${pooled.length} أسئلة فريدة متاحة من هذا الدرس والدروس التالية`,
   };
 }
 
@@ -470,8 +505,8 @@ function parsePhToGibhaSah(
         .map((round: any) => [round.question.trim(), round])
     ).values()
   );
-  // Fewer than five valid questions means this lesson cannot form a valid game.
-  if (validRounds.length < 5) {
+  // Keep every valid unique question. A short lesson is completed from following lesson files.
+  if (validRounds.length === 0) {
     return {
       lessonId,
       subject: category,
@@ -483,7 +518,7 @@ function parsePhToGibhaSah(
     };
   }
 
-  const cardsCount = 10;
+  const cardsCount = Math.min(10, validRounds.length);
   const shuffle = <T,>(values: T[]): T[] => {
     const result = [...values];
     for (let i = result.length - 1; i > 0; i -= 1) {
@@ -501,9 +536,7 @@ function parsePhToGibhaSah(
     points: 100,
     answerLabel: getRoundAnswer(round),
   }));
-  const selectedPool = questionPool.length > cardsCount
-    ? shuffle(questionPool).slice(0, cardsCount)
-    : Array.from({ length: cardsCount }, (_, idx) => questionPool[idx % questionPool.length]);
+  const selectedPool = shuffle(questionPool).slice(0, cardsCount);
   const cards: GibhaSahCard[] = selectedPool.map((question, idx) => ({
     id: idx + 1,
     number: idx + 1,
