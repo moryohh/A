@@ -759,10 +759,12 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
       {/* ========================================================= */}
       {previewLesson && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-md bg-[#09152b] border-2 border-sky-400 rounded-3xl p-5 text-white shadow-2xl space-y-4">
+          <div className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-sky-300/60 bg-[linear-gradient(145deg,#0b1d3d_0%,#071329_52%,#10183a_100%)] p-5 text-white shadow-[0_28px_80px_rgba(2,132,199,.32)] space-y-4">
+            <span className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl" />
+            <span className="pointer-events-none absolute -bottom-24 -left-20 h-52 w-52 rounded-full bg-violet-500/15 blur-3xl" />
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="relative flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-400 flex items-center justify-center text-sky-300">
                   <Play className="w-4 h-4 fill-sky-400 text-sky-400" />
@@ -774,27 +776,33 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
               </div>
               <button
                 onClick={() => setPreviewLesson(null)}
-                className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-colors"
+                className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/10 text-gray-300 transition-colors hover:bg-white/20 hover:text-white"
+                aria-label="إغلاق نافذة خيارات الدرس"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Keep this preview intentionally minimal: the lesson content is
-                loaded from the lessons topic after entering the lesson. */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="relative rounded-2xl border border-white/10 bg-white/[.04] px-3 py-2.5 text-center">
+              <p className="text-[11px] font-bold text-slate-300">اختر ما تريد البدء به في مادة <span className="text-cyan-300">{subjectName}</span></p>
+            </div>
+
+            {/* Both actions stay above the fold on mobile. Exams inherit the
+                currently selected subject and chapter automatically. */}
+            <div className="relative grid grid-cols-2 gap-3">
               <button
                 onClick={() => {
                   const targetLesson = previewLesson.lesson;
                   setPreviewLesson(null);
                   onSelectLesson(targetLesson);
                 }}
-                className="group relative min-h-[92px] overflow-hidden rounded-2xl border border-sky-200/40 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 p-3 text-white shadow-[0_12px_32px_rgba(14,165,233,.32)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(14,165,233,.42)] active:scale-95"
+                className="group relative min-h-[126px] overflow-hidden rounded-3xl border border-cyan-200/50 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-700 p-3.5 text-white shadow-[0_14px_34px_rgba(14,165,233,.34)] transition-all hover:-translate-y-1 hover:shadow-[0_20px_42px_rgba(14,165,233,.44)] active:scale-95"
               >
-                <span className="absolute -left-4 -top-5 h-16 w-16 rounded-full bg-white/20 blur-xl" />
-                <span className="relative flex flex-col items-center gap-2">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/30 bg-white/15 shadow-inner"><BookOpen className="h-5 w-5" /></span>
-                  <span className="text-xs font-black sm:text-sm">بدء الدرس</span>
+                <span className="absolute -left-5 -top-6 h-20 w-20 rounded-full bg-white/25 blur-xl" />
+                <span className="relative flex h-full flex-col items-center justify-center gap-2.5">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/40 bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_8px_20px_rgba(0,0,0,.16)]"><BookOpen className="h-6 w-6" /></span>
+                  <span className="text-sm font-black">بدء الدرس</span>
+                  <span className="-mt-1 text-[9px] font-bold text-cyan-50/90">شرح ومحتوى تفاعلي</span>
                 </span>
               </button>
               <button
@@ -803,14 +811,14 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                   setPreviewLesson(null);
                   setExamPickerRequest((request) => request + 1);
                 }}
-                className="group relative min-h-[92px] overflow-hidden rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-600 p-3 text-white shadow-[0_12px_32px_rgba(249,115,22,.3)] transition-all hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(249,115,22,.42)] active:scale-95"
+                className="group relative min-h-[126px] overflow-hidden rounded-3xl border border-amber-200/60 bg-gradient-to-br from-amber-300 via-orange-500 to-rose-600 p-3.5 text-white shadow-[0_14px_34px_rgba(249,115,22,.34)] transition-all hover:-translate-y-1 hover:shadow-[0_20px_42px_rgba(249,115,22,.44)] active:scale-95"
                 aria-label={`فتح الامتحانات الشهرية والوزارية لمادة ${subjectName}`}
               >
-                <span className="absolute -right-4 -top-5 h-16 w-16 rounded-full bg-yellow-100/30 blur-xl" />
-                <span className="relative flex flex-col items-center gap-2">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/30 bg-white/15 shadow-inner"><ClipboardCheck className="h-5 w-5" /></span>
-                  <span className="text-xs font-black sm:text-sm">الامتحانات</span>
-                  <span className="-mt-1 text-[9px] font-bold text-amber-50/90">شهرية ووزارية</span>
+                <span className="absolute -right-5 -top-6 h-20 w-20 rounded-full bg-yellow-100/35 blur-xl" />
+                <span className="relative flex h-full flex-col items-center justify-center gap-2.5">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/45 bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.4),0_8px_20px_rgba(0,0,0,.16)]"><ClipboardCheck className="h-6 w-6" /></span>
+                  <span className="text-sm font-black">امتحانات المادة</span>
+                  <span className="-mt-1 rounded-full border border-white/20 bg-black/10 px-2 py-0.5 text-[9px] font-bold text-amber-50">شهرية ووزارية</span>
                 </span>
               </button>
             </div>
