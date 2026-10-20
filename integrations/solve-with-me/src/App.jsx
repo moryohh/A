@@ -384,7 +384,7 @@ function Solver({ file, subjectId, initialQuestionIndex = 0, onBack, apples, set
     },{threshold:0.15})
     observer.observe(board)
     return()=>observer.disconnect()
-  },[boardThemeStarted,currentStep?.step_id])
+  },[boardThemeStarted,activeId])
   useEffect(()=>{loadBoardFile(subjectId,file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,subjectId,initialQuestionIndex])
   useEffect(()=>{
     try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}
