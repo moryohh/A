@@ -5,9 +5,10 @@ import clappingHands from '../assets/animations/clapping-hands.json';
 type ClappingHandsAnimationProps = {
   className?: string;
   ariaLabel?: string;
+  autoplay?: boolean;
 };
 
-export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ className, ariaLabel = 'تصفيق' }) => {
+export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ className, ariaLabel = 'تصفيق', autoplay = true }) => {
   const lottieRef = useRef<any>(null);
   const reversingRef = useRef(false);
 
@@ -15,7 +16,7 @@ export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ 
     <Lottie
       lottieRef={lottieRef}
       animationData={clappingHands}
-      autoplay
+      autoplay={autoplay}
       loop={false}
       className={className}
       aria-label={ariaLabel}
