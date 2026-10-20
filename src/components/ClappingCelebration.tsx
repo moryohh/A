@@ -6,9 +6,10 @@ type ClappingHandsAnimationProps = {
   className?: string;
   ariaLabel?: string;
   autoplay?: boolean;
+  pingPong?: boolean;
 };
 
-export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ className, ariaLabel = 'تصفيق', autoplay = true }) => {
+export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ className, ariaLabel = 'تصفيق', autoplay = true, pingPong = false }) => {
   const lottieRef = useRef<any>(null);
   const reversingRef = useRef(false);
 
@@ -24,7 +25,14 @@ export const ClappingHandsAnimation: React.FC<ClappingHandsAnimationProps> = ({ 
       onDOMLoaded={() => lottieRef.current?.setSpeed(0.5)}
       onComplete={() => {
         const animation = lottieRef.current;
-        if (!animation || reversingRef.current) return;
+        if (!animation) return;
+        if (pingPong) {
+          reversingRef.current = !reversingRef.current;
+          animation.setDirection(reversingRef.current ? -1 : 1);
+          animation.play();
+          return;
+        }
+        if (reversingRef.current) return;
         reversingRef.current = true;
         animation.setDirection(-1);
         animation.play();
@@ -55,6 +63,7 @@ export const ClappingCelebration: React.FC<ClappingCelebrationProps> = ({
         {positions.map((position, index) => (
           <ClappingHandsAnimation
             key={position}
+            pingPong
             className={`absolute ${position} h-20 w-20 sm:h-24 sm:w-24 ${index % 2 ? '-rotate-12' : 'rotate-12'} drop-shadow-[0_0_14px_rgba(251,191,36,.45)]`}
           />
         ))}
