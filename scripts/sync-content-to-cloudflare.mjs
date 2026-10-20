@@ -5,10 +5,10 @@ const SYNC_TOKEN = process.env.CONTENT_SYNC_TOKEN;
 if (!SUPABASE_ANON_KEY || !SYNC_URL || !SYNC_TOKEN) throw new Error('Missing sync environment variables');
 
 const headers = { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-async function table(name, select = '*') {
+async function table(name, select = '*', orderColumn = 'id') {
   const output = [];
   for (let from = 0; ; from += 500) {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${name}?select=${encodeURIComponent(select)}&order=id.asc`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${name}?select=${encodeURIComponent(select)}&order=${encodeURIComponent(orderColumn)}.asc`, {
       headers: { ...headers, Range: `${from}-${from + 499}`, Prefer: 'count=exact' },
     });
     if (!response.ok) throw new Error(`${name}: ${response.status} ${await response.text()}`);
@@ -42,7 +42,7 @@ function number(value) {
 
 await post('/setup', {});
 const [educational, canonicalIndex, exams] = await Promise.all([
-  table('educational_data'), table('educational_content_index'), table('curriculum_exam_bank'),
+  table('educational_data'), table('educational_content_index', '*', 'record_id'), table('curriculum_exam_bank'),
 ]);
 await batches('/educational', educational);
 await batches('/exams', exams);
