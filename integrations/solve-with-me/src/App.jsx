@@ -208,15 +208,22 @@ const boardFileCache=new Map()
 async function loadBoardFile(file){
   if(boardFileCache.has(file))return boardFileCache.get(file)
   const promise=(async()=>{
-    const indexResponse=await fetch(`${CONTENT_INDEX_API}/content?section=solve_with_me&q=${encodeURIComponent(file)}&limit=20`)
-    if(!indexResponse.ok)throw new Error('تعذر تحميل فهرس الصبورة')
-    const payload=await indexResponse.json()
-    const row=(payload.items||[]).find(item=>item.file_name===file||item.file_name.endsWith(`/${file}`))
-    if(!row)throw new Error(`ملف الصبورة غير مفهرس: ${file}`)
-    const response=await fetch(`${CONTENT_R2_API}/educational/${encodeURIComponent(row.source_id)}`)
-    if(!response.ok)throw new Error(`تعذر تحميل ملف الصبورة: ${file}`)
-    const envelope=await response.json()
-    return Object.prototype.hasOwnProperty.call(envelope,'content')?envelope.content:envelope
+    try{
+      const indexResponse=await fetch(`${CONTENT_INDEX_API}/content?section=solve_with_me&q=${encodeURIComponent(file)}&limit=100`)
+      if(!indexResponse.ok)throw new Error('تعذر تحميل فهرس الصبورة')
+      const payload=await indexResponse.json()
+      const row=(payload.items||[]).find(item=>item.file_name===file||item.file_name.endsWith(`/${file}`))
+      if(!row)throw new Error(`ملف الصبورة غير مفهرس: ${file}`)
+      const response=await fetch(`${CONTENT_R2_API}/educational/${encodeURIComponent(row.source_id)}`)
+      if(!response.ok)throw new Error(`تعذر تحميل ملف الصبورة: ${file}`)
+      const envelope=await response.json()
+      return Object.prototype.hasOwnProperty.call(envelope,'content')?envelope.content:envelope
+    }catch(remoteError){
+      const localName=String(file).split('/').pop()
+      const response=await fetch(`./data/${encodeURIComponent(localName)}`)
+      if(!response.ok)throw remoteError
+      return response.json()
+    }
   })()
   boardFileCache.set(file,promise)
   return promise
@@ -371,6 +378,37 @@ function QuestionImages({ problem }) {
 function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
+  const boardAudioRef=useRef(null)
+  const [boardThemeStarted,setBoardThemeStarted]=useState(false)
+  const startBoardTheme=()=>{
+    let player=boardAudioRef.current
+    if(!player){
+      player=new Audio(`${window.location.origin}/audio/game-session-theme.mp3`)
+      player.preload='auto'
+      player.loop=true
+      player.volume=0.5
+      boardAudioRef.current=player
+    }
+    setBoardThemeStarted(true)
+    void player.play().catch(()=>{
+      window.addEventListener('pointerdown',()=>void player.play().catch(()=>{}),{once:true,passive:true})
+    })
+  }
+  useEffect(()=>()=>{
+    const player=boardAudioRef.current
+    if(player){player.pause();player.currentTime=0}
+  },[])
+  useEffect(()=>{
+    if(!boardThemeStarted)return
+    const board=boardRef.current,player=boardAudioRef.current
+    if(!board||!player)return
+    const observer=new IntersectionObserver(([entry])=>{
+      if(entry.isIntersecting)void player.play().catch(()=>{})
+      else player.pause()
+    },{threshold:0.15})
+    observer.observe(board)
+    return()=>observer.disconnect()
+  },[boardThemeStarted,activeId])
   useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
   useEffect(()=>{
     if(resetProgress){setAnswers({});return}
@@ -386,7 +424,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
   const inputById=id=>problem.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
-  const choose=value=>{if(value===choice.correct_value){setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
+  const choose=value=>{if(value===choice.correct_value){startBoardTheme();setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
   const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
