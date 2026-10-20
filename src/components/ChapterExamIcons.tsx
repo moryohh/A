@@ -4,6 +4,7 @@ import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, 
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
 import { NotificationExamResult } from '../types';
+import { gameAudio } from '../utils/gameAudio';
 
 interface ChapterExamIconsProps {
   subjectId: string;
@@ -566,6 +567,11 @@ function notifyChapterExamResult(submission: ChapterSubmission) {
 
 const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; examKind: 'monthly' | 'ministry'; onClose: () => void; onScoreUpdate?: (points: number) => void }> = ({ exam, subjectName, examKind, onClose, onScoreUpdate }) => {
   const questions = examQuestions(exam.payload);
+
+  useEffect(() => {
+    gameAudio.playExternal('chapter-exam-theme', `${import.meta.env.BASE_URL}audio/game-session-theme.mp3`, 0.25, true);
+    return () => gameAudio.stopExternal('chapter-exam-theme');
+  }, []);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [activePartIndex, setActivePartIndex] = useState(0);
   const [pageTurnDirection, setPageTurnDirection] = useState<1 | -1>(1);
