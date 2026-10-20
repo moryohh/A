@@ -66,7 +66,19 @@ class GameAudioEngine {
       player.loop = loop;
       player.volume = volume;
       player.currentTime = 0;
-      void player.play().catch(() => {});
+      void player.play().catch(() => {
+        // Mobile browsers may reject playback outside the original tap.
+        // Retry once on the next real user gesture instead of failing silently.
+        const retry = () => {
+          const current = this.externalPlayers.get(key);
+          if (!current || this.isMuted) return;
+          current.loop = loop;
+          current.volume = volume;
+          void current.play().catch(() => {});
+        };
+        window.addEventListener('pointerdown', retry, { once: true, passive: true });
+        window.addEventListener('touchstart', retry, { once: true, passive: true });
+      });
     } catch {}
   }
 
@@ -96,7 +108,7 @@ class GameAudioEngine {
   }
 
   public playGameSessionTheme() {
-    // The external player loops the 24-second track continuously while the game is open.
+    // The external player loops the compressed game theme while the game is open.
     this.gameSessionThemeRequested = true;
     this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.55, true);
   }
