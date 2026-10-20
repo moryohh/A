@@ -389,6 +389,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
       player.volume=0.5
       boardAudioRef.current=player
     }
+    player.volume=0.5
     setBoardThemeStarted(true)
     void player.play().catch(()=>{
       window.addEventListener('pointerdown',()=>void player.play().catch(()=>{}),{once:true,passive:true})
@@ -403,7 +404,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
     const board=boardRef.current,player=boardAudioRef.current
     if(!board||!player)return
     const observer=new IntersectionObserver(([entry])=>{
-      if(entry.isIntersecting)void player.play().catch(()=>{})
+      if(entry.isIntersecting){player.volume=0.5;void player.play().catch(()=>{})}
       else player.pause()
     },{threshold:0.15})
     observer.observe(board)
