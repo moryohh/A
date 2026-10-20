@@ -97,6 +97,15 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
   const assessmentReportedRef = useRef(false);
   const submissionIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) {
+      gameAudio.stopExamSessionTheme();
+      return;
+    }
+    gameAudio.playExamSessionTheme();
+    return () => gameAudio.stopExamSessionTheme();
+  }, [isOpen]);
+
   // Load exam data on mount / open
   useEffect(() => {
     if (!isOpen) return;
