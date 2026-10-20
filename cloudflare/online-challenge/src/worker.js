@@ -707,13 +707,19 @@ export class ChallengeRoom {
       var nextQuestionIndex = currentIndex + 1;
       if (game.gameType === 'gibha_sah') {
         game.gibhaRefillSlots = [];
+        var finishAfterThisAnswer = false;
         if (isCorrect) {
           game.gibhaBoardSlots[chosen] = null;
           game.gibhaBoardOptions[chosen] = '';
           var remainingCards = game.gibhaBoardSlots.filter(Boolean).length;
-          if (remainingCards <= 3) this.refillGibhaBoard(game);
+          var pendingCards = (game.gibhaPendingQuestions || []).length;
+          // When only two cards existed before this correct answer and there is
+          // nothing left to refill, finish immediately instead of forcing the
+          // players to answer the final orphan card.
+          finishAfterThisAnswer = remainingCards <= 1 && pendingCards === 0;
+          if (!finishAfterThisAnswer && remainingCards <= 3) this.refillGibhaBoard(game);
         }
-        nextQuestionIndex = this.advanceGibhaQuestion(game, currentIndex, isCorrect);
+        nextQuestionIndex = finishAfterThisAnswer ? game.questions.length : this.advanceGibhaQuestion(game, currentIndex, isCorrect);
       }
       game.round = nextQuestionIndex;
       game.questionIndex = nextQuestionIndex;
