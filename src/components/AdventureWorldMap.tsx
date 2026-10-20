@@ -78,6 +78,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   const { theme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const activeNodeRef = useRef<HTMLDivElement>(null);
+  const chapterSelectorRef = useRef<HTMLDivElement>(null);
 
   // Selected Chapter State & Dropdown
   const [internalChapterIndex, setInternalChapterIndex] = useState<number>(0);
@@ -94,6 +95,17 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   }, [controlledChapterNumber, controlledChapterIndex, internalChapterIndex, chapters]);
 
   const [isChapterDropdownOpen, setIsChapterDropdownOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isChapterDropdownOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!chapterSelectorRef.current?.contains(event.target as Node)) {
+        setIsChapterDropdownOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePress, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePress, true);
+  }, [isChapterDropdownOpen]);
 
   // Selected lesson modal
   const [previewLesson, setPreviewLesson] = useState<{
@@ -277,7 +289,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
       {/* ========================================================= */}
       <div className="sticky top-1 z-40 w-full mb-1.5">
           <div
-            className="flex flex-row-reverse items-center justify-between gap-2 p-1.5 sm:p-2 rounded-2xl backdrop-blur-md border-2 shadow-2xl text-white transition-all duration-300"
+            className="flex flex-row-reverse items-center justify-between gap-2 rounded-2xl border p-1.5 text-white shadow-2xl backdrop-blur-md transition-all duration-300 sm:p-2"
           style={{
             backgroundColor: `${theme.colors.bgCard}F2`,
             borderColor: `${theme.colors.primary}60`,
@@ -286,84 +298,42 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
         >
           
           {/* Main Chapter Selector Button */}
-          <div className="relative flex-1 min-w-0">
+          <div ref={chapterSelectorRef} className="relative min-w-0 flex-1">
             <button
               onClick={() => !isLoadingChapters && setIsChapterDropdownOpen(!isChapterDropdownOpen)}
               disabled={isLoadingChapters}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border shadow-lg transition-all active:scale-[0.98] cursor-pointer group disabled:cursor-wait"
-              style={{
-                backgroundColor: `${theme.colors.primary}20`,
-                borderColor: `${theme.colors.primary}50`,
-              }}
+              className={`group relative flex min-h-[58px] w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border border-cyan-200/50 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 px-3.5 py-2.5 text-white shadow-[0_10px_30px_rgba(37,99,235,.38)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:cursor-wait ${isChapterDropdownOpen ? 'ring-2 ring-cyan-300/60 shadow-[0_14px_38px_rgba(99,102,241,.48)]' : ''}`}
+              aria-expanded={isChapterDropdownOpen}
+              aria-haspopup="listbox"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className="w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"
-                  style={{
-                    backgroundColor: `${theme.colors.primary}30`,
-                    borderColor: theme.colors.primary,
-                    color: theme.colors.primary,
-                  }}
-                >
+              <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/20 blur-2xl" />
+              <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+              <div className="relative flex min-w-0 items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/35 bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,.45),0_7px_18px_rgba(0,0,0,.18)] transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-110">
                   {isLoadingChapters ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                    <Loader2 className="h-5 w-5 animate-spin text-amber-200" />
                   ) : (
-                    <BookOpen className="w-4 h-4" />
+                    <Layers className="h-5 w-5 drop-shadow" />
                   )}
                 </div>
                 <div className="text-right min-w-0">
-                  <div className="text-[10px] font-bold leading-none mb-0.5" style={{ color: theme.colors.secondary }}>
-                    {isLoadingChapters
-                      ? 'يرجى الانتظار'
-                      : 'تغيير الفصل من هنا'}
-                  </div>
-                  <div className="text-xs sm:text-sm font-black text-white truncate">
-                    {isLoadingChapters
-                      ? 'جاري جلب الفصول...'
-                      : currentChapter
-                      ? currentChapter.title
-                      : `الفصل ${selectedChapterIndex + 1}`}
-                  </div>
+                  <div className="text-sm font-black leading-5 drop-shadow sm:text-base">{isLoadingChapters ? 'جاري جلب الفصول...' : 'تغيير الفصل'}</div>
+                  <div className="max-w-[180px] truncate text-[10px] font-bold text-cyan-50/85">{currentChapter?.title || `الفصل ${selectedChapterIndex + 1}`}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span
-                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold border"
-                  style={{
-                    backgroundColor: `${theme.colors.primary}35`,
-                    borderColor: `${theme.colors.primary}60`,
-                    color: theme.colors.textPrimary,
-                  }}
-                >
-                  {isLoadingChapters ? 'جاري التحميل...' : 'تبديل الفصل'}
-                  {!isLoadingChapters && <ChevronDown className="w-3 h-3" />}
-                </span>
-                {!isLoadingChapters && (
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isChapterDropdownOpen ? 'rotate-180 text-yellow-300' : ''
-                    }`}
-                    style={{ color: theme.colors.primary }}
-                  />
-                )}
-              </div>
+              {!isLoadingChapters && <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/30 bg-black/10"><ChevronDown className={`h-5 w-5 transition-transform duration-300 ${isChapterDropdownOpen ? 'rotate-180' : 'motion-safe:animate-bounce'}`} /></span>}
             </button>
 
             {/* Chapters Dropdown Menu */}
             {isChapterDropdownOpen && !isLoadingChapters && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsChapterDropdownOpen(false)}
-                />
-                <div className="absolute top-full mt-1.5 right-0 left-0 z-50 p-2 rounded-2xl bg-slate-900/98 backdrop-blur-xl border-2 border-sky-400 shadow-2xl space-y-1.5 max-h-[60vh] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between px-2 py-1 border-b border-white/10 text-xs font-black text-sky-300">
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[64vh] space-y-2 overflow-y-auto rounded-[24px] border border-cyan-300/60 bg-gradient-to-b from-slate-900/98 via-[#0b1735]/98 to-[#14133a]/98 p-2.5 shadow-[0_24px_65px_rgba(2,8,23,.75),0_0_28px_rgba(56,189,248,.24)] backdrop-blur-2xl custom-scrollbar animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.05] px-3 py-2 text-xs font-black text-cyan-200">
                     <span className="flex items-center gap-1.5">
                       <Layers className="w-3.5 h-3.5" />
                       فصول المادة ({chapters.length} فصول متاحة)
                     </span>
-                    <span className="text-[10px] text-gray-400 font-normal">اضغط للانتقال إلى الفصل</span>
+                    <span className="text-[9px] font-bold text-white/45">اضغط خارج القائمة للإغلاق</span>
                   </div>
 
                   {chapters.map((chapter, idx) => {
@@ -379,10 +349,14 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                       <button
                         key={chapter.id || `ch-${idx}`}
                         onClick={() => scrollToChapter(chapter, idx)}
-                        className={`w-full flex items-center justify-between gap-2 p-2.5 rounded-xl text-right transition-all cursor-pointer ${
+                        className={`group/chapter relative flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-2xl border p-3 text-right transition-all duration-300 hover:-translate-y-0.5 ${
                           isSelected
-                            ? 'bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white border border-white/40 shadow-lg'
-                            : 'bg-slate-800/80 hover:bg-slate-700/80 text-gray-200 border border-white/5 hover:border-sky-500/30'
+                            ? 'border-white/45 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 text-white shadow-[0_10px_26px_rgba(37,99,235,.34)]'
+                            : idx % 3 === 0
+                            ? 'border-cyan-300/15 bg-gradient-to-r from-slate-800/95 to-cyan-950/80 text-gray-100 hover:border-cyan-300/45'
+                            : idx % 3 === 1
+                            ? 'border-blue-300/15 bg-gradient-to-r from-slate-800/95 to-blue-950/80 text-gray-100 hover:border-blue-300/45'
+                            : 'border-violet-300/15 bg-gradient-to-r from-slate-800/95 to-violet-950/80 text-gray-100 hover:border-violet-300/45'
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -392,7 +366,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                                 ? 'bg-emerald-500 text-black font-black'
                                 : isSelected
                                 ? 'bg-white text-blue-900 font-black'
-                                : 'bg-slate-700 text-gray-300'
+                                : 'border border-white/10 bg-white/10 text-gray-200 group-hover/chapter:bg-white/15'
                             }`}
                           >
                             {isFullyCompleted ? '✓' : idx + 1}
@@ -408,7 +382,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                         </div>
 
                         {isSelected && (
-                          <div className="px-2 py-0.5 rounded-full bg-yellow-400 text-black text-[10px] font-black shrink-0 shadow">
+                          <div className="shrink-0 rounded-full border border-amber-100/60 bg-gradient-to-r from-amber-300 to-yellow-400 px-2 py-0.5 text-[9px] font-black text-slate-950 shadow">
                             الفصل الحالي
                           </div>
                         )}
@@ -416,7 +390,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                     );
                   })}
                 </div>
-              </>
             )}
           </div>
 
