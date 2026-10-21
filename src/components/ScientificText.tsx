@@ -12,6 +12,7 @@ type MathPart = {type: 'text' | 'inline' | 'block'; value: string};
 function repairCommonEscapes(value: string): string {
   // A malformed JSON source may have interpreted \f and \t as control characters.
   return value
+    .replace(/\\{2,}(?=(?:frac|dfrac|tfrac|sqrt|times|Delta|circ|varsigma|mathrm|rightarrow|leftrightarrow)\b)/g, '\\')
     .replace(/\f(?=rac)/g, '\\frac')
     .replace(/\t(?=imes)/g, '\\times')
     .replace(/\u000b(?=ec|sqrt)/g, '\\vec')
