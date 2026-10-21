@@ -24,6 +24,7 @@ function repairCommonEscapes(value: string): string {
     .replace(/\bDelta\s*H_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
     .replace(/\bDeltaH_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
     .replace(/\bDeltaH([fr])(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/\bDeltaH\b/g, '\\Delta H')
     .replace(/\bDelta\s*H\b/g, '\\Delta H')
     .replace(/\bDelta(?=[A-Za-z])/g, '\\Delta ')
     .replace(/\bDelta\b/g, '\\Delta')
