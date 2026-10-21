@@ -17,11 +17,17 @@ function repairCommonEscapes(value: string): string {
     .replace(/\u000b(?=ec|sqrt)/g, '\\vec')
     // Repair recurring OCR/JSON damage in chemistry and physics equations.
     .replace(/\\fracrac\b/g, '\\frac')
+    .replace(/\\timesimes\b/g, '\\times')
     .replace(/(?:\\)?leftrightarrow\b/g, '\\leftrightarrow')
     .replace(/(?:\\)?(?:r?ightarrow)\b/g, '\\rightarrow')
     .replace(/\bDelta\s*Hfirc\b/g, '\\Delta H_f^{\\circ}')
+    .replace(/\bDelta\s*H_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/\bDeltaH_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/\bDeltaH([fr])(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
     .replace(/\bDelta\s*H\b/g, '\\Delta H')
-    .replace(/\bDelta(?=[A-Za-z])/g, '\\Delta ');
+    .replace(/\bDelta(?=[A-Za-z])/g, '\\Delta ')
+    .replace(/\\?(?:s?elect)\s*kJ\b/gi, '\\mathrm{kJ}')
+    .replace(/\\?(?:s?elect)\s*J\b/gi, '\\mathrm{J}');
 }
 
 function looksLikeLatex(value: string): boolean {
