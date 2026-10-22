@@ -1567,7 +1567,7 @@ function AppContent() {
             subjectId: challengeConfig?.subject || 'biology',
             chapterNumber: challengeConfig?.chapterNumber || 1,
             lessonNumber: challengeConfig?.lessonNumber || 1,
-            lessonId: `lesson-${challengeConfig?.lessonNumber || 1}`,
+            lessonId: challengeConfig?.lessonId || `lesson-${challengeConfig?.lessonNumber || 1}`,
             lessonKey: `${challengeConfig?.subject || 'biology'}-ch${challengeConfig?.chapterNumber || 1}-les${challengeConfig?.lessonNumber || 1}`,
             title: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
             lessonTitle: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',

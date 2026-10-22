@@ -44,7 +44,7 @@ interface SubscriptionsViewProps {
   competitionSnapshot?: CompetitionSnapshot | null;
   onOpenChallenge?: () => void;
   onJoinChallenge?: (room: ActiveRoom) => void;
-  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' }) => void;
+  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; lessonId?: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' }) => void;
 }
 
 const STATUS_STYLES: Record<CourseStatus, { text: string; background: string; border: string }> = {
@@ -191,7 +191,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       const selectedLesson = challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
-        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس رياضيات أونلاين' : 'الملزمة — درس رياضيات أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
+        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس رياضيات أونلاين' : 'الملزمة — درس رياضيات أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
         setChallengeMessage('');
         return;
       }
