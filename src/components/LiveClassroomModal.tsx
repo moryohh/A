@@ -140,6 +140,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [error, setError] = useState("");
   const [booklet, setBooklet] = useState<LessonBookletData | null>(null);
   const [bookletLoading, setBookletLoading] = useState(false);
+  const [bookletError, setBookletError] = useState("");
   const [color, setColor] = useState("#facc15");
   const [size, setSize] = useState(4);
   const [draft, setDraft] = useState<Point[]>([]);
@@ -187,6 +188,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     if (classroom?.contentMode !== "booklet") return;
     setBookletLoading(true);
+    setBookletError("");
     const context: OpenLessonContext = {
       subjectId: currentContent.subject || category,
       chapterNumber: Number(currentContent.chapter) || 1,
@@ -198,7 +200,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
       lessonTitle: currentContent.lessonTitle || lessonTitle,
     };
     fetchLessonCurriculum(context)
-      .then((result) => setBooklet(result.data))
+      .then((result) => {
+        setBooklet(result.data);
+        setBookletError(result.error || "");
+      })
       .finally(() => setBookletLoading(false));
   }, [
     classroom?.contentMode,
@@ -576,6 +581,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               <LessonBookletView
                 bookletData={booklet}
                 isLoading={bookletLoading}
+                  error={bookletError || undefined}
                 lessonTitle={currentContent.lessonTitle || lessonTitle}
               />
             </div>

@@ -144,6 +144,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [challengeChapters, setChallengeChapters] = useState<Array<{ number: number; title: string }>>([]);
   const [challengeGame, setChallengeGame] = useState<ChallengeGame | ''>('');
   const [classroomContentMode, setClassroomContentMode] = useState<'board' | 'booklet'>('board');
+  const [classroomLessonId, setClassroomLessonId] = useState('');
   const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [challengeBusy, setChallengeBusy] = useState(false);
@@ -179,7 +180,9 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       setChallengeChapters(index.chapters.map((item) => ({ number: item.chapterNumber, title: item.title })));
       const chapter = index.chapters.find((item) => item.chapterNumber === Number(challengeChapter)) || index.chapters[0];
       setChallengeChapter(chapter ? String(chapter.chapterNumber) : '');
-      setChallengeLessons(chapter?.lessons.map((lesson) => ({ number: lesson.lessonNumber, title: lesson.title, id: lesson.lessonId })) || []);
+      const lessons = chapter?.lessons.map((lesson) => ({ number: lesson.lessonNumber, title: lesson.title, id: lesson.lessonId })) || [];
+      setChallengeLessons(lessons);
+      setClassroomLessonId((current) => lessons.some((lesson) => lesson.id === current) ? current : (lessons[0]?.id || ''));
     }).catch(() => { if (!cancelled) setChallengeLessons([]); });
     return () => { cancelled = true; };
   }, [challengeSubject, challengeChapter, selectedChallengeSubject?.name]);
@@ -188,7 +191,9 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
     setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
     try {
-      const selectedLesson = challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
+      const selectedLesson = challengeGame === 'live_classroom'
+        ? (challengeLessons.find((lesson) => lesson.id === classroomLessonId) || challengeLessons[0])
+        : challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
         onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس رياضيات أونلاين' : 'الملزمة — درس رياضيات أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
@@ -310,6 +315,13 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             {challengeSubject === 'mathematics' && challengeChapter && (
               <div className="rounded-2xl border border-cyan-300/30 bg-slate-950/45 p-2.5">
                 <p className="mb-2 text-center text-[11px] font-black text-cyan-100">درس الرياضيات الأونلاين</p>
+                <label className="mb-2 flex items-center overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
+                  <GraduationCap className="mr-2 h-4 w-4 shrink-0 text-cyan-300" />
+                  <select value={classroomLessonId} onChange={(event) => setClassroomLessonId(event.target.value)} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold text-white outline-none">
+                    {challengeLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+                  </select>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-cyan-200" />
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => { setClassroomContentMode('board'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'board' ? 'border-sky-200 bg-sky-400/30 ring-2 ring-sky-300/30' : 'border-sky-300/35 bg-sky-500/10'}`}>
                     <MonitorCheck className="mb-2 h-8 w-8 text-sky-200" />
