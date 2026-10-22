@@ -304,7 +304,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
           <div className="relative space-y-2.5 rounded-3xl border border-white/10 bg-black/15 p-2.5 shadow-inner backdrop-blur-sm">
             <label className="relative flex items-center overflow-hidden rounded-2xl border border-cyan-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-400/20">
               <BookOpen className="mr-3 h-5 w-5 shrink-0 text-cyan-300" />
-              <select value={challengeSubject} onChange={(event) => { const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <select value={challengeSubject} onChange={(event) => { const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-cyan-200" />
             </label>
             <label className="relative flex items-center overflow-hidden rounded-2xl border border-blue-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-400/20">
@@ -312,7 +312,19 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none disabled:opacity-45"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-blue-200" />
             </label>
-            {['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && challengeChapter && (
+            {challengeSubject && challengeSubject !== 'mathematics' && <label className="relative flex items-center overflow-hidden rounded-2xl border border-violet-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-400/20">
+              <Gamepad2 className="mr-3 h-5 w-5 shrink-0 text-violet-300" />
+              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none">
+                <option value="">اختر نوع اللعبة / النشاط</option>
+                {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
+                {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_booklet">الملزمة</option>}
+                <option value="true_false">صواب أم خطأ</option>
+                <option value="millionaire">من سيربح المليون</option>
+                <option value="gibha_sah">جبتها صح</option>
+              </select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
+            </label>}
+            {['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
               <div className="rounded-2xl border border-cyan-300/30 bg-slate-950/45 p-2.5">
                 <p className="mb-2 text-center text-[11px] font-black text-cyan-100">تحديد موضوع</p>
                 <label className="mb-2 flex items-center overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
@@ -323,25 +335,8 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                   </select>
                   <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-cyan-200" />
                 </label>
-                {challengeSubject !== 'mathematics' && <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { setClassroomContentMode('board'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'board' ? 'border-sky-200 bg-sky-400/30 ring-2 ring-sky-300/30' : 'border-sky-300/35 bg-sky-500/10'}`}>
-                    <MonitorCheck className="mb-2 h-8 w-8 text-sky-200" />
-                    <b className="text-sm text-white">حل معي</b>
-                    <small className="mt-1 text-[9px] text-sky-100/70">صبورة تفاعلية مباشرة</small>
-                  </button>
-                  {challengeSubject !== 'mathematics' && <button type="button" onClick={() => { setClassroomContentMode('booklet'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'booklet' ? 'border-emerald-200 bg-emerald-400/30 ring-2 ring-emerald-300/30' : 'border-emerald-300/35 bg-emerald-500/10'}`}>
-                    <BookOpen className="mb-2 h-8 w-8 text-emerald-200" />
-                    <b className="text-sm text-white">الملزمة</b>
-                    <small className="mt-1 text-[9px] text-emerald-100/70">شرح الملزمة مباشرة</small>
-                  </button>}
-                </div>}
               </div>
             )}
-            {challengeSubject !== 'mathematics' && <label className="relative flex items-center overflow-hidden rounded-2xl border border-violet-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-400/20">
-              <Gamepad2 className="mr-3 h-5 w-5 shrink-0 text-violet-300" />
-              <select value={challengeGame} onChange={(event) => { const game = event.target.value as ChallengeGame | ''; setChallengeGame(game); if (game === 'live_classroom') setClassroomContentMode('board'); }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">اختر نوع اللعبة</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
-            </label>}
             <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">
               <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
               <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
