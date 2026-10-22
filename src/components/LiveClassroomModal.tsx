@@ -622,8 +622,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
               }
             }}
             onPointerMove={(event) => {
-              if (canDraw && draft.length)
-                setDraft((value) => [...value, point(event)]);
+              if (canDraw && draft.length) {
+                const nextPoint = point(event);
+                setDraft((value) => [...value, nextPoint]);
+              }
             }}
             onPointerUp={(event) => {
               if (draft.length > 1)
