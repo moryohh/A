@@ -29,6 +29,7 @@ import {
 } from '../data/mockCourses';
 import { CompetitionSnapshot, EducationalLesson } from '../types';
 import { getSubjectIndex } from '../services/lessonsService';
+import { fetchSolveWithMeTopics } from '../services/solveWithMeCatalog';
 import { fetchLessonGamesData } from '../services/gamesService';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 
@@ -175,6 +176,21 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   React.useEffect(() => {
     let cancelled = false;
     if (!challengeSubject) { setChallengeLessons([]); setChallengeChapters([]); setChallengeChapter(''); return; }
+    if (['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && (!challengeGame || challengeGame === 'live_classroom')) {
+      fetchSolveWithMeTopics(challengeSubject).then((topics) => {
+        if (cancelled) return;
+        const chapterNumbers = [...new Set(topics.map((topic) => topic.chapterNumber))].sort((a, b) => a - b);
+        setChallengeChapters(chapterNumbers.map((number) => ({ number, title: `الفصل ${number}` })));
+        const selectedChapter = chapterNumbers.includes(Number(challengeChapter)) ? Number(challengeChapter) : chapterNumbers[0];
+        setChallengeChapter(selectedChapter ? String(selectedChapter) : '');
+        const lessons = topics.filter((topic) => topic.chapterNumber === selectedChapter).map((topic) => ({ number: topic.lessonNumber, title: topic.title, id: topic.id }));
+        setChallengeLessons(lessons);
+        setClassroomLessonId((current) => lessons.some((lesson) => lesson.id === current) ? current : '');
+      }).catch(() => {
+        if (!cancelled) { setChallengeLessons([]); setChallengeMessage('تعذر التحقق من تمارين حل معي. لم تُعرض عناوين غير مؤكدة.'); }
+      });
+      return () => { cancelled = true; };
+    }
     getSubjectIndex(challengeSubject, selectedChallengeSubject?.name || 'المادة').then((index) => {
       if (cancelled) return;
       setChallengeChapters(index.chapters.map((item) => ({ number: item.chapterNumber, title: item.title })));
@@ -185,7 +201,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       setClassroomLessonId((current) => lessons.some((lesson) => lesson.id === current) ? current : '');
     }).catch(() => { if (!cancelled) setChallengeLessons([]); });
     return () => { cancelled = true; };
-  }, [challengeSubject, challengeChapter, selectedChallengeSubject?.name]);
+  }, [challengeSubject, challengeChapter, challengeGame, selectedChallengeSubject?.name]);
 
   const createRandomChallenge = async () => {
     if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
