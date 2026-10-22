@@ -45,6 +45,9 @@ type Participant = {
   handRaised?: boolean;
   micAllowed?: boolean;
   drawAllowed?: boolean;
+  answerFrozen?: boolean;
+  lastAnswer?: string;
+  progress?: { step?: number; solved?: number; total?: number; answer?: string } | null;
 };
 type ClassroomState = {
   type: "state";
@@ -68,6 +71,8 @@ type ClassroomState = {
     };
     strokes: Stroke[];
     drawingVersion: number;
+    presenterId?: string;
+    presenterState?: Record<string, unknown> | null;
   };
 };
 
@@ -160,6 +165,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -188,6 +194,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
         }));
         return;
       }
+      if (event.data?.type === "classroom_presenter_state" && (isTeacher || classroom?.presenterId === me)) {
+        send({ type: "classroom_presenter_state", state: event.data.state });
+        return;
+      }
+      if (event.data?.type === "classroom_student_progress" && !isTeacher) {
+        send({ type: "classroom_progress", progress: event.data.progress });
+        return;
+      }
       if (event.data?.type !== "classroom_exercises") return;
       const items = Array.isArray(event.data.items) ? event.data.items : [];
       setClassroomExercises(items);
@@ -202,7 +216,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
     window.addEventListener("message", receiveExercises);
     return () => window.removeEventListener("message", receiveExercises);
-  }, [isTeacher, currentContent]);
+  }, [isTeacher, currentContent, classroom?.presenterId, me]);
+
+  useEffect(() => {
+    if (isTeacher || classroom?.presenterId === me || !classroom?.presenterState) return;
+    boardFrameRef.current?.contentWindow?.postMessage(
+      { type: "classroom_apply_presenter_state", state: classroom.presenterState },
+      window.location.origin,
+    );
+  }, [isTeacher, classroom?.presenterId, classroom?.presenterState, me]);
 
   const send = (payload: unknown) => {
     if (socketRef.current?.readyState === WebSocket.OPEN)
@@ -442,7 +464,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=exercise-direct-2&embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const isBoardPresenter = Boolean(isTeacher || classroom?.presenterId === me);
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
 
   if (!room)
     return (
@@ -570,9 +593,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 <span className="absolute inset-0 animate-ping rounded-full border border-white/45" />
                 <Radio className="relative h-5 w-5 drop-shadow" />
               </span>
-              <span className="text-[11px] leading-none">المتحدث</span>
+              <span className="text-[11px] leading-none">أدوات الفصل</span>
             </button>
-            {speakerMenu && <div className="absolute right-0 top-12 z-50 min-w-56 rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl"><b className="block p-2 text-cyan-200">اختر طالباً ليتحدث</b>{state?.players.filter((player) => player.id !== me).map((player) => <button key={player.id} onClick={() => { send({ type: "classroom_control", action: "select_speaker", targetId: player.id }); setSpeakerMenu(false); }} className="flex w-full items-center justify-between rounded-xl p-2 text-right hover:bg-white/10"><span>{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</span>{player.micAllowed && <Mic className="h-4 w-4 text-emerald-300"/>}</button>)}</div>}
+            {speakerMenu && <div className="fixed inset-x-2 top-[9.5rem] z-[120] max-h-[62dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
+              <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={() => setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
+              {classroom?.presenterId && classroom.presenterId !== me && <button onClick={() => send({ type: "classroom_control", action: "restore_presenter" })} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
+              <div className="space-y-2">{state?.players.filter((player) => player.id !== me).map((player) => <div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised ? "border-amber-300 bg-amber-400/10" : "border-white/10 bg-white/5"}`}>
+                <div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</b><small className="text-slate-400">{player.connected ? "متصل" : "غير متصل"}{player.progress ? ` · الخطوة ${player.progress.step || 1} · ${player.progress.solved || 0}/${player.progress.total || 0}` : ""}</small></div>{classroom?.presenterId === player.id && <span className="rounded-full bg-fuchsia-500/20 px-2 py-1 text-[10px] text-fuchsia-200">يشرح الآن</span>}</div>
+                {player.lastAnswer && <div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100"><span className="text-slate-400">آخر إجابة: </span>{player.lastAnswer}</div>}
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <button onClick={() => send({ type: "classroom_control", action: "select_speaker", targetId: player.id })} className={`rounded-xl p-2 font-black ${player.micAllowed ? "bg-emerald-400 text-slate-950" : "bg-white/10"}`}><Mic className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.micAllowed ? "يتحدث" : "سماح تحدث"}</span></button>
+                  <button onClick={() => send({ type: "classroom_control", action: "answer_permission", targetId: player.id, value: player.answerFrozen })} className={`rounded-xl p-2 font-black ${player.answerFrozen ? "bg-sky-400 text-slate-950" : "bg-white/10"}`}><Snowflake className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.answerFrozen ? "فتح الإجابة" : "تجميد"}</span></button>
+                  <button onClick={() => send({ type: "classroom_control", action: "select_presenter", targetId: player.id })} className={`rounded-xl p-2 font-black ${classroom?.presenterId === player.id ? "bg-fuchsia-500" : "bg-white/10"}`}><PenLine className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">كتابة وشرح</span></button>
+                </div>
+              </div>)}</div>
+            </div>}
           </div>
           <button
             onClick={() =>
@@ -637,7 +672,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>
           ) : (
             <iframe
+              ref={boardFrameRef}
               src={boardUrl}
+              onLoad={() => {
+                if (!isBoardPresenter && classroom?.presenterState) boardFrameRef.current?.contentWindow?.postMessage(
+                  { type: "classroom_apply_presenter_state", state: classroom.presenterState },
+                  window.location.origin,
+                );
+              }}
               title="الصبورة المباشرة"
               className="h-[calc(100dvh-8rem)] min-h-[560px] w-full border-0 bg-white"
               allow="fullscreen; clipboard-write"
