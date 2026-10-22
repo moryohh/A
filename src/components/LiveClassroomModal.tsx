@@ -20,6 +20,7 @@ import { getSupabaseClient } from "../lib/supabase";
 import { loadGuestSession } from "../services/guestPreviewService";
 import { fetchLessonCurriculum } from "../services/curriculumService";
 import { getSubjectIndex } from "../services/lessonsService";
+import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
 import type { LessonBookletData } from "../data/lessonBooklet";
 
@@ -278,12 +279,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     if (!room || !isTeacher) return;
     let cancelled = false;
+    const subject = String(currentContent.subject || category).toLowerCase();
+    if (classroom?.contentMode === "board" && ["mathematics", "math", "physics", "chemistry"].includes(subject)) {
+      fetchSolveWithMeTopics(subject).then((topics) => {
+        if (!cancelled) setLessonChoices(topics
+          .filter((topic) => topic.chapterNumber === Number(currentContent.chapter))
+          .map((topic) => ({ lessonId: topic.id, lessonNumber: topic.lessonNumber, title: topic.title })));
+      }).catch(() => { if (!cancelled) setLessonChoices([]); });
+      return () => { cancelled = true; };
+    }
     getSubjectIndex(currentContent.subject || category, category).then((index) => {
       const chapter = index.chapters.find((item) => item.chapterNumber === Number(currentContent.chapter));
       if (!cancelled) setLessonChoices((chapter?.lessons || []).map((lesson) => ({ lessonId: lesson.lessonId, lessonNumber: lesson.lessonNumber, title: lesson.title })));
     }).catch(() => { if (!cancelled) setLessonChoices([]); });
     return () => { cancelled = true; };
-  }, [room, isTeacher, currentContent.subject, currentContent.chapter, category]);
+  }, [room, isTeacher, classroom?.contentMode, currentContent.subject, currentContent.chapter, category]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
