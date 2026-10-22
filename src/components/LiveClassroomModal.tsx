@@ -62,6 +62,9 @@ type ClassroomState = {
       lesson?: number;
       lessonId?: string;
       lessonTitle?: string;
+      exerciseFile?: string;
+      exerciseIndex?: number;
+      exerciseNumber?: number;
     };
     strokes: Stroke[];
     drawingVersion: number;
@@ -153,6 +156,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
   const [canvasVersion, setCanvasVersion] = useState(0);
+  const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -170,6 +174,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
   };
   const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
+
+  useEffect(() => {
+    const receiveExercises = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "classroom_exercises") return;
+      setClassroomExercises(Array.isArray(event.data.items) ? event.data.items : []);
+    };
+    window.addEventListener("message", receiveExercises);
+    return () => window.removeEventListener("message", receiveExercises);
+  }, []);
 
   const send = (payload: unknown) => {
     if (socketRef.current?.readyState === WebSocket.OPEN)
@@ -409,7 +422,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}`;
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
 
   if (!room)
     return (
@@ -524,7 +537,16 @@ export const LiveClassroomModal: React.FC<Props> = ({
       </header>
       {isTeacher && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
-          <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
+          {isMathClassroom ? (
+            <div className="mb-2 flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/20 bg-[#091a36] p-2" aria-label="تمارين الموضوع المحدد">
+              {classroomExercises.length ? classroomExercises.map((exercise) => {
+                const active = currentContent.exerciseFile === exercise.file && Number(currentContent.exerciseIndex || 0) === exercise.questionIndex;
+                return <button key={`${exercise.file}-${exercise.questionIndex}`} title={exercise.title} onClick={() => send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: exercise.file, exerciseIndex: exercise.questionIndex, exerciseNumber: exercise.number } })} className={`shrink-0 rounded-2xl border px-4 py-2 font-black transition ${active ? "border-cyan-300 bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg" : "border-cyan-300/45 bg-slate-900 text-cyan-100"}`}>تمرين {exercise.number}</button>;
+              }) : <span className="px-3 py-2 font-bold text-cyan-200">جاري تحميل تمارين الموضوع…</span>}
+            </div>
+          ) : (
+            <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
+          )}
           <div className="flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
           <div className="relative shrink-0">
             <button onClick={() => setSpeakerMenu((value) => !value)} className="flex items-center gap-2 rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 px-3 py-2 font-black text-white"><Radio className="h-5 w-5"/>المتحدث</button>
