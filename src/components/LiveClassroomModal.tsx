@@ -152,6 +152,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [answerText, setAnswerText] = useState("");
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
+  const [canvasVersion, setCanvasVersion] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -230,13 +231,30 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.floor(rect.width * ratio));
+      const height = Math.max(1, Math.floor(rect.height * ratio));
+      if (canvas.width === width && canvas.height === height) return;
+      canvas.width = width;
+      canvas.height = height;
+      setCanvasVersion((value) => value + 1);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [room, classroom?.contentMode]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const ratio = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.scale(ratio, ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -258,7 +276,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       });
       ctx.stroke();
     });
-  }, [classroom?.drawingVersion, classroom?.strokes, draft, color, size, me]);
+  }, [classroom?.drawingVersion, classroom?.strokes, draft, canvasVersion, me]);
 
   async function connect(code: string) {
     const response = await fetch(`${API}/rooms/${code}/connect`, {
