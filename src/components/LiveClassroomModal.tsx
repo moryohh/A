@@ -168,6 +168,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
     lessonId: openLessonContext?.lessonId,
     lessonTitle,
   };
+  const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
+  const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
 
   const send = (payload: unknown) => {
     if (socketRef.current?.readyState === WebSocket.OPEN)
@@ -571,7 +573,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           >
             +5 دقائق
           </button>
-          <button
+          {!isMathClassroom && <button
             onClick={() =>
               send({
                 type: "classroom_control",
@@ -589,7 +591,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               <Presentation className="h-4 w-4" />
             )}
             {classroom?.contentMode === "board" ? "عرض الملزمة" : "عرض الصبورة"}
-          </button>
+          </button>}
           </div>
         </div>
       )}
