@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import katex from 'katex'
 import {
   Apple, ArrowRight, BookOpen, Calculator, ChevronLeft, Eraser, Heart,
-  HelpCircle, Home, Lightbulb, Music2, Palette, Pen, Redo2, Share2, Sparkles,
-  Trash2, Undo2, VolumeX, X
+  HelpCircle, Home, Lightbulb, Palette, Pen, Redo2, Share2, Sparkles,
+  Trash2, Undo2, X
 } from 'lucide-react'
 
 // Some converted lesson files contain JSON-escaped LaTeX twice (for example
@@ -153,19 +153,9 @@ function PracticeEquation({ step }) {
   return <div className="practice-equation" ref={hostRef} dir="ltr"><div className="practice-equation-content" ref={contentRef} style={{fontSize}}>{formulas.map((formula, index) => <div className="practice-equation-line" key={`${index}-${formula}`} dangerouslySetInnerHTML={{__html:renderFormula(formula)}} />)}</div></div>
 }
 
-function Header({ apples, hearts, onHome, onBack, musicMuted, onToggleMusic }) {
+function Header({ apples, hearts, onHome, onBack }) {
   return <header className="game-header">
     <div className="score"><span className="pill heart"><Heart size={17} fill="currentColor"/>{hearts}</span><span className="pill apple"><Apple size={17} fill="currentColor"/>{apples}</span></div>
-    <button
-      type="button"
-      className={`music-toggle ${musicMuted ? 'muted' : ''}`}
-      onClick={onToggleMusic}
-      aria-label={musicMuted ? 'تشغيل موسيقى الصبورة' : 'كتم موسيقى الصبورة'}
-      aria-pressed={musicMuted}
-      title={musicMuted ? 'تشغيل الموسيقى' : 'كتم الموسيقى'}
-    >
-      {musicMuted ? <VolumeX size={20}/> : <Music2 size={20}/>}
-    </button>
     <div className="header-left">{onBack&&<button className="header-back" onClick={onBack} aria-label="رجوع"><ArrowRight size={19}/></button>}<button className="icon-button" onClick={onHome}><Home size={18}/><span>الرئيسية</span></button></div>
   </header>
 }
@@ -385,50 +375,9 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = false }) {
+function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const boardRef=useRef(null)
-  const boardAudioRef=useRef(null)
-  const [boardThemeStarted,setBoardThemeStarted]=useState(false)
-  const startBoardTheme=()=>{
-    let player=boardAudioRef.current
-    if(!player){
-      player=new Audio(`${window.location.origin}/audio/game-session-theme.mp3`)
-      player.preload='auto'
-      player.loop=true
-      player.volume=0.5
-      boardAudioRef.current=player
-    }
-    player.volume=0.5
-    player.muted=musicMuted
-    setBoardThemeStarted(true)
-    if(musicMuted)return
-    void player.play().catch(()=>{
-      window.addEventListener('pointerdown',()=>void player.play().catch(()=>{}),{once:true,passive:true})
-    })
-  }
-  useEffect(()=>()=>{
-    const player=boardAudioRef.current
-    if(player){player.pause();player.currentTime=0}
-  },[])
-  useEffect(()=>{
-    const player=boardAudioRef.current
-    if(!player)return
-    player.muted=musicMuted
-    if(musicMuted)player.pause()
-    else if(boardThemeStarted)void player.play().catch(()=>{})
-  },[musicMuted,boardThemeStarted])
-  useEffect(()=>{
-    if(!boardThemeStarted||musicMuted)return
-    const board=boardRef.current,player=boardAudioRef.current
-    if(!board||!player)return
-    const observer=new IntersectionObserver(([entry])=>{
-      if(entry.isIntersecting){player.volume=0.5;void player.play().catch(()=>{})}
-      else player.pause()
-    },{threshold:0.15})
-    observer.observe(board)
-    return()=>observer.disconnect()
-  },[boardThemeStarted,activeId,musicMuted])
   useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
   useEffect(()=>{
     if(resetProgress){setAnswers({});return}
@@ -444,7 +393,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
   const inputById=id=>problem.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
-  const choose=value=>{if(value===choice.correct_value){startBoardTheme();setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
+  const choose=value=>{if(value===choice.correct_value){setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
   const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
@@ -462,7 +411,7 @@ export default function App(){
   const requestedSubject=String(params.get('subject')||'').toLowerCase()
   const requestedTopic=String(params.get('topicTitle')||'').trim()
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
-  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(false)
+  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
     const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('math')||requestedSubject.includes('رياض')?subjects.find(item=>item.id==='math'):requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
@@ -499,12 +448,12 @@ export default function App(){
     return()=>{cancelled=true}
   },[embeddedScience,params,requestedSubject])
   const home=()=>{setView('subjects');setSubject(null);setChapter(null);setTopic(null);setFile(null);setQuestionIndex(0)}
-  return <><Header {...{apples,hearts,musicMuted}} onToggleMusic={()=>setMusicMuted(value=>!value)} onHome={home} onBack={embeddedScience?()=>setView('topics'):undefined}/>
+  return <><Header {...{apples,hearts}} onHome={home} onBack={embeddedScience?()=>setView('topics'):undefined}/>
     {view==='loading'&&<main className="page"><div className="loading">جاري فتح تمارين الدرس المحدد…</div></main>}
     {view==='missing'&&<main className="page"><div className="loading">لا توجد تمارين مضافة لهذا الدرس حاليًا</div></main>}
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
     {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts,musicMuted}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
+    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
 }
