@@ -360,17 +360,20 @@ function InlineBoard({ onHint, onHelp, step, strokes, onStrokesChange, collapsed
   const [tool,setTool]=useState('pen'), [color,setColor]=useState('#111827'), [size,setSize]=useState(4)
   const [history,setHistory]=useState([]), [future,setFuture]=useState([])
   const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false)
+  const [locallyCollapsed,setLocallyCollapsed]=useState(Boolean(collapsed))
   const canvasRef=useRef(null)
+  useEffect(()=>setLocallyCollapsed(Boolean(collapsed)),[collapsed])
   const setStrokes=value=>onStrokesChange?.(value)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
+  const toggleBoard=()=>{const next=!locallyCollapsed;setLocallyCollapsed(next);onToggle?.(next)}
   return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
-      <button type="button" className="board-collapse" onPointerDown={event=>{event.preventDefault();event.stopPropagation();onToggle?.()}} aria-label={collapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={collapsed?'':'open'}/></button>
-      {!collapsed&&<><button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
+      <button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>
+      {!locallyCollapsed&&<><button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
       <button className="hint" onClick={hint}><Lightbulb/><span>تلميح</span></button>
       <button className="calc" onClick={()=>setCalculator(true)}><Calculator/><span>حاسبة</span></button></>}
     </div>
-    {!collapsed&&<><div className="inline-canvas"><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><PracticeEquation step={step}/>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>
+    {!locallyCollapsed&&<><div className="inline-canvas"><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><PracticeEquation step={step}/>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>
     {!readOnly&&<div className="inline-tools">
       <button className={tool==='pen'?'selected':''} onClick={()=>setTool('pen')}><Pen/>قلم</button>
       <button className={tool==='eraser'?'selected':''} onClick={()=>setTool('eraser')}><Eraser/>ممحاة</button>
