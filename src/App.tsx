@@ -1573,6 +1573,7 @@ function AppContent() {
             lessonTitle: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
           }}
           initialRoomCode={challengeRoomCode}
+          initialContentMode={challengeConfig?.contentMode || 'board'}
         />
       )}
       {isChallengeHubOpen && challengeConfig?.gameType !== 'live_classroom' && (
