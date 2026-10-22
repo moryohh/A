@@ -243,10 +243,10 @@ function Exercises({ topic, onBack, onOpen, embedded = false, classroom = false,
   useEffect(()=>{
     if(!classroom||!items.length)return
     window.parent.postMessage({type:'classroom_exercises',items:items.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
-    if(requestedFile){
-      const selected=items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex))
-      if(selected)onOpen(selected.file,selected.questionIndex)
-    }
+    const selected=requestedFile
+      ? items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex))
+      : items[0]
+    if(selected)onOpen(selected.file,selected.questionIndex)
   },[classroom,items,requestedFile,requestedIndex,onOpen])
   return <main className="page exercises-page">{!embedded&&<div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>}
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
@@ -453,7 +453,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
   const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
-  return <><div className="classroom-question-strip" aria-label="الأسئلة">{questions.map((_, index)=><button key={index} disabled={classroomRole==='student'} className={index===questionIndex?'active':''} onClick={()=>setQuestionIndex(index)}>{index+1}</button>)}</div><main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
+  return <>{!classroomRole&&<div className="classroom-question-strip" aria-label="الأسئلة">{questions.map((_, index)=><button key={index} className={index===questionIndex?'active':''} onClick={()=>setQuestionIndex(index)}>{index+1}</button>)}</div>}<main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
     <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div ref={i===activeIndex?currentStepRef:null} className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} onHint={boardHint} onHelp={help}/>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
