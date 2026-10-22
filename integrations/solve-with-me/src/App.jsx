@@ -230,14 +230,14 @@ async function loadBoardFile(file){
   return promise
 }
 
-function Exercises({ topic, onBack, onOpen, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0 }) {
+function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0 }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
     Promise.all(topic.files.map(async item => {
       const info=fileInfo(item), questions=await loadBoardFile(info.file)
       return questions.map((problem,index)=>({ ...info, problem, questionIndex:index }))
-    })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
+    })).then(groups=>{if(active){const next=groups.flat();setItems(next);onItems?.(next)}}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
   },[topic])
   useEffect(()=>{
@@ -384,7 +384,7 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '' }) {
+function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '' }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const currentStepRef=useRef(null)
   const boardAudioRef=useRef(null)
@@ -453,7 +453,8 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem.steps.indexOf(currentStep)
   const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
-  return <>{!classroomRole&&<div className="classroom-question-strip" aria-label="الأسئلة">{questions.map((_, index)=><button key={index} className={index===questionIndex?'active':''} onClick={()=>setQuestionIndex(index)}>{index+1}</button>)}</div>}<main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
+  const navigationItems=exerciseItems.length?exerciseItems:questions.map((item,index)=>({file,questionIndex:index,problem:item}))
+  return <><div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} disabled={classroomRole==='student'} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div><main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
     <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div ref={i===activeIndex?currentStepRef:null} className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}{i===activeIndex&&<InlineBoard key={step.step_id} step={step} onHint={boardHint} onHelp={help}/>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
@@ -469,7 +470,7 @@ export default function App(){
   const requestedExerciseIndex=Number(params.get('exerciseIndex')||0)
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
   const classroom=params.get('classroom')==='1', classroomRole=params.get('role')||''
-  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(true)
+  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[exerciseItems,setExerciseItems]=useState([]),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(true)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
     const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('math')||requestedSubject.includes('رياض')?subjects.find(item=>item.id==='math'):requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
@@ -512,6 +513,6 @@ export default function App(){
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts,musicMuted,classroomRole}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</div>
+    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='solver'&&<Solver {...{file,exerciseItems,apples,setApples,hearts,setHearts,musicMuted,classroomRole}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
 }
