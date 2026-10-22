@@ -107,15 +107,16 @@ jobs:
           source = json.loads(Path('cloudflare/online-challenge/wrangler.jsonc').read_text())
           source['main'] = str(Path.cwd() / 'cloudflare/online-challenge/src/worker.js')
           stable_preview = 'https://duha-challenge-preview.pages.dev'
+          branch_preview = 'https://preview-online-challenge.duha-challenge-preview.pages.dev'
           dynamic_preview = __import__('os').environ['PREVIEW_URL']
           legacy_previews = [
               'https://442b9c76.duha-challenge-preview.pages.dev',
               'https://8befce4f.duha-challenge-preview.pages.dev',
               'https://1c1ae7f7.duha-challenge-preview.pages.dev',
           ]
-          allowed_origins = ['https://a-1q1.pages.dev', stable_preview, dynamic_preview, *legacy_previews]
+          allowed_origins = ['https://a-1q1.pages.dev', stable_preview, branch_preview, dynamic_preview, *legacy_previews]
           source['vars']['ALLOWED_ORIGINS'] = ','.join(allowed_origins)
-          source['vars']['PREVIEW_GUEST_ORIGINS'] = ','.join([stable_preview, dynamic_preview, *legacy_previews])
+          source['vars']['PREVIEW_GUEST_ORIGINS'] = ','.join([stable_preview, branch_preview, dynamic_preview, *legacy_previews])
           source['vars']['ALLOW_PREVIEW_GUESTS'] = 'true'
           Path('/tmp/wrangler-preview.json').write_text(json.dumps(source))
           PY
