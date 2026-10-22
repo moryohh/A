@@ -649,7 +649,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               allow="fullscreen; clipboard-write"
             />
           )}
-          <canvas
+          {classroom?.contentMode === "booklet" && <canvas
             ref={canvasRef}
             className={`absolute inset-0 z-20 h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "pointer-events-none"}`}
             onPointerDown={(event) => {
@@ -677,7 +677,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 });
               setDraft([]);
             }}
-          />
+          />}
           {!isTeacher && classroom?.answersLocked && (
             <div className="pointer-events-none fixed inset-x-4 bottom-24 z-30 mx-auto max-w-sm rounded-3xl border border-cyan-200/70 bg-cyan-100/90 p-4 text-center text-cyan-950 shadow-[0_0_35px_rgba(125,211,252,.8)] backdrop-blur">
               <Snowflake className="mx-auto mb-1 animate-pulse" />
@@ -688,7 +688,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       </main>
       <footer className="border-t border-white/10 bg-slate-950 p-2">
         <div className="flex items-center gap-2">
-          {canDraw && (
+          {canDraw && classroom?.contentMode === "booklet" && (
             <>
               <PenLine className="h-4 w-4 text-cyan-300" />
               <input
