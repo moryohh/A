@@ -347,13 +347,13 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   </div>
 }
 
-function InlineBoard({ anchorRef, onHint, onHelp, step }) {
+function InlineBoard({ onHint, onHelp, step }) {
   const [tool,setTool]=useState('pen'), [color,setColor]=useState('#111827'), [size,setSize]=useState(4)
   const [strokes,setStrokes]=useState([]), [history,setHistory]=useState([]), [future,setFuture]=useState([])
   const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false)
   const canvasRef=useRef(null)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
-  return <section className="inline-board" ref={anchorRef} aria-label="السبورة">
+  return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
       <button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
       <button className="hint" onClick={hint}><Lightbulb/><span>تلميح</span></button>
@@ -377,7 +377,7 @@ function QuestionImages({ problem }) {
 
 function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts, resetProgress = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
-  const boardRef=useRef(null)
+  const currentStepRef=useRef(null)
   useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
   useEffect(()=>{
     if(resetProgress){setAnswers({});return}
@@ -389,7 +389,31 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const problem=questions[questionIndex]
   const currentStep=useMemo(()=>problem?.steps.find(s=>s.inputs.some(i=>!answers[i.id])) || problem?.steps.at(-1),[problem,answers])
   useEffect(()=>{setActiveId(currentStep?.inputs.find(i=>!answers[i.id])?.id||null)},[currentStep,answers])
-  useEffect(()=>{if(currentStep?.step_id)requestAnimationFrame(()=>boardRef.current?.scrollIntoView({behavior:'smooth',block:'center'}))},[currentStep?.step_id])
+  useEffect(()=>{
+    if(!currentStep?.step_id)return
+    let secondFrame
+    const firstFrame=requestAnimationFrame(()=>{
+      secondFrame=requestAnimationFrame(()=>{
+        const step=currentStepRef.current
+        if(!step)return
+        const controls=step.querySelector('.inline-board-actions')
+        const scroller=document.scrollingElement
+        const pageY=scroller?.scrollTop||window.scrollY||0
+        const stepTop=pageY+step.getBoundingClientRect().top
+        const controlsBottom=controls?pageY+controls.getBoundingClientRect().bottom:stepTop
+        const topLimit=62
+        const bottomLimit=12
+        // Keep the new step visible and never scroll farther than needed to
+        // reveal the calculator, hint and help row. The drawing canvas remains
+        // below the fold until the learner scrolls to it intentionally.
+        const showStepTop=Math.max(0,stepTop-topLimit)
+        const showControls=Math.max(0,controlsBottom-(window.innerHeight-bottomLimit))
+        const target=Math.max(showStepTop,showControls)
+        window.scrollTo({top:target,behavior:'smooth'})
+      })
+    })
+    return()=>{cancelAnimationFrame(firstFrame);cancelAnimationFrame(secondFrame)}
+  },[currentStep?.step_id,activeId])
   if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
   const inputById=id=>problem.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
@@ -400,7 +424,7 @@ function Solver({ file, initialQuestionIndex = 0, onBack, apples, setApples, hea
   const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
   return <main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
-    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<p><MathText>{step.explanation}</MathText></p>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} anchorRef={boardRef} onHint={boardHint} onHelp={help}/>}</div>})}</section>
+    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div ref={i===activeIndex?currentStepRef:null} className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<p><MathText>{step.explanation}</MathText></p>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} onHint={boardHint} onHelp={help}/>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
     <Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)}/>
   </main>
