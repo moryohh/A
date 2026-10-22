@@ -82,6 +82,18 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   assert.equal(data.get('game').players[1].handRaised, false);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'answers_locked', value: false }));
   assert.equal(data.get('game').answersLocked, false);
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'classroom_progress', progress: { step: 2, solved: 3, total: 7, answer: '42' } }));
+  assert.deepEqual(data.get('game').players[1].progress, { step: 2, solved: 3, total: 7, answer: '42' });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_presenter_state', state: { activeId: 'q1', scrollY: 240 } }));
+  assert.deepEqual(data.get('game').presenterState, { activeId: 'q1', scrollY: 240 });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'select_presenter', targetId: 'student-1' }));
+  assert.equal(data.get('game').presenterId, 'student-1');
+  assert.equal(data.get('game').players[1].drawAllowed, true);
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'classroom_presenter_state', state: { activeId: 'q2', scrollY: 310 } }));
+  assert.deepEqual(data.get('game').presenterState, { activeId: 'q2', scrollY: 310 });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'restore_presenter' }));
+  assert.equal(data.get('game').presenterId, 'teacher');
+  assert.equal(data.get('game').players[1].drawAllowed, false);
   assert.equal(room.view(data.get('game')).classroom.capacity, 50);
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });
