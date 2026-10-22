@@ -230,7 +230,7 @@ async function loadBoardFile(file){
   return promise
 }
 
-function Exercises({ topic, onBack, onOpen, embedded = false }) {
+function Exercises({ topic, onBack, onOpen, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0 }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
@@ -240,6 +240,14 @@ function Exercises({ topic, onBack, onOpen, embedded = false }) {
     })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
   },[topic])
+  useEffect(()=>{
+    if(!classroom||!items.length)return
+    window.parent.postMessage({type:'classroom_exercises',items:items.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
+    if(requestedFile){
+      const selected=items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex))
+      if(selected)onOpen(selected.file,selected.questionIndex)
+    }
+  },[classroom,items,requestedFile,requestedIndex,onOpen])
   return <main className="page exercises-page">{!embedded&&<div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>}
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
@@ -457,6 +465,8 @@ export default function App(){
   const params=useMemo(()=>new URLSearchParams(window.location.search),[])
   const requestedSubject=String(params.get('subject')||'').toLowerCase()
   const requestedTopic=String(params.get('topicTitle')||'').trim()
+  const requestedExerciseFile=String(params.get('exerciseFile')||'').trim()
+  const requestedExerciseIndex=Number(params.get('exerciseIndex')||0)
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
   const classroom=params.get('classroom')==='1', classroomRole=params.get('role')||''
   const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(true)
@@ -502,6 +512,6 @@ export default function App(){
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
     {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts,musicMuted,classroomRole}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</div>
 }
