@@ -365,7 +365,7 @@ function InlineBoard({ onHint, onHelp, step, strokes, onStrokesChange, collapsed
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
   return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
-      <button className="board-collapse" onClick={onToggle} aria-label={collapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={collapsed?'':'open'}/></button>
+      <button type="button" className="board-collapse" onPointerDown={event=>{event.preventDefault();event.stopPropagation();onToggle?.()}} aria-label={collapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={collapsed?'':'open'}/></button>
       {!collapsed&&<><button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
       <button className="hint" onClick={hint}><Lightbulb/><span>تلميح</span></button>
       <button className="calc" onClick={()=>setCalculator(true)}><Calculator/><span>حاسبة</span></button></>}
