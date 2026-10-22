@@ -7,6 +7,7 @@ import {
   LockKeyhole,
   Mic,
   MicOff,
+  Radio,
   PenLine,
   Presentation,
   Snowflake,
@@ -18,6 +19,7 @@ import { OpenLessonContext } from "../types";
 import { getSupabaseClient } from "../lib/supabase";
 import { loadGuestSession } from "../services/guestPreviewService";
 import { fetchLessonCurriculum } from "../services/curriculumService";
+import { getSubjectIndex } from "../services/lessonsService";
 import { LessonBookletView } from "./LessonBookletView";
 import type { LessonBookletData } from "../data/lessonBooklet";
 
@@ -25,7 +27,8 @@ const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
   /\/$/,
   "",
 );
-type Capacity = 1 | 5 | 10 | 50;
+const CAPACITIES = [2, 4, 8, 12, 20, 30, 50] as const;
+type Capacity = (typeof CAPACITIES)[number];
 type Point = { x: number; y: number };
 type Stroke = {
   id: string;
@@ -130,7 +133,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     (isScienceBoard(openLessonContext?.subjectId || category)
       ? "board"
       : "booklet");
-  const [capacity, setCapacity] = useState<Capacity>(5);
+  const [capacity, setCapacity] = useState<Capacity>(8);
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [room, setRoom] = useState("");
   const [entry, setEntry] = useState("");
@@ -147,6 +150,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [seconds, setSeconds] = useState(0);
   const [micOn, setMicOn] = useState(false);
   const [answerText, setAnswerText] = useState("");
+  const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
+  const [speakerMenu, setSpeakerMenu] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -212,6 +217,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
     currentContent.lesson,
     currentContent.lessonId,
   ]);
+  useEffect(() => {
+    if (!room || !isTeacher) return;
+    let cancelled = false;
+    getSubjectIndex(currentContent.subject || category, category).then((index) => {
+      const chapter = index.chapters.find((item) => item.chapterNumber === Number(currentContent.chapter));
+      if (!cancelled) setLessonChoices((chapter?.lessons || []).map((lesson) => ({ lessonId: lesson.lessonId, lessonNumber: lesson.lessonNumber, title: lesson.title })));
+    }).catch(() => { if (!cancelled) setLessonChoices([]); });
+    return () => { cancelled = true; };
+  }, [room, isTeacher, currentContent.subject, currentContent.chapter, category]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -375,7 +389,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}`;
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}`;
 
   if (!room)
     return (
@@ -402,16 +416,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </button>
           </div>
           <label className="mt-5 block text-xs font-black">عدد الطلاب</label>
-          <div className="mt-2 grid grid-cols-4 gap-2">
-            {([1, 5, 10, 50] as Capacity[]).map((value) => (
-              <button
-                key={value}
-                onClick={() => setCapacity(value)}
-                className={`rounded-xl border py-3 font-black ${capacity === value ? "border-cyan-300 bg-cyan-500 text-slate-950" : "border-white/15 bg-white/5"}`}
-              >
-                {value}
-              </button>
-            ))}
+          <div className="mt-2 rounded-2xl border border-cyan-300/20 bg-white/5 p-4">
+            <div className="mb-3 flex items-center justify-between"><span className="text-xs text-slate-300">اسحب لتحديد السعة</span><b className="rounded-xl bg-cyan-400 px-4 py-2 text-xl text-slate-950">{capacity} طالب</b></div>
+            <input aria-label="عدد الطلاب" type="range" min="0" max={CAPACITIES.length - 1} step="1" value={CAPACITIES.indexOf(capacity)} onChange={(event) => setCapacity(CAPACITIES[Number(event.target.value)])} className="w-full accent-cyan-400" />
+            <div className="mt-2 flex justify-between text-[10px] font-black text-slate-400" dir="ltr">{CAPACITIES.map((value) => <span key={value}>{value}</span>)}</div>
           </div>
           <label className="mt-4 block text-xs font-black">مدة الدرس</label>
           <select
@@ -467,11 +475,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
       className="fixed inset-0 z-[100] flex flex-col bg-[#071126] font-cairo text-white"
       dir="rtl"
     >
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950/95 p-2">
+      <header className="flex items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-3 py-2 shadow-lg">
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="rounded-xl bg-rose-500/20 p-2 text-rose-200"
+            className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,.35)]"
           >
             <X />
           </button>
@@ -487,21 +495,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 font-mono">
+          <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">
             <Clock3 className="h-4 w-4" />
             {timerText}
           </span>
-          <button
-            onClick={() => void toggleMic()}
-            disabled={!isTeacher && !self?.micAllowed}
-            className={`rounded-xl p-2.5 ${micOn ? "bg-emerald-500 text-slate-950" : "bg-white/10"} disabled:opacity-35`}
-          >
-            {micOn ? <Mic /> : <MicOff />}
-          </button>
+          {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
         </div>
       </header>
       {isTeacher && (
-        <div className="flex gap-2 overflow-x-auto border-b border-white/10 bg-slate-900/90 p-2 text-xs">
+        <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
+          <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
+          <div className="flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
+          <div className="relative shrink-0">
+            <button onClick={() => setSpeakerMenu((value) => !value)} className="flex items-center gap-2 rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 px-3 py-2 font-black text-white"><Radio className="h-5 w-5"/>المتحدث</button>
+            {speakerMenu && <div className="absolute right-0 top-12 z-50 min-w-56 rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl"><b className="block p-2 text-cyan-200">اختر طالباً ليتحدث</b>{state?.players.filter((player) => player.id !== me).map((player) => <button key={player.id} onClick={() => { send({ type: "classroom_control", action: "select_speaker", targetId: player.id }); setSpeakerMenu(false); }} className="flex w-full items-center justify-between rounded-xl p-2 text-right hover:bg-white/10"><span>{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</span>{player.micAllowed && <Mic className="h-4 w-4 text-emerald-300"/>}</button>)}</div>}
+          </div>
           <button
             onClick={() =>
               send({
@@ -523,14 +531,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 تجميد الإجابات
               </>
             )}
-          </button>
-          <button
-            onClick={() =>
-              send({ type: "classroom_control", action: "mute_all" })
-            }
-            className="shrink-0 rounded-xl bg-rose-500/15 px-3 py-2"
-          >
-            كتم الجميع
           </button>
           <button
             onClick={() =>
@@ -572,6 +572,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             )}
             {classroom?.contentMode === "board" ? "عرض الملزمة" : "عرض الصبورة"}
           </button>
+          </div>
         </div>
       )}
       <main className="relative min-h-0 flex-1 overflow-auto bg-slate-100 text-slate-900">

@@ -48,7 +48,7 @@ function validGameType(value) {
 }
 
 function classroomCapacity(value) {
-  return [1, 5, 10, 50].includes(Number(value)) ? Number(value) : 5;
+  return [2, 4, 8, 12, 20, 30, 50].includes(Number(value)) ? Number(value) : 8;
 }
 
 var BOT_ID = 'bot:duha-challenge';
@@ -612,6 +612,10 @@ export class ChallengeRoom {
         }
         if (action === 'draw_permission' && target && target.id !== liveGame.hostId) target.drawAllowed = Boolean(payload.value);
         if (action === 'mute_all') liveGame.players.forEach(function (player) { if (player.id !== liveGame.hostId) player.micAllowed = false; });
+        if (action === 'select_speaker' && target && target.id !== liveGame.hostId) {
+          liveGame.players.forEach(function (player) { if (player.id !== liveGame.hostId) player.micAllowed = player.id === target.id; });
+          target.handRaised = false;
+        }
         if (action === 'clear_drawing') { liveGame.strokes = []; liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1; }
         if (action === 'extend_time') liveGame.endsAt = Math.max(Date.now(), Number(liveGame.endsAt) || Date.now()) + Math.max(1, Math.min(60, Number(payload.minutes) || 5)) * 60000;
         if (action === 'change_content' && payload.content && typeof payload.content === 'object') {

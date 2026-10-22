@@ -20,6 +20,7 @@ html,body{overscroll-behavior-y:none}
 
 
 .question-images{display:grid;gap:12px;justify-items:center}.question-images img{display:block;max-width:100%;max-height:480px;object-fit:contain}
+.classroom-embedded{min-height:100dvh;padding-top:1px}.classroom-question-strip{position:sticky;top:0;z-index:60;display:flex;gap:8px;overflow-x:auto;padding:9px 12px;background:#eff6ffdd;backdrop-filter:blur(10px);border-bottom:1px solid #bae6fd}.classroom-question-strip:empty{display:none}.classroom-question-strip button{width:42px;height:42px;flex:none;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#334155;font-weight:900;box-shadow:0 3px 10px #0f172a12}.classroom-question-strip button.active{border-color:#22d3ee;background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;transform:translateY(-2px)}.classroom-question-strip button:disabled{cursor:default}.classroom-embedded .solver{margin-top:8px}.classroom-embedded .solver aside{display:none}
 
 
 /* Topic -> exercise navigation */
