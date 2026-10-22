@@ -178,11 +178,20 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     const receiveExercises = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.data?.type !== "classroom_exercises") return;
-      setClassroomExercises(Array.isArray(event.data.items) ? event.data.items : []);
+      const items = Array.isArray(event.data.items) ? event.data.items : [];
+      setClassroomExercises(items);
+      if (isTeacher && !currentContent.exerciseFile && items[0] && socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({
+          type: "classroom_control",
+          action: "change_content",
+          contentMode: "board",
+          content: { ...currentContent, exerciseFile: items[0].file, exerciseIndex: items[0].questionIndex, exerciseNumber: 1 },
+        }));
+      }
     };
     window.addEventListener("message", receiveExercises);
     return () => window.removeEventListener("message", receiveExercises);
-  }, []);
+  }, [isTeacher, currentContent]);
 
   const send = (payload: unknown) => {
     if (socketRef.current?.readyState === WebSocket.OPEN)
@@ -422,7 +431,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=exercise-direct-2&embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
 
   if (!room)
     return (
