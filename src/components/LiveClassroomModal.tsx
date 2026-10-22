@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Apple,
   BookOpen,
   Clock3,
-  Eraser,
   Hand,
   LockKeyhole,
   Mic,
@@ -560,9 +560,18 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isMathClassroom && (
             <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
           )}
-          <div className="flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
-          <div className="relative shrink-0">
-            <button onClick={() => setSpeakerMenu((value) => !value)} className="flex items-center gap-2 rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 px-3 py-2 font-black text-white"><Radio className="h-5 w-5"/>المتحدث</button>
+          <div className="grid grid-cols-3 gap-2 rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
+          <div className="relative min-w-0">
+            <button
+              onClick={() => setSpeakerMenu((value) => !value)}
+              className="group flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 via-sky-500 to-indigo-600 px-2 font-black text-white shadow-[0_8px_24px_rgba(14,165,233,.28)] transition active:scale-95"
+            >
+              <span className="relative grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner">
+                <span className="absolute inset-0 animate-ping rounded-full border border-white/45" />
+                <Radio className="relative h-5 w-5 drop-shadow" />
+              </span>
+              <span className="text-[11px] leading-none">المتحدث</span>
+            </button>
             {speakerMenu && <div className="absolute right-0 top-12 z-50 min-w-56 rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl"><b className="block p-2 text-cyan-200">اختر طالباً ليتحدث</b>{state?.players.filter((player) => player.id !== me).map((player) => <button key={player.id} onClick={() => { send({ type: "classroom_control", action: "select_speaker", targetId: player.id }); setSpeakerMenu(false); }} className="flex w-full items-center justify-between rounded-xl p-2 text-right hover:bg-white/10"><span>{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</span>{player.micAllowed && <Mic className="h-4 w-4 text-emerald-300"/>}</button>)}</div>}
           </div>
           <button
@@ -573,41 +582,26 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 value: !classroom?.answersLocked,
               })
             }
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-cyan-500/15 px-3 py-2"
+            className={`group flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border px-2 font-black shadow-lg transition active:scale-95 ${classroom?.answersLocked ? "border-sky-200/50 bg-gradient-to-br from-sky-400 to-blue-700" : "border-violet-200/45 bg-gradient-to-br from-violet-500 to-fuchsia-700"}`}
           >
             {classroom?.answersLocked ? (
               <>
-                <Snowflake />
-                فتح الإجابات
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner"><UnlockKeyhole className="h-5 w-5 animate-pulse" /></span>
+                <span className="text-[11px] leading-none">فتح الإجابات</span>
               </>
             ) : (
               <>
-                <LockKeyhole />
-                تجميد الإجابات
+                <span className="relative grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner"><Snowflake className="h-5 w-5 animate-spin [animation-duration:4s]" /><LockKeyhole className="absolute h-3 w-3" /></span>
+                <span className="text-[11px] leading-none">تجميد الإجابات</span>
               </>
             )}
           </button>
-          <button
-            onClick={() =>
-              send({ type: "classroom_control", action: "clear_drawing" })
-            }
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-2"
-          >
-            <Eraser className="h-4 w-4" />
-            مسح الرسم
-          </button>
-          <button
-            onClick={() =>
-              send({
-                type: "classroom_control",
-                action: "extend_time",
-                minutes: 5,
-              })
-            }
-            className="shrink-0 rounded-xl bg-white/10 px-3 py-2"
-          >
-            +5 دقائق
-          </button>
+          <div className="flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-emerald-200/35 bg-gradient-to-br from-emerald-400/25 to-teal-900/70 px-2 text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,.18)]">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-300/20 shadow-inner">
+              <Apple className="h-6 w-6 animate-bounce fill-emerald-300 text-emerald-100 [animation-duration:2s]" />
+            </span>
+            <span className="text-[11px] font-black leading-none"><b className="text-sm">100</b> تفاحة</span>
+          </div>
           {!isMathClassroom && <button
             onClick={() =>
               send({
