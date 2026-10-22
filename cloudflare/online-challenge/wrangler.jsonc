@@ -14,9 +14,9 @@
   ],
   "vars": {
     "SUPABASE_URL": "https://qlfleszoyujelygwzdgu.supabase.co",
-    "ALLOWED_ORIGINS": "https://a-1q1.pages.dev,https://duha-challenge-preview.pages.dev",
+    "ALLOWED_ORIGINS": "https://a-1q1.pages.dev,https://duha-challenge-preview.pages.dev,https://preview-online-challenge.duha-challenge-preview.pages.dev",
     "ALLOW_PREVIEW_GUESTS": "true",
-    "PREVIEW_GUEST_ORIGIN": "https://duha-challenge-preview.pages.dev",
+    "PREVIEW_GUEST_ORIGINS": "https://duha-challenge-preview.pages.dev,https://preview-online-challenge.duha-challenge-preview.pages.dev",
     "TEAM_MATCHMAKING_WAIT_MS": "5000"
   }
 }
