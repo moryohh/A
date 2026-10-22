@@ -44,7 +44,11 @@ function validQuestions(value) {
 }
 
 function validGameType(value) {
-  return ['millionaire', 'millionaire_team', 'true_false', 'gibha_sah'].includes(value);
+  return ['millionaire', 'millionaire_team', 'true_false', 'gibha_sah', 'live_classroom'].includes(value);
+}
+
+function classroomCapacity(value) {
+  return [1, 5, 10, 50].includes(Number(value)) ? Number(value) : 5;
 }
 
 var BOT_ID = 'bot:duha-challenge';
@@ -95,7 +99,7 @@ export default {
       var roomId = crypto.randomUUID();
       var registry = env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms'));
       var registration = await registry.fetch(new Request('https://registry/internal/register', {
-        method: 'POST', body: JSON.stringify({ roomId: roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType }),
+        method: 'POST', body: JSON.stringify({ roomId: roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity) }),
       }));
       if (!registration.ok) return json({ error: 'room_code_unavailable' }, 503, origin);
       var registrationBody = await registration.json();
@@ -104,7 +108,7 @@ export default {
         return { question: q.question, options: q.options, correctAnswer: q.correctAnswer };
       });
       var created = await stub.fetch(new Request('https://room/internal/init', {
-        method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: questions, roomCode: registrationBody.code }),
+        method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: questions, roomCode: registrationBody.code, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
       }));
       if (!created.ok) {
         await registry.fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: roomId }) }));
@@ -428,7 +432,7 @@ export class ChallengeRoom {
       gibhaRefillVersion: game.gameType === 'gibha_sah' ? game.gibhaRefillVersion || 0 : undefined,
       players: game.players.map(function (p) {
         var profile = p.profile || (this.isBot(p) ? game.botProfile : null);
-        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level };
+        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level, handRaised: Boolean(p.handRaised), micAllowed: Boolean(p.micAllowed), drawAllowed: Boolean(p.drawAllowed) };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length >= 2 && winner === null,
@@ -441,6 +445,19 @@ export class ChallengeRoom {
       discussionPhase: game.botDiscussionAt ? 'thinking' : game.botAnswerAt ? 'recommended' : null,
       questionDeadline: game.questionDeadline || null,
       lifelines: game.lifelines || null,
+      classroom: game.gameType === 'live_classroom' ? {
+        hostId: game.hostId,
+        capacity: game.capacity,
+        answersLocked: game.answersLocked !== false,
+        endsAt: game.endsAt,
+        contentMode: game.contentMode,
+        content: game.content || null,
+        drawingVersion: game.drawingVersion || 0,
+        strokes: game.strokes || [],
+        participants: game.players.map(function (player) {
+          return { id: player.id, handRaised: Boolean(player.handRaised), micAllowed: Boolean(player.micAllowed), drawAllowed: Boolean(player.drawAllowed) };
+        }),
+      } : undefined,
     };
   }
   async fetch(request) {
@@ -454,7 +471,8 @@ export class ChallengeRoom {
       var fourPlayerMode = teamMode || init.gameType === 'gibha_sah';
       var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
       var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var classroomMode = init.gameType === 'live_classroom';
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, handRaised: false }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -463,7 +481,7 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/ticket' && request.method === 'POST') {
       var ticketBody = await request.json();
       if (!ticketBody || typeof ticketBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
-      var maxPlayers = game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' ? 4 : 2;
+      var maxPlayers = game.gameType === 'live_classroom' ? classroomCapacity(game.capacity) + 1 : game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' ? 4 : 2;
       if (game.players.length >= maxPlayers && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
       var ticket = crypto.randomUUID();
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
@@ -476,6 +494,13 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/leave' && request.method === 'POST') {
       var leaveBody = await request.json().catch(function () { return null; });
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
+      if (game.gameType === 'live_classroom' && leaveBody.userId !== game.hostId) {
+        game.players = game.players.filter(function (player) { return player.id !== leaveBody.userId; });
+        await this.ctx.storage.put('game', game);
+        this.broadcast(this.view(game));
+        await this.updateRegistry('playing', game);
+        return json({ ok: true, closed: false }, 200, '');
+      }
       if (game.status === 'playing' && game.players.some(function (player) { return player.id === leaveBody.userId; }) && (game.players.length >= 2 || game.gameType === 'millionaire_team')) {
         await this.replacePlayerWithBot(game, leaveBody.userId);
         return json({ ok: true, botContinues: true }, 200, '');
@@ -499,15 +524,16 @@ export class ChallengeRoom {
       await this.ctx.storage.delete('ticket:' + ticketId);
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
+        var canJoinClassroom = game.gameType === 'live_classroom' && game.players.length < classroomCapacity(game.capacity) + 1 && game.status === 'playing';
         var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 4 && game.status === 'waiting';
         var canJoinGibha = game.gameType === 'gibha_sah' && game.players.length < 4 && game.status === 'waiting';
-        if (!canJoinTeam && !canJoinGibha && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
+        if (!canJoinClassroom && !canJoinTeam && !canJoinGibha && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
         var team = null;
         if (game.gameType === 'millionaire_team') {
           var humans = this.teamHumans(game).length;
           team = humans === 0 || humans === 1 ? 'A' : 'B';
         }
-        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null };
+        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null, micAllowed: false, drawAllowed: false, handRaised: false };
         game.players.push(joinedPlayer);
         this.assignCharacter(game, joinedPlayer);
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
@@ -556,6 +582,58 @@ export class ChallengeRoom {
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
     var liveGame = this.ctx.storage && typeof this.ctx.storage.get === 'function' ? await this.read() : null;
+    if (payload && sender && liveGame && liveGame.gameType === 'live_classroom') {
+      var senderPlayer = liveGame.players.find(function (player) { return player.id === sender.userId; });
+      var isTeacher = sender.userId === liveGame.hostId;
+      if (payload.type === 'raise_hand' && senderPlayer && !isTeacher) {
+        senderPlayer.handRaised = Boolean(payload.raised);
+      } else if (payload.type === 'classroom_answer' && senderPlayer && !isTeacher) {
+        if (liveGame.answersLocked) return;
+        this.broadcast({ type: 'classroom_answer', from: sender.userId, value: String(payload.value || '').slice(0, 500), sentAt: Date.now() });
+      } else if (payload.type === 'classroom_stroke' && senderPlayer && (isTeacher || senderPlayer.drawAllowed)) {
+        var stroke = payload.stroke;
+        if (!stroke || !Array.isArray(stroke.points) || stroke.points.length < 2 || stroke.points.length > 1200) return;
+        var normalized = {
+          id: String(stroke.id || crypto.randomUUID()).slice(0, 80),
+          owner: sender.userId,
+          color: typeof stroke.color === 'string' ? stroke.color.slice(0, 20) : '#facc15',
+          size: Math.max(1, Math.min(24, Number(stroke.size) || 4)),
+          points: stroke.points.map(function (point) { return { x: Math.max(0, Math.min(1, Number(point.x) || 0)), y: Math.max(0, Math.min(1, Number(point.y) || 0)) }; }),
+        };
+        liveGame.strokes = (liveGame.strokes || []).slice(-299).concat(normalized);
+        liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1;
+      } else if (payload.type === 'classroom_control' && isTeacher) {
+        var action = payload.action;
+        var target = liveGame.players.find(function (player) { return player.id === payload.targetId; });
+        if (action === 'answers_locked') liveGame.answersLocked = Boolean(payload.value);
+        if (action === 'mic_permission' && target && target.id !== liveGame.hostId) {
+          target.micAllowed = Boolean(payload.value);
+          if (target.micAllowed) target.handRaised = false;
+        }
+        if (action === 'draw_permission' && target && target.id !== liveGame.hostId) target.drawAllowed = Boolean(payload.value);
+        if (action === 'mute_all') liveGame.players.forEach(function (player) { if (player.id !== liveGame.hostId) player.micAllowed = false; });
+        if (action === 'clear_drawing') { liveGame.strokes = []; liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1; }
+        if (action === 'extend_time') liveGame.endsAt = Math.max(Date.now(), Number(liveGame.endsAt) || Date.now()) + Math.max(1, Math.min(60, Number(payload.minutes) || 5)) * 60000;
+        if (action === 'change_content' && payload.content && typeof payload.content === 'object') {
+          liveGame.contentMode = payload.contentMode === 'booklet' ? 'booklet' : 'board';
+          liveGame.content = payload.content;
+          liveGame.strokes = [];
+          liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1;
+        }
+      } else if (payload.type === 'audio_state') {
+        if (!isTeacher && !(senderPlayer && senderPlayer.micAllowed)) return;
+        this.broadcast({ type: 'audio_state', from: sender.userId, enabled: Boolean(payload.enabled) });
+        return;
+      } else if (payload.type === 'audio_signal') {
+        if (!isTeacher && !(senderPlayer && senderPlayer.micAllowed)) return;
+        this.broadcast({ type: 'audio_signal', from: sender.userId, targetId: payload.targetId || null, signal: payload.signal }, socket);
+        return;
+      } else return;
+      await this.ctx.storage.put('game', liveGame);
+      this.broadcast(this.view(liveGame));
+      await this.updateRegistry('playing', liveGame);
+      return;
+    }
     if (payload && payload.type === 'reaction' && sender && liveGame && liveGame.gameType === 'gibha_sah' && liveGame.status === 'playing') {
       var reactionKinds = ['clap', 'laugh', 'think', 'angry', 'rocket'];
       if (!reactionKinds.includes(payload.kind)) return;
@@ -931,7 +1009,7 @@ export class ChallengeRegistry {
         if (!rooms[candidate]) { code = candidate; break; }
       }
       if (!code) return json({ error: 'no_room_code' }, 503, '');
-      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, players: 1, status: 'waiting', createdAt: Date.now() };
+      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now() };
       await this.ctx.storage.put('rooms', rooms);
       return json({ code: code }, 201, '');
     }

@@ -55,6 +55,37 @@ test('room accepts the option counts used by true/false and card games', async (
   }
 });
 
+test('live classroom supports 50 students and teacher-controlled permissions', async () => {
+  const data = new Map();
+  const received = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'teacher' }), send: message => received.push(JSON.parse(message)) };
+  const studentSocket = { deserializeAttachment: () => ({ userId: 'student-1' }), send: message => received.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) },
+    getWebSockets: () => [hostSocket, studentSocket],
+  });
+  const response = await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({
+      hostId: 'teacher', gameType: 'live_classroom', roomCode: '5050', capacity: 50, durationMinutes: 45,
+      contentMode: 'booklet', content: { subject: 'physics', chapter: 1, lesson: 2 },
+      questions: [{ question: 'درس مباشر', options: ['شرح', 'متابعة'], correctAnswer: 0 }],
+    }),
+  }));
+  assert.equal(response.status, 200);
+  const game = data.get('game');
+  game.players.push({ id: 'student-1', score: 0, answer: null, handRaised: false, micAllowed: false, drawAllowed: false });
+  data.set('game', game);
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'raise_hand', raised: true }));
+  assert.equal(data.get('game').players[1].handRaised, true);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'mic_permission', targetId: 'student-1', value: true }));
+  assert.equal(data.get('game').players[1].micAllowed, true);
+  assert.equal(data.get('game').players[1].handRaised, false);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'answers_locked', value: false }));
+  assert.equal(data.get('game').answersLocked, false);
+  assert.equal(room.view(data.get('game')).classroom.capacity, 50);
+  assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
+});
+
 test('two players finish a match; duplicate answers and third player are rejected', async () => {
   const data = new Map();
   const messages = new Map([['host', []], ['guest', []]]);

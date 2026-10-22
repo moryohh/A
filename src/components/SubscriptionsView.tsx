@@ -33,10 +33,10 @@ import { fetchLessonGamesData } from '../services/gamesService';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 
 const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
-type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
+type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah' | 'live_classroom';
 type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
-type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
@@ -197,7 +197,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
           ? config.questions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
           : config.questions.map((item: any) => ({ question: item.question, options: config.cards.map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
       if (questions.length < 1) throw new Error('لا توجد أسئلة لهذا الدرس. اختر مادة أو فصلاً آخر.');
-      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: selectedLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number });
+      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: selectedLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'live_classroom' ? 'الفصل التعليمي المباشر' : challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number });
       setChallengeMessage('');
     } catch (error) { setChallengeMessage(error instanceof Error ? error.message : 'تعذر تجهيز الغرفة.'); }
     finally { setChallengeBusy(false); }
@@ -303,7 +303,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             </label>
             <label className="relative flex items-center overflow-hidden rounded-2xl border border-violet-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-400/20">
               <Gamepad2 className="mr-3 h-5 w-5 shrink-0 text-violet-300" />
-              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame | '')} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">كل الألعاب / اختر للإنشاء</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
+              <select value={challengeGame} onChange={(event) => setChallengeGame(event.target.value as ChallengeGame | '')} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">كل الألعاب / اختر للإنشاء</option><option value="live_classroom">الفصل التعليمي المباشر</option><option value="true_false">صواب أم خطأ</option><option value="millionaire">من سيربح المليون</option><option value="gibha_sah">جبتها صح</option></select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
             </label>
             <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">

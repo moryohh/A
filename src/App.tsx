@@ -42,6 +42,7 @@ import { MainHomeView } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { OnlineChallengeModal } from './components/OnlineChallengeModal';
+import { LiveClassroomModal } from './components/LiveClassroomModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
@@ -1557,7 +1558,24 @@ function AppContent() {
         </React.Suspense>
       </GamesLoadBoundary>
 
-      {isChallengeHubOpen && (
+      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && (
+        <LiveClassroomModal
+          onClose={() => setIsChallengeHubOpen(false)}
+          lessonTitle={challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر'}
+          category={challengeConfig?.subject || 'المادة التعليمية'}
+          openLessonContext={{
+            subjectId: challengeConfig?.subject || 'biology',
+            chapterNumber: challengeConfig?.chapterNumber || 1,
+            lessonNumber: challengeConfig?.lessonNumber || 1,
+            lessonId: `lesson-${challengeConfig?.lessonNumber || 1}`,
+            lessonKey: `${challengeConfig?.subject || 'biology'}-ch${challengeConfig?.chapterNumber || 1}-les${challengeConfig?.lessonNumber || 1}`,
+            title: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
+            lessonTitle: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
+          }}
+          initialRoomCode={challengeRoomCode}
+        />
+      )}
+      {isChallengeHubOpen && challengeConfig?.gameType !== 'live_classroom' && (
         <OnlineChallengeModal
           onClose={() => setIsChallengeHubOpen(false)}
           questions={challengeConfig?.questions || []}

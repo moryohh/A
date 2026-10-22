@@ -30,6 +30,7 @@ import { useAppTheme } from '../services/themeService';
 import { ScientificText } from './ScientificText';
 import { ClappingCelebration } from './ClappingCelebration';
 import { OnlineChallengeGameType, OnlineChallengeModal, OnlineChallengeQuestion } from './OnlineChallengeModal';
+import { LiveClassroomModal } from './LiveClassroomModal';
 
 interface LessonGamesModalProps {
   isOpen: boolean;
@@ -69,9 +70,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   playerId,
 }) => {
   const { theme } = useAppTheme();
-  // Mode: 'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
+  // Mode: games, online challenges, or the teacher-led live classroom.
   const [activeGameMode, setActiveGameMode] = useState<
-    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online'
+    'menu' | 'millionaire' | 'true_false' | 'gibha_sah' | 'daily_exam' | 'quick' | 'online' | 'live_classroom'
   >('menu');
   const [onlineGameType, setOnlineGameType] = useState<OnlineChallengeGameType>('millionaire');
   const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>([]);
@@ -280,6 +281,13 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     lessonNumber={openLessonContext?.lessonNumber || 1}
   />;
 
+  if (activeGameMode === 'live_classroom') return <LiveClassroomModal
+    onClose={() => setActiveGameMode('menu')}
+    lessonTitle={openLessonContext?.lessonTitle || lessonTitle}
+    category={openLessonContext?.subjectId || category}
+    openLessonContext={openLessonContext}
+  />;
+
   // Render Millionaire Modal (MCQ)
   if (activeGameMode === 'millionaire') {
     return (
@@ -414,6 +422,16 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
           {/* MENU MODE */}
           {activeGameMode === 'menu' && (
             <div className="space-y-3 animate-in fade-in" dir="rtl">
+              <button
+                type="button"
+                onClick={() => setActiveGameMode('live_classroom')}
+                disabled={!import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
+                className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border-2 border-cyan-300/50 bg-gradient-to-l from-cyan-950 via-blue-950 to-indigo-950 p-4 text-right shadow-[0_0_24px_rgba(34,211,238,.18)] transition active:scale-[.99] disabled:opacity-40"
+              >
+                <span className="absolute -left-5 -top-8 h-24 w-24 rounded-full bg-cyan-400/15 blur-2xl" />
+                <span><b className="block text-sm text-cyan-100">الفصل التعليمي المباشر</b><small className="mt-1 block text-[10px] leading-5 text-cyan-200/75">صبورة أو ملزمة مباشرة · حتى 50 طالبًا · رفع يد وصلاحيات مايك ورسم</small></span>
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-cyan-300/40 bg-cyan-400/15 text-cyan-200"><Users className="h-6 w-6"/></span>
+              </button>
               {isLoadingBundle ? (
                 <div className="flex items-center gap-2.5 bg-sky-500/10 border border-sky-500/30 px-3.5 py-2 rounded-xl text-xs text-sky-300 animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin text-sky-400 shrink-0" />
