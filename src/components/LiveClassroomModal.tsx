@@ -177,7 +177,18 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   useEffect(() => {
     const receiveExercises = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "classroom_exercises") return;
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "classroom_select_exercise" && isTeacher) {
+        const item = event.data.item;
+        if (item?.file && socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({
+          type: "classroom_control",
+          action: "change_content",
+          contentMode: "board",
+          content: { ...currentContent, exerciseFile: item.file, exerciseIndex: Number(item.questionIndex || 0), exerciseNumber: Number(item.number || 1) },
+        }));
+        return;
+      }
+      if (event.data?.type !== "classroom_exercises") return;
       const items = Array.isArray(event.data.items) ? event.data.items : [];
       setClassroomExercises(items);
       if (isTeacher && !currentContent.exerciseFile && items[0] && socketRef.current?.readyState === WebSocket.OPEN) {
@@ -546,16 +557,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       </header>
       {isTeacher && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
-          {isMathClassroom ? (
-            <div className="mb-2 flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/20 bg-[#091a36] p-2" aria-label="تمارين الموضوع المحدد">
-              {classroomExercises.length ? classroomExercises.map((exercise) => {
-                const active = currentContent.exerciseFile
-                  ? currentContent.exerciseFile === exercise.file && Number(currentContent.exerciseIndex || 0) === exercise.questionIndex
-                  : exercise.number === 1;
-                return <button key={`${exercise.file}-${exercise.questionIndex}`} title={exercise.title} onClick={() => send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: exercise.file, exerciseIndex: exercise.questionIndex, exerciseNumber: exercise.number } })} className={`shrink-0 rounded-2xl border px-4 py-2 font-black transition ${active ? "border-cyan-300 bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg" : "border-cyan-300/45 bg-slate-900 text-cyan-100"}`}>تمرين {exercise.number}</button>;
-              }) : <span className="px-3 py-2 font-bold text-cyan-200">جاري تحميل تمارين الموضوع…</span>}
-            </div>
-          ) : (
+          {!isMathClassroom && (
             <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
           )}
           <div className="flex gap-2 overflow-x-auto rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
