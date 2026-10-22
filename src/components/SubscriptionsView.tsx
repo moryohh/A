@@ -196,7 +196,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
         : challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
-        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس رياضيات أونلاين' : 'الملزمة — درس رياضيات أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
+        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — درس أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
         setChallengeMessage('');
         return;
       }
@@ -312,9 +312,9 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none disabled:opacity-45"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-blue-200" />
             </label>
-            {challengeSubject === 'mathematics' && challengeChapter && (
+            {['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && challengeChapter && (
               <div className="rounded-2xl border border-cyan-300/30 bg-slate-950/45 p-2.5">
-                <p className="mb-2 text-center text-[11px] font-black text-cyan-100">درس الرياضيات الأونلاين</p>
+                <p className="mb-2 text-center text-[11px] font-black text-cyan-100">درس {selectedChallengeSubject?.name || 'المادة'} الأونلاين</p>
                 <label className="mb-2 flex items-center overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
                   <GraduationCap className="mr-2 h-4 w-4 shrink-0 text-cyan-300" />
                   <select value={classroomLessonId} onChange={(event) => setClassroomLessonId(event.target.value)} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold text-white outline-none">
@@ -322,17 +322,17 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                   </select>
                   <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-cyan-200" />
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={`grid gap-2 ${challengeSubject === 'mathematics' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <button type="button" onClick={() => { setClassroomContentMode('board'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'board' ? 'border-sky-200 bg-sky-400/30 ring-2 ring-sky-300/30' : 'border-sky-300/35 bg-sky-500/10'}`}>
                     <MonitorCheck className="mb-2 h-8 w-8 text-sky-200" />
                     <b className="text-sm text-white">حل معي</b>
                     <small className="mt-1 text-[9px] text-sky-100/70">صبورة تفاعلية مباشرة</small>
                   </button>
-                  <button type="button" onClick={() => { setClassroomContentMode('booklet'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'booklet' ? 'border-emerald-200 bg-emerald-400/30 ring-2 ring-emerald-300/30' : 'border-emerald-300/35 bg-emerald-500/10'}`}>
+                  {challengeSubject !== 'mathematics' && <button type="button" onClick={() => { setClassroomContentMode('booklet'); setChallengeGame('live_classroom'); }} className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border p-3 transition active:scale-95 ${challengeGame === 'live_classroom' && classroomContentMode === 'booklet' ? 'border-emerald-200 bg-emerald-400/30 ring-2 ring-emerald-300/30' : 'border-emerald-300/35 bg-emerald-500/10'}`}>
                     <BookOpen className="mb-2 h-8 w-8 text-emerald-200" />
                     <b className="text-sm text-white">الملزمة</b>
                     <small className="mt-1 text-[9px] text-emerald-100/70">شرح الملزمة مباشرة</small>
-                  </button>
+                  </button>}
                 </div>
               </div>
             )}
@@ -344,7 +344,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">
               <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
               <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
-              {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? 'ابدأ درس الرياضيات الأونلاين' : 'أنشئ غرفة من درس عشوائي'}
+              {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? 'ابدأ الدرس الأونلاين' : 'أنشئ غرفة من درس عشوائي'}
             </button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
           </div>

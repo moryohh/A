@@ -476,7 +476,7 @@ export default function App(){
       const isMath=selected.id==='math'
       const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').split(/[^\u0600-\u06ff\w]+/).filter(token=>token.length>2&&!['ال','الفصل','استخدام','باستخدام','شرح','معادلة','محاضرة'].includes(token))
       const requestedTokens=new Set(topicTokens(requestedTopic))
-      const titleMatchedTopic=isMath&&requestedTokens.size
+      const titleMatchedTopic=requestedTokens.size
         ? matched.topics.map(t=>{
             const tokens=topicTokens(t.name)
             const score=tokens.filter(token=>requestedTokens.has(token)).length

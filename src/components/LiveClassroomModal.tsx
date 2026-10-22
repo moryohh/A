@@ -407,7 +407,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}`;
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&classroom=1&role=${isTeacher ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}`;
 
   if (!room)
     return (

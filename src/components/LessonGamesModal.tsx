@@ -140,6 +140,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   const canOpenDailyExam = canLoadGame && hasDailyExam;
   const subjectKey = `${openLessonContext?.subjectId || ""} ${category}`.toLowerCase();
   const isMathLesson = subjectKey.includes("math") || subjectKey.includes("رياض");
+  const isPhysicsLesson = subjectKey.includes("phys") || subjectKey.includes("فيز");
+  const isChemistryLesson = subjectKey.includes("chem") || subjectKey.includes("كيمي");
+  const supportsLiveLesson = isMathLesson || isPhysicsLesson || isChemistryLesson;
 
   const lessonRewardIdentity = [
     playerId || "anonymous",
@@ -529,7 +532,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
           {/* MENU MODE */}
           {activeGameMode === "menu" && (
             <div className="space-y-3 animate-in fade-in" dir="rtl">
-              {isMathLesson && (
+              {supportsLiveLesson && (
                 <section className="relative overflow-hidden rounded-3xl border-2 border-cyan-300/50 bg-gradient-to-l from-cyan-950 via-blue-950 to-indigo-950 p-3 shadow-[0_0_24px_rgba(34,211,238,.18)]">
                   <span className="absolute -left-5 -top-8 h-24 w-24 rounded-full bg-cyan-400/15 blur-2xl" />
                   <div className="relative mb-3 flex items-center gap-2">
@@ -541,12 +544,12 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         قسم الدرس الأونلاين
                       </b>
                       <small className="text-[10px] text-cyan-200/75">
-                        اختر حل معي أو الملزمة لبدء درس رياضيات مباشر
+                        {isMathLesson ? "ابدأ صبورة حل معي المباشرة" : "اختر حل معي أو الملزمة لبدء درس مباشر"}
                       </small>
                     </div>
                   </div>
-                  <div className="relative grid grid-cols-2 gap-2">
-                    <button
+                  <div className={`relative grid gap-2 ${isMathLesson ? "grid-cols-1" : "grid-cols-2"}`}>
+                    {!isMathLesson && <button
                       type="button"
                       onClick={() => {
                         setLiveClassroomMode("board");
@@ -560,7 +563,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       <small className="mt-1 text-[9px] text-sky-100/75">
                         صبورة تفاعلية أونلاين
                       </small>
-                    </button>
+                    </button>}
                     <button
                       type="button"
                       onClick={() => {
