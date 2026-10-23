@@ -30,6 +30,7 @@ export default defineConfig(() => {
           start_url: appBase,
           scope: appBase,
           display: 'standalone',
+          orientation: 'landscape',
           theme_color: '#050505',
           background_color: '#050505',
           icons: [
