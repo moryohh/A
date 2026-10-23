@@ -33,7 +33,7 @@ html,body{overscroll-behavior-y:none}
 .classroom-embedded .classroom-question-strip{height:61px;position:relative;flex:none}
 .classroom-landscape-board{
   width:100%;
-  height:calc(100dvh - 61px);
+  height:100dvh;
   min-width:860px;
   display:grid;
   grid-template-columns:minmax(520px,1fr) minmax(310px,38%);
@@ -57,6 +57,12 @@ html,body{overscroll-behavior-y:none}
 }
 .classroom-drawing-pane .inline-canvas{height:auto;min-height:0;flex:1}
 .classroom-drawing-pane .inline-tools{flex:none}
+.classroom-drawing-pane .inline-board-title{height:44px;min-height:44px;justify-content:flex-start;padding:5px 8px}
+.board-tool-menu{position:relative;z-index:24}
+.inline-board-actions .board-tool-menu-button{width:34px;min-width:34px;height:34px;padding:0;border:1px solid #38bdf866;border-radius:10px;background:#172554;color:#e0f2fe;display:grid;place-items:center}
+.inline-board-actions .board-tool-menu-button svg{width:18px;height:18px}
+.board-tool-menu-popover{position:absolute;top:40px;left:0;z-index:80;width:140px;padding:7px;display:grid;gap:6px;border:1px solid #38bdf877;border-radius:14px;background:#0f172af5;box-shadow:0 14px 32px #02061766}
+.inline-board-actions .board-tool-menu-popover button{width:100%;height:36px;padding:0 10px;justify-content:flex-start;border-radius:9px;font-size:12px}
 .classroom-questions-pane{
   height:100%;
   padding:10px;
@@ -68,7 +74,7 @@ html,body{overscroll-behavior-y:none}
   box-shadow:0 12px 34px #0f172a18;
 }
 .classroom-questions-pane .problem-card{position:sticky;top:0;z-index:5;margin-bottom:9px;border-color:#bae6fd;background:#fff}
-.classroom-questions-pane .problem-card h1{margin:2px 0;font-size:18px;line-height:1.55}
+.classroom-questions-pane .problem-card h1{margin:2px 0;font-size:14px;line-height:1.45}
 .classroom-steps-list{display:grid;gap:7px}
 .classroom-questions-pane .solution-step{margin:0;padding:10px;border-radius:14px;box-shadow:none}
 .classroom-questions-pane .solution-step.active-step{border:2px solid #38bdf8;background:#f0f9ff;box-shadow:0 6px 18px #0284c729}
