@@ -436,11 +436,9 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
   const activeIndex=problem?problem.steps.indexOf(currentStep):0
-  // A live lesson is a teacher-led presentation, so hiding every future step
-  // makes a complete exercise look as if it contains only one step. Keep the
-  // progressive flow offline, but expose the complete solution outline to
-  // everyone in the classroom. Future blanks remain locked until their turn.
-  const displayedSteps=problem?(classroomRole?problem.steps:problem.steps.slice(0,activeIndex+1)):[]
+  // Never reveal an unsolved future step. The current step appears only when
+  // the learner reaches it; completed steps remain as a compact text solution.
+  const displayedSteps=problem?problem.steps.slice(0,activeIndex+1):[]
   // The classroom uses one working board for the active step. Once that step
   // is solved it becomes a compact textual solution, and the same workspace
   // moves to the next step instead of creating a board history for every step.
