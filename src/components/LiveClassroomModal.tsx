@@ -180,12 +180,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [answerText, setAnswerText] = useState("");
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
+  const [exerciseMenu, setExerciseMenu] = useState(false);
   const [canvasVersion, setCanvasVersion] = useState(0);
   const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -473,6 +475,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (room) void enterClassroomLandscape();
   }, [room]);
 
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!exerciseMenuRef.current?.contains(event.target as Node))
+        setExerciseMenu(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+
   const closeClassroom = () => {
     try {
       (screen.orientation as LockableScreenOrientation).unlock?.();
@@ -511,6 +522,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const isBoardPresenter = Boolean(isTeacher || classroom?.presenterId === me);
+  const selectClassroomExercise = (item: { file: string; questionIndex: number; number: number }) => {
+    send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: item.file, exerciseIndex: item.questionIndex, exerciseNumber: item.number } });
+    setExerciseMenu(false);
+  };
   const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
 
   if (!room)
@@ -616,6 +631,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </small>
           </div>
         </div>
+        {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+          <div className="relative" ref={exerciseMenuRef}>
+            <div className="flex items-center gap-1">{classroomExercises.slice(0,2).map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`grid h-9 min-w-9 place-items-center rounded-xl border px-2 text-xs font-black ${currentContent.exerciseFile===item.file&&Number(currentContent.exerciseIndex||0)===Number(item.questionIndex)?"border-cyan-200 bg-gradient-to-br from-cyan-400 to-indigo-500 text-white":"border-white/15 bg-white/10 text-cyan-50"}`}>{index+1}</button>)}{classroomExercises.length>2&&<button onClick={()=>setExerciseMenu(value=>!value)} className="grid h-9 min-w-9 place-items-center rounded-xl border border-cyan-300/35 bg-white/10 text-lg font-black" aria-label="عرض بقية التمارين">+</button>}</div>
+            {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-28 -translate-x-1/2 gap-1.5 overflow-y-auto rounded-2xl border border-cyan-300/30 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.slice(2).map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black hover:bg-cyan-500">{index+3}</button>)}</div>}
+          </div>
+          <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
+          <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`grid h-9 w-9 place-items-center rounded-xl border ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"فتح الإجابات":"تجميد الإجابات"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}</button>
+          <span className="flex h-9 items-center gap-1 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-2 text-[11px] font-black text-emerald-100"><Apple className="h-4 w-4 fill-emerald-300"/>100</span>
+        </div>}
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">
             <Clock3 className="h-4 w-4" />
@@ -624,7 +648,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
         </div>
       </header>
-      {isTeacher && (
+      {isTeacher && isMathClassroom && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
+        <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
+        {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
+        <div className="space-y-2">{state?.players.filter(player=>player.id!==me).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}</small></div></div>{player.lastAnswer&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {player.lastAnswer}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح":"تجميد"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>شرح</button></div></div>)}</div>
+      </div>}
+      {isTeacher && !isMathClassroom && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
           {!isMathClassroom && (
             <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
@@ -706,7 +735,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </div>
       )}
       <main className="relative min-h-0 flex-1 overflow-auto bg-slate-100 text-slate-900">
-        <div className="relative mx-auto min-h-full max-w-5xl">
+        <div className="relative mx-auto h-full min-h-0 w-full">
           {classroom?.contentMode === "booklet" ? (
             <div className="p-3">
               <LessonBookletView
@@ -727,7 +756,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 );
               }}
               title="الصبورة المباشرة"
-              className="h-[calc(100dvh-8rem)] min-h-[560px] w-full border-0 bg-white"
+              className="h-full min-h-0 w-full border-0 bg-white"
               allow="fullscreen; clipboard-write"
             />
           )}
