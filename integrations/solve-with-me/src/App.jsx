@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import katex from 'katex'
+import classroomAssistant from './assets/classroom-assistant-v1.png'
 import {
   Apple, ArrowRight, BookOpen, Calculator, ChevronDown, ChevronLeft, Eraser, Heart,
   HelpCircle, Home, Lightbulb, Music2, Palette, Pen, Redo2, Share2, Sparkles,
@@ -411,6 +412,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   const boardAudioRef=useRef(null)
   const [boardThemeStarted,setBoardThemeStarted]=useState(false)
   const [explanationExpanded,setExplanationExpanded]=useState(false)
+  const [assistantOpen,setAssistantOpen]=useState(true)
   const [collapsedSteps,setCollapsedSteps]=useState({})
   const [collapsedBoards,setCollapsedBoards]=useState({})
   const [boardStrokes,setBoardStrokes]=useState({})
@@ -442,7 +444,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   },[answers,file,questionIndex,questions.length,resetProgress])
   const problem=questions[questionIndex]
   const currentStep=useMemo(()=>problem?.steps.find(s=>s.inputs.some(i=>!answers[i.id])) || problem?.steps.at(-1),[problem,answers])
-  useEffect(()=>setExplanationExpanded(false),[currentStep?.step_id])
+  useEffect(()=>{setExplanationExpanded(false);setAssistantOpen(true)},[currentStep?.step_id])
   useEffect(()=>{setActiveId(currentStep?.inputs.find(i=>!answers[i.id])?.id||null)},[currentStep,answers])
   // A completed blank must never move the learner's screen automatically.
   // In a live class the teacher controls the shared viewport explicitly.
@@ -523,10 +525,19 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
       <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
         <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
+        <aside className={`classroom-assistant ${assistantOpen?'is-open':'is-resting'}`} aria-label="المساعد التوضيحي">
+          {assistantOpen&&<div className="assistant-explanation" onClick={()=>setAssistantOpen(false)}>
+            <button type="button" className="assistant-close" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}} aria-label="إخفاء المساعد"><X size={16}/></button>
+            <div className="assistant-explanation-head"><b>{workingStep.title}</b><small>الخطوة {activeIndex+1} من {problem.steps.length}</small></div>
+            <MathText>{explanation}</MathText>
+          </div>}
+          <button type="button" className="assistant-character" onClick={()=>setAssistantOpen(value=>!value)} aria-label={assistantOpen?'تصغير المساعد':'إظهار التوضيح'} aria-expanded={assistantOpen}>
+            <img src={classroomAssistant} alt="مساعد تعليمي يشير إلى التوضيح" draggable="false"/>
+          </button>
+        </aside>
       </section>
       <section ref={questionsPaneRef} className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
         <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
-        <div ref={currentStepRef} className={`classroom-explanation-card ${explanationExpanded?'expanded':'collapsed'}`}><div className="classroom-explanation-head"><b>{workingStep.title}</b><small>من {problem.steps.length}</small></div><div className="classroom-explanation-text"><MathText>{explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>
         {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}
       </section>
     </main><Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'}/></>
