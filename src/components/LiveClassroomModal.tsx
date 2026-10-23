@@ -4,6 +4,7 @@ import {
   BookOpen,
   Clock3,
   Hand,
+  Grid2X2,
   LockKeyhole,
   Mic,
   MicOff,
@@ -532,6 +533,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     setExerciseMenu(false);
   };
   const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
 
   if (!room)
     return (
@@ -638,8 +640,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </div>
         {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div className="relative" ref={exerciseMenuRef}>
-            <div className="flex items-center gap-1">{classroomExercises.slice(0,2).map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`grid h-9 min-w-9 place-items-center rounded-xl border px-2 text-xs font-black ${currentContent.exerciseFile===item.file&&Number(currentContent.exerciseIndex||0)===Number(item.questionIndex)?"border-cyan-200 bg-gradient-to-br from-cyan-400 to-indigo-500 text-white":"border-white/15 bg-white/10 text-cyan-50"}`}>{index+1}</button>)}{classroomExercises.length>2&&<button onClick={()=>setExerciseMenu(value=>!value)} className="grid h-9 min-w-9 place-items-center rounded-xl border border-cyan-300/35 bg-white/10 text-lg font-black" aria-label="عرض بقية التمارين">+</button>}</div>
-            {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-28 -translate-x-1/2 gap-1.5 overflow-y-auto rounded-2xl border border-cyan-300/30 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.slice(2).map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black hover:bg-cyan-500">{index+3}</button>)}</div>}
+            <button onClick={()=>setExerciseMenu(value=>!value)} className="flex h-9 items-center gap-1.5 rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-400/30 to-teal-700/60 px-3 text-xs font-black text-white shadow-lg" aria-label="عرض قائمة التمارين"><Grid2X2 className="h-4 w-4"/><span>التمارين {classroomExercises.length?activeExercisePosition+1:0}/{classroomExercises.length}</span></button>
+            {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-48 -translate-x-1/2 grid-cols-4 gap-1.5 overflow-y-auto rounded-2xl border border-emerald-300/35 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`rounded-xl px-2 py-2 text-xs font-black ${index===activeExercisePosition?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-emerald-600"}`}>{index+1}</button>)}</div>}
           </div>
           <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
           <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`grid h-9 w-9 place-items-center rounded-xl border ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"فتح الإجابات":"تجميد الإجابات"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}</button>
