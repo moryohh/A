@@ -440,7 +440,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   // makes a complete exercise look as if it contains only one step. Keep the
   // progressive flow offline, but expose the complete solution outline to
   // everyone in the classroom. Future blanks remain locked until their turn.
-  const displayedSteps=classroomRole?problem.steps:problem.steps.slice(0,activeIndex+1)
+  const displayedSteps=problem?(classroomRole?problem.steps:problem.steps.slice(0,activeIndex+1)):[]
   const allInputs=problem?problem.steps.flatMap(s=>s.inputs):[], solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
   useEffect(()=>{
     if(!classroomRole)return
