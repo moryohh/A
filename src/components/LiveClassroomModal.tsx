@@ -204,6 +204,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
 
   useEffect(() => {
+    setClassroomExercises([]);
+    setExerciseMenu(false);
+  }, [currentContent.lessonId, currentContent.lessonTitle]);
+
+  useEffect(() => {
     const receiveExercises = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === "classroom_select_exercise" && isTeacher) {
@@ -747,6 +752,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>
           ) : (
             <iframe
+              key={`${currentContent.exerciseFile || "first"}:${Number(currentContent.exerciseIndex || 0)}`}
               ref={boardFrameRef}
               src={boardUrl}
               onLoad={() => {
