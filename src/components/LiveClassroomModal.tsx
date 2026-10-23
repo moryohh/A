@@ -129,6 +129,25 @@ function isScienceBoard(subject: string) {
   );
 }
 
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: "landscape") => Promise<void>;
+  unlock?: () => void;
+};
+
+async function enterClassroomLandscape() {
+  try {
+    if (!document.fullscreenElement)
+      await document.documentElement.requestFullscreen();
+  } catch {
+    // Some in-app browsers refuse fullscreen; orientation lock is still tried.
+  }
+  try {
+    await (screen.orientation as LockableScreenOrientation).lock?.("landscape");
+  } catch {
+    // Unsupported browsers keep the same two-column landscape canvas.
+  }
+}
+
 export const LiveClassroomModal: React.FC<Props> = ({
   onClose,
   lessonTitle,
@@ -378,6 +397,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }
 
   async function create() {
+    void enterClassroomLandscape();
     setBusy(true);
     setError("");
     try {
@@ -425,6 +445,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }
 
   async function join() {
+    void enterClassroomLandscape();
     setBusy(true);
     setError("");
     try {
@@ -447,6 +468,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
     // Join a selected classroom once when opened from the room hub.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRoomCode]);
+
+  useEffect(() => {
+    if (room) void enterClassroomLandscape();
+  }, [room]);
+
+  const closeClassroom = () => {
+    try {
+      (screen.orientation as LockableScreenOrientation).unlock?.();
+    } catch {
+      /* orientation unlocking is optional */
+    }
+    if (document.fullscreenElement)
+      void document.exitFullscreen().catch(() => undefined);
+    onClose();
+  };
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
     if (micOn) {
@@ -497,7 +533,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   : "شرح الملزمة مباشرة للمدرس والطلاب"}
               </p>
             </div>
-            <button onClick={onClose} className="rounded-full bg-white/10 p-2">
+            <button onClick={closeClassroom} className="rounded-full bg-white/10 p-2">
               <X />
             </button>
           </div>
@@ -558,13 +594,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col bg-[#071126] font-cairo text-white"
+      className="live-classroom-root fixed inset-0 z-[100] flex flex-col bg-[#071126] font-cairo text-white"
       dir="rtl"
     >
       <header className="flex items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-3 py-2 shadow-lg">
         <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
+            onClick={closeClassroom}
             className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,.35)]"
           >
             <X />
