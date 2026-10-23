@@ -448,7 +448,21 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   // In a live class the teacher controls the shared viewport explicitly.
   const inputById=id=>problem?.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
-  const choose=value=>{const correct=value===choice.correct_value;if(correct){startBoardTheme();setTimeout(()=>{setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)},620)}else{setHearts(v=>Math.max(0,v-1))}return correct}
+  const choose=value=>{
+    const correct=value===choice.correct_value
+    if(correct){
+      startBoardTheme()
+      setTimeout(()=>{setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)},620)
+    }else{
+      const remaining=Math.max(0,hearts-1)
+      setHearts(remaining)
+      if(remaining===0)setTimeout(()=>{
+        setAnswers({});setActiveId(problem?.steps?.[0]?.inputs?.[0]?.id||null);setChoice(null)
+        setBoardStrokes({});setCollapsedSteps({});setCollapsedBoards({});setExplanationExpanded(false);setHearts(10)
+      },560)
+    }
+    return correct
+  }
   const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<5)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-5);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
   const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<3){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-3);return input.hint}
   const activeIndex=problem?problem.steps.indexOf(currentStep):0
@@ -504,14 +518,15 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   const exerciseNavigation=!classroomRole&&<div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div>
   if(classroomRole){
     const workingStep=problem.steps[activeIndex]||problem.steps.at(-1)
-    const recentSteps=problem.steps.slice(Math.max(0,activeIndex-2),activeIndex).map((item,index)=>({...item,order:Math.max(1,activeIndex-1)+index}))
+    const recentSteps=problem.steps.slice(0,activeIndex).map((item,index)=>({...item,order:index+1})).reverse()
+    const explanation=workingStep.explanation || workingStep.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
       <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
         <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
       </section>
       <section ref={questionsPaneRef} className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
         <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
-        <div className="classroom-steps-list">{displayedSteps.map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]),future=i>activeIndex,active=i===activeIndex;return <div ref={active?currentStepRef:null} className={`solution-step ${done?'done':''} ${future?'future-step':''} ${active?'active-step':''}`} key={step.step_id}><div className="step-copy">{!done&&<h3>{step.title} <small>من {problem.steps.length}</small></h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={classroomRole==='student'||future?undefined:open} solved={done}/>{active&&!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation || step.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}</div></div>})}</div>
+        <div ref={currentStepRef} className={`classroom-explanation-card ${explanationExpanded?'expanded':'collapsed'}`}><div className="classroom-explanation-head"><b>{workingStep.title}</b><small>من {problem.steps.length}</small></div><div className="classroom-explanation-text"><MathText>{explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>
         {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}
       </section>
     </main><Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'}/></>
