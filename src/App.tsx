@@ -365,6 +365,23 @@ function AppContent() {
   const [challengeConfig, setChallengeConfig] = useState<any | null>(null);
   const [isDailyExamOpen, setIsDailyExamOpen] = useState(false);
 
+  React.useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('classroom')?.trim();
+    if (!code || !/^\d{1,4}$/.test(code)) return;
+    setChallengeRoomCode(code.padStart(4, '0'));
+    setChallengeConfig({
+      questions: [],
+      lessonTitle: 'الفصل التعليمي المباشر',
+      gameType: 'live_classroom',
+      gameTitle: 'حل معي أونلاين',
+      subject: 'mathematics',
+      chapterNumber: 1,
+      lessonNumber: 1,
+      contentMode: 'board',
+    });
+    setIsChallengeHubOpen(true);
+  }, []);
+
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);

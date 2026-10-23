@@ -62,6 +62,14 @@ html,body{overscroll-behavior-y:none}
 .inline-board-actions .compact-board-tools button{width:30px;min-width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#dbeafe;display:grid;place-items:center;transition:.16s}
 .inline-board-actions .compact-board-tools button svg{width:17px;height:17px}
 .inline-board-actions .compact-board-tools .mini-tool:hover,.inline-board-actions .compact-board-tools .mini-tool.active{background:#075985;color:#7dd3fc;box-shadow:0 0 12px #38bdf877}
+.inline-board-actions .compact-board-tools .tool-calculator,.inline-board-actions .compact-board-tools .tool-hint,.inline-board-actions .compact-board-tools .tool-help{position:relative;color:#fff;border:1px solid #ffffff55;box-shadow:0 4px 12px #02061755;animation:tool-float 2.6s ease-in-out infinite}
+.inline-board-actions .compact-board-tools .tool-calculator{background:linear-gradient(145deg,#06b6d4,#2563eb)}
+.inline-board-actions .compact-board-tools .tool-hint{background:linear-gradient(145deg,#fbbf24,#f97316);animation-delay:.22s}
+.inline-board-actions .compact-board-tools .tool-help{background:linear-gradient(145deg,#ec4899,#7c3aed);animation-delay:.44s}
+.inline-board-actions .compact-board-tools .tool-calculator:hover,.inline-board-actions .compact-board-tools .tool-hint:hover,.inline-board-actions .compact-board-tools .tool-help:hover{color:#fff;filter:brightness(1.12)}
+.inline-board-actions .compact-board-tools .tool-hint small,.inline-board-actions .compact-board-tools .tool-help small{position:absolute;right:-5px;top:-6px;display:grid;min-width:14px;height:14px;padding:0 3px;place-items:center;border:1px solid #fff8;border-radius:999px;background:#166534;color:#fff;font-size:8px;font-weight:1000;line-height:1}
+@keyframes tool-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){.inline-board-actions .compact-board-tools .tool-calculator,.inline-board-actions .compact-board-tools .tool-hint,.inline-board-actions .compact-board-tools .tool-help{animation:none}}
 .inline-board-actions .compact-board-tools .pen-toggle{border-radius:0;background:transparent;color:#93c5fd}
 .inline-board-actions .compact-board-tools .pen-toggle.active{color:#38bdf8;filter:drop-shadow(0 0 7px #38bdf8)}
 .drawing-mode-label{margin-inline-start:auto;color:#7dd3fc;font-size:10px;font-weight:900;white-space:nowrap;direction:rtl}

@@ -9,6 +9,7 @@ import {
   Mic,
   MicOff,
   Radio,
+  Share2,
   PenLine,
   Presentation,
   Snowflake,
@@ -184,6 +185,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [exerciseMenu, setExerciseMenu] = useState(false);
   const [canvasVersion, setCanvasVersion] = useState(0);
   const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
+  const [classroomApples, setClassroomApples] = useState(100);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -212,6 +215,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     const receiveExercises = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "classroom_resource_state") {
+        setClassroomApples(Math.max(0, Number(event.data.apples) || 0));
+        return;
+      }
       if (event.data?.type === "classroom_select_exercise" && isTeacher) {
         const item = event.data.item;
         if (item?.file && socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({
@@ -532,8 +539,27 @@ export const LiveClassroomModal: React.FC<Props> = ({
     send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: item.file, exerciseIndex: item.questionIndex, exerciseNumber: item.number } });
     setExerciseMenu(false);
   };
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const canAnswer = Boolean(!isTeacher && !classroom?.answersLocked && !self?.answerFrozen);
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&canAnswer=${canAnswer ? "1" : "0"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
   const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
+  const inviteStudents = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?classroom=${encodeURIComponent(room)}#nahnu-maak-app`;
+    const shareData = { title: "انضم إلى درس حل معي", text: `رمز الفصل: ${room}`, url };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 1800);
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url);
+        setInviteCopied(true);
+        window.setTimeout(() => setInviteCopied(false), 1800);
+      } catch {
+        setError(`شارك رمز الفصل مع الطلاب: ${room}`);
+      }
+    }
+  };
 
   if (!room)
     return (
@@ -637,6 +663,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {classroom?.capacity || capacity} طالب
             </small>
           </div>
+          {isTeacher && <button onClick={() => void inviteStudents()} className="flex h-9 items-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 px-2 text-[11px] font-black text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب"><Share2 className="h-4 w-4"/>{inviteCopied ? "تم النسخ" : "دعوة"}</button>}
         </div>
         {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div className="relative" ref={exerciseMenuRef}>
@@ -645,7 +672,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
           <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
           <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`grid h-9 w-9 place-items-center rounded-xl border ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"فتح الإجابات":"تجميد الإجابات"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}</button>
-          <span className="flex h-9 items-center gap-1 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-2 text-[11px] font-black text-emerald-100"><Apple className="h-4 w-4 fill-emerald-300"/>100</span>
+          <span className="flex h-9 items-center gap-1 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-2 text-[11px] font-black text-emerald-100"><Apple className="h-4 w-4 fill-emerald-300"/>{classroomApples}</span>
         </div>}
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">

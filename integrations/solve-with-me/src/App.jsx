@@ -362,7 +362,7 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   },[])
   const undo=()=>{if(!history.length)return;setFuture(v=>[...v,strokes]);setStrokes(history.at(-1));setHistory(v=>v.slice(0,-1))}
   const redo=()=>{if(!future.length)return;setHistory(v=>[...v,strokes]);setStrokes(future.at(-1));setFuture(v=>v.slice(0,-1))}
-  const hint=()=>{if(!activeInput)return;if(apples<3)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-3);setBubble(activeInput.hint)}
+  const hint=()=>{if(!activeInput)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setBubble(activeInput.hint)}
   const exit=()=>{if(confirm('هل تريد الخروج؟ ستبدأ هذه المحاولة من الصفر.'))onExit()}
   return <div className="board-modal">
     <div className="board-head"><div className="board-actions"><button className="exit" onClick={exit}><X/></button><button onClick={()=>navigator.share?.({title:'السبورة'})}><Share2/></button><button className="calc" onClick={()=>setCalculator(true)}><Calculator/></button><button className="named-tool hint-tool" onClick={hint}><Lightbulb/><span>تلميح</span></button><button className="named-tool help-tool" onClick={help}><HelpCircle/><span>مساعدة</span></button></div><span className="pill apple"><Apple size={17} fill="currentColor"/>{apples}</span></div>
@@ -393,7 +393,7 @@ function InlineBoard({ onHint, onHelp, step, recentSteps = [], answers = {}, act
   return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
       {!hideCollapse&&<button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>}
-      {(hideCollapse||!locallyCollapsed)&&<div className="compact-board-tools"><button className="mini-tool" onClick={()=>setCalculator(true)} aria-label="حاسبة"><Calculator/></button><button className="mini-tool" onClick={hint} aria-label="تلميح"><Lightbulb/></button><button className="mini-tool" onClick={onHelp} aria-label="مساعدة"><HelpCircle/></button>{!readOnly&&<><button className={`mini-tool ${tool==='eraser'?'active':''}`} onClick={()=>setTool(value=>value==='eraser'?'none':'eraser')} aria-label="ممحاة"><Eraser/></button><button className={`pen-toggle ${tool==='pen'?'active':''}`} onClick={()=>setTool(value=>value==='pen'?'none':'pen')} aria-label={tool==='pen'?'إيقاف الرسم':'تشغيل الرسم'}><Pen/></button></>}{tool==='pen'&&<small className="drawing-mode-label">وضع الرسم مفعّل</small>}</div>}
+      {(hideCollapse||!locallyCollapsed)&&<div className="compact-board-tools"><button className="mini-tool tool-calculator" onClick={()=>setCalculator(true)} aria-label="حاسبة" title="حاسبة"><Calculator/></button><button className="mini-tool tool-hint" onClick={hint} aria-label="تلميح — 4 تفاحات" title="تلميح — 4 تفاحات"><Lightbulb/><small>4</small></button><button className="mini-tool tool-help" onClick={onHelp} aria-label="مساعدة — 7 تفاحات" title="مساعدة — 7 تفاحات"><HelpCircle/><small>7</small></button>{!readOnly&&<><button className={`mini-tool ${tool==='eraser'?'active':''}`} onClick={()=>setTool(value=>value==='eraser'?'none':'eraser')} aria-label="ممحاة"><Eraser/></button><button className={`pen-toggle ${tool==='pen'?'active':''}`} onClick={()=>setTool(value=>value==='pen'?'none':'pen')} aria-label={tool==='pen'?'إيقاف الرسم':'تشغيل الرسم'}><Pen/></button></>}{tool==='pen'&&<small className="drawing-mode-label">وضع الرسم مفعّل</small>}</div>}
     </div>
     {(hideCollapse||!locallyCollapsed)&&<div className={`inline-canvas ${tool==='pen'?'drawing-enabled':''}`}><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/>{recentSteps.length>0&&<div className="board-recent-steps" aria-label="الخطوتان السابقتان">{recentSteps.map((previous,index)=><div className="board-recent-step" key={previous.step_id}><small>الخطوة {previous.order||index+1}</small><Equation step={previous} answers={answers} solved/></div>)}</div>}<div className="board-live-equation"><Equation step={step} answers={answers} activeId={activeId} onBlank={readOnly?undefined:onBlank} solved={false}/></div>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>}
     {calculator&&<CalculatorModal onClose={()=>setCalculator(false)}/>} 
@@ -405,7 +405,7 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '' }) {
+function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '', classroomCanAnswer = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const currentStepRef=useRef(null)
   const questionsPaneRef=useRef(null), boardTouchY=useRef(null)
@@ -465,8 +465,8 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
     }
     return correct
   }
-  const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<5)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-5);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
-  const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<3){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-3);return input.hint}
+  const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<7)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-7);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
+  const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<4){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-4);return input.hint}
   const activeIndex=problem?problem.steps.indexOf(currentStep):0
   // Never reveal an unsolved future step. The current step appears only when
   // the learner reaches it; completed steps remain as a compact text solution.
@@ -524,7 +524,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
     const explanation=workingStep.explanation || workingStep.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
       <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onClick={()=>{if(assistantOpen)setAssistantOpen(false)}} onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
-        <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
+        <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'&&!classroomCanAnswer} hideCollapse/>
         <aside className={`classroom-assistant ${assistantOpen?'is-open':'is-resting'}`} aria-label="المساعد التوضيحي">
           {assistantOpen&&<div className="assistant-explanation" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}}>
             <button type="button" className="assistant-close" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}} aria-label="إخفاء المساعد"><X size={16}/></button>
@@ -540,7 +540,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
         <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
         {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}
       </section>
-    </main><Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'}/></>
+    </main><Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'&&!classroomCanAnswer}/></>
   }
   return <>{exerciseNavigation}<main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
@@ -557,7 +557,7 @@ export default function App(){
   const requestedExerciseFile=String(params.get('exerciseFile')||'').trim()
   const requestedExerciseIndex=Number(params.get('exerciseIndex')||0)
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
-  const classroom=params.get('classroom')==='1', classroomRole=params.get('role')||''
+  const classroom=params.get('classroom')==='1', classroomRole=params.get('role')||'', classroomCanAnswer=params.get('canAnswer')==='1'
   const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[exerciseItems,setExerciseItems]=useState([]),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(true)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
@@ -595,6 +595,7 @@ export default function App(){
     return()=>{cancelled=true}
   },[embeddedScience,params,requestedSubject])
   const home=()=>{setView('subjects');setSubject(null);setChapter(null);setTopic(null);setFile(null);setQuestionIndex(0)}
+  useEffect(()=>{if(classroom)window.parent.postMessage({type:'classroom_resource_state',apples,hearts},window.location.origin)},[classroom,apples,hearts])
   return <div className={classroom?'classroom-embedded':''}>{!classroom&&<Header {...{apples,hearts,musicMuted}} onToggleMusic={()=>setMusicMuted(value=>!value)} onHome={home} onBack={embeddedScience?()=>setView('topics'):undefined}/>}
     {view==='loading'&&<main className="page"><div className="loading">جاري فتح تمارين الدرس المحدد…</div></main>}
     {view==='missing'&&<main className="page"><div className="loading">لا توجد تمارين مضافة لهذا الدرس حاليًا</div></main>}
@@ -602,5 +603,5 @@ export default function App(){
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
     {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,exerciseItems,apples,setApples,hearts,setHearts,musicMuted,classroomRole}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
+    {view==='solver'&&<Solver {...{file,exerciseItems,apples,setApples,hearts,setHearts,musicMuted,classroomRole,classroomCanAnswer}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
 }
