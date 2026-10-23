@@ -139,7 +139,7 @@ html,body{overscroll-behavior-y:none}
 .board-recent-step small{display:block;margin-bottom:2px;color:#1d4ed8;font-size:10px;font-weight:900;text-align:right}
 .board-recent-step .equation{min-height:38px;font-size:clamp(15px,1.7vw,22px);line-height:1.1}
 .board-recent-step .answer-placeholder{min-height:1.25em;border-color:#60a5fa;background:#eff6ff;color:#1d4ed8}
-.classroom-drawing-pane .board-live-equation{padding-top:104px}
+.classroom-drawing-pane .board-live-equation{padding-top:72px;transform:translateY(-12px)}
 .inline-canvas.drawing-enabled .board-recent-steps{opacity:.2}
 .classroom-explanation-card{position:relative;margin-top:8px;padding:11px 12px;border:2px solid #38bdf8;border-radius:15px;background:#effaff;color:#0c4a6e;box-shadow:0 6px 18px #0284c724;font-size:12px;line-height:1.6;font-weight:750}
 .classroom-explanation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;color:#075985;font-weight:950}.classroom-explanation-head small{color:#64748b;font-size:10px}
@@ -147,19 +147,19 @@ html,body{overscroll-behavior-y:none}
 .classroom-explanation-card>button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 9px;font-size:11px;font-weight:900}.classroom-explanation-card.collapsed>button{position:absolute;left:8px;bottom:8px}.classroom-explanation-card.expanded>button{display:block;margin:8px 0 0 auto}
 
 /* The classroom assistant is a pure overlay: it never changes board layout. */
-.classroom-assistant{position:absolute;z-index:18;right:8px;bottom:5px;width:min(82%,570px);height:clamp(118px,31vh,220px);pointer-events:none;direction:rtl}
+.classroom-assistant{position:absolute;z-index:18;right:8px;bottom:-8px;width:min(82%,570px);height:clamp(118px,31vh,220px);pointer-events:none;direction:rtl}
 .assistant-character{position:absolute;z-index:2;right:-6px;bottom:-18px;width:clamp(72px,11vw,126px);height:clamp(108px,22vh,190px);padding:0;border:0;background:transparent;filter:drop-shadow(0 8px 10px #0f172a45);pointer-events:auto;cursor:pointer;transform-origin:bottom right;transition:transform .35s ease,opacity .35s ease,bottom .35s ease}
 .assistant-character img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;animation:assistantFloat 2.7s ease-in-out infinite}
-.assistant-explanation{position:absolute;z-index:1;right:clamp(64px,9vw,108px);bottom:26px;width:min(78%,455px);max-height:calc(100% - 20px);overflow:auto;padding:12px 16px 12px 38px;border:2px solid #0ea5e9;border-radius:18px 18px 5px 18px;background:#fffffff7;color:#0c4a6e;box-shadow:0 12px 28px #0f172a33;font-size:clamp(11px,1.25vw,15px);font-weight:750;line-height:1.65;pointer-events:auto;cursor:pointer;animation:assistantBubbleIn .34s cubic-bezier(.2,.9,.25,1.25) both}
+.assistant-explanation{position:absolute;z-index:1;right:clamp(64px,9vw,108px);bottom:12px;width:min(78%,455px);max-height:calc(100% - 8px);overflow:auto;padding:12px 16px 12px 38px;border:2px solid #0ea5e9;border-radius:18px 18px 5px 18px;background:#fffffff7;color:#0c4a6e;box-shadow:0 12px 28px #0f172a33;font-size:clamp(11px,1.25vw,15px);font-weight:750;line-height:1.65;pointer-events:auto;cursor:pointer;animation:assistantBubbleIn .34s cubic-bezier(.2,.9,.25,1.25) both}
 .assistant-explanation:after{content:'';position:absolute;right:-14px;bottom:17px;width:25px;height:25px;border-right:2px solid #0ea5e9;border-bottom:2px solid #0ea5e9;background:#fff;transform:rotate(-45deg)}
 .assistant-explanation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;color:#075985}.assistant-explanation-head small{color:#64748b;font-size:10px;white-space:nowrap}
-.assistant-close{position:absolute;z-index:3;top:-8px;left:-8px;width:27px;height:27px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#ef4444;color:#fff;box-shadow:0 4px 12px #7f1d1d66;cursor:pointer}
+.assistant-close{position:absolute;z-index:3;top:6px;left:6px;width:27px;height:27px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#ef4444;color:#fff;box-shadow:0 4px 12px #7f1d1d66;cursor:pointer}
 .classroom-assistant.is-resting{width:70px;height:72px;right:2px;bottom:-5px}
-.classroom-assistant.is-resting .assistant-character{right:0;bottom:-28px;transform:scale(.5) translateY(12px);opacity:.88}
-.classroom-assistant.is-resting .assistant-character:hover{transform:scale(.58) translateY(5px);opacity:1}
+.classroom-assistant.is-resting .assistant-character{right:0;bottom:-28px;transform:scale(1) translateY(6px);opacity:.9}
+.classroom-assistant.is-resting .assistant-character:hover{transform:scale(1.06) translateY(1px);opacity:1}
 @keyframes assistantFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-1deg)}}
 @keyframes assistantBubbleIn{from{opacity:0;transform:translateY(18px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media(max-width:900px){.classroom-assistant{right:4px;bottom:2px;width:min(86%,480px);height:clamp(108px,30vh,178px)}.assistant-explanation{right:58px;bottom:20px;width:min(82%,390px);padding:9px 12px 9px 34px;line-height:1.45}.assistant-character{width:70px;height:112px;bottom:-16px}}
+@media(max-width:900px){.classroom-assistant{right:4px;bottom:-8px;width:min(86%,480px);height:clamp(108px,30vh,178px)}.assistant-explanation{right:58px;bottom:8px;width:min(82%,390px);padding:9px 12px 9px 34px;line-height:1.45}.assistant-character{width:70px;height:112px;bottom:-16px}}
 
 /* Compact explanation: two lines by default, expandable on demand. */
 .step-explanation{position:relative;margin:10px 0;padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.step-explanation-text{transition:max-height .25s ease}.step-explanation.collapsed .step-explanation-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding-left:96px}.step-explanation button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 10px;font-size:12px;font-weight:900;box-shadow:0 4px 12px #0284c755}.step-explanation.collapsed button{position:absolute;left:9px;bottom:10px}.step-explanation.collapsed:after{content:'';position:absolute;left:0;bottom:0;width:116px;height:2.35em;border-radius:0 0 10px 10px;background:linear-gradient(90deg,#f0f9ff 76%,transparent);pointer-events:none}.step-explanation.collapsed button{z-index:1}.step-explanation.expanded button{display:block;margin:9px 0 0 auto}

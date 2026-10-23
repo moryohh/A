@@ -523,15 +523,15 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
     const recentSteps=problem.steps.slice(0,activeIndex).map((item,index)=>({...item,order:index+1})).reverse()
     const explanation=workingStep.explanation || workingStep.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
-      <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
+      <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onClick={()=>{if(assistantOpen)setAssistantOpen(false)}} onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
         <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
         <aside className={`classroom-assistant ${assistantOpen?'is-open':'is-resting'}`} aria-label="المساعد التوضيحي">
-          {assistantOpen&&<div className="assistant-explanation" onClick={()=>setAssistantOpen(false)}>
+          {assistantOpen&&<div className="assistant-explanation" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}}>
             <button type="button" className="assistant-close" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}} aria-label="إخفاء المساعد"><X size={16}/></button>
             <div className="assistant-explanation-head"><b>{workingStep.title}</b><small>الخطوة {activeIndex+1} من {problem.steps.length}</small></div>
             <MathText>{explanation}</MathText>
           </div>}
-          <button type="button" className="assistant-character" onClick={()=>setAssistantOpen(value=>!value)} aria-label={assistantOpen?'تصغير المساعد':'إظهار التوضيح'} aria-expanded={assistantOpen}>
+          <button type="button" className="assistant-character" onClick={event=>{event.stopPropagation();setAssistantOpen(value=>!value)}} aria-label={assistantOpen?'تصغير المساعد':'إظهار التوضيح'} aria-expanded={assistantOpen}>
             <img src={classroomAssistant} alt="مساعد تعليمي يشير إلى التوضيح" draggable="false"/>
           </button>
         </aside>
