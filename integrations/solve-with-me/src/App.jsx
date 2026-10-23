@@ -3,7 +3,7 @@ import katex from 'katex'
 import {
   Apple, ArrowRight, BookOpen, Calculator, ChevronDown, ChevronLeft, Eraser, Heart,
   HelpCircle, Home, Lightbulb, Music2, Palette, Pen, Redo2, Share2, Sparkles,
-  Trash2, Undo2, VolumeX, X
+  Trash2, Undo2, VolumeX, Wrench, X
 } from 'lucide-react'
 
 // Some converted lesson files contain JSON-escaped LaTeX twice (for example
@@ -359,19 +359,18 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
 function InlineBoard({ onHint, onHelp, step, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
   const [tool,setTool]=useState('pen'), [color,setColor]=useState('#111827'), [size,setSize]=useState(4)
   const [history,setHistory]=useState([]), [future,setFuture]=useState([])
-  const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false)
+  const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false), [toolsOpen,setToolsOpen]=useState(false)
   const [locallyCollapsed,setLocallyCollapsed]=useState(Boolean(collapsed))
-  const canvasRef=useRef(null)
+  const canvasRef=useRef(null), toolsRef=useRef(null)
   useEffect(()=>setLocallyCollapsed(hideCollapse?false:Boolean(collapsed)),[collapsed,hideCollapse])
+  useEffect(()=>{const close=event=>{if(!toolsRef.current?.contains(event.target))setToolsOpen(false)};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close)},[])
   const setStrokes=value=>onStrokesChange?.(value)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
   const toggleBoard=()=>{const next=!locallyCollapsed;setLocallyCollapsed(next);onToggle?.(next)}
   return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
       {!hideCollapse&&<button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>}
-      {(hideCollapse||!locallyCollapsed)&&<><button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
-      <button className="hint" onClick={hint}><Lightbulb/><span>تلميح</span></button>
-      <button className="calc" onClick={()=>setCalculator(true)}><Calculator/><span>حاسبة</span></button></>}
+      {(hideCollapse||!locallyCollapsed)&&<div className="board-tool-menu" ref={toolsRef}><button className="board-tool-menu-button" onClick={()=>setToolsOpen(value=>!value)} aria-label="أدوات الصبورة" aria-expanded={toolsOpen}><Wrench/></button>{toolsOpen&&<div className="board-tool-menu-popover"><button className="calc" onClick={()=>{setCalculator(true);setToolsOpen(false)}}><Calculator/><span>حاسبة</span></button><button className="hint" onClick={()=>{hint();setToolsOpen(false)}}><Lightbulb/><span>تلميح</span></button><button className="help" onClick={()=>{onHelp?.();setToolsOpen(false)}}><HelpCircle/><span>مساعدة</span></button></div>}</div>}
     </div>
     {(hideCollapse||!locallyCollapsed)&&<><div className="inline-canvas"><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><PracticeEquation step={step}/>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>
     {!readOnly&&<div className="inline-tools">
@@ -484,7 +483,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   },[classroomRole,activeIndex,solvedCount,allInputs.length,activeId,answers])
   if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
   const navigationItems=exerciseItems.length?exerciseItems:questions.map((item,index)=>({file,questionIndex:index,problem:item}))
-  const exerciseNavigation=<div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} disabled={classroomRole==='student'} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div>
+  const exerciseNavigation=!classroomRole&&<div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div>
   if(classroomRole){
     const workingStep=problem.steps[activeIndex]||problem.steps.at(-1)
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
