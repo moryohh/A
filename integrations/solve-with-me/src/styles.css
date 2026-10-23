@@ -134,6 +134,13 @@ html,body{overscroll-behavior-y:none}
 .classroom-drawing-pane .inline-board-title{background:linear-gradient(135deg,#064e3b,#047857,#0f766e)}
 .classroom-drawing-pane .inline-canvas{background-color:#fff9df;background-image:linear-gradient(#e8dfbd 1px,transparent 1px),linear-gradient(90deg,#e8dfbd 1px,transparent 1px);animation:classroomQuestionSwitch .9s ease-out}
 @keyframes classroomQuestionSwitch{0%,62%{background-color:#dff4ff;background-image:linear-gradient(#c2e4f2 1px,transparent 1px),linear-gradient(90deg,#c2e4f2 1px,transparent 1px)}100%{background-color:#fff9df;background-image:linear-gradient(#e8dfbd 1px,transparent 1px),linear-gradient(90deg,#e8dfbd 1px,transparent 1px)}}
+.board-recent-steps{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;pointer-events:none}
+.board-recent-step{min-width:0;min-height:76px;padding:6px 9px;border:1px solid #60a5fa88;border-radius:13px;background:#dbeafeeb;color:#1e3a8a;box-shadow:0 5px 14px #1d4ed822;overflow:hidden}
+.board-recent-step small{display:block;margin-bottom:2px;color:#1d4ed8;font-size:10px;font-weight:900;text-align:right}
+.board-recent-step .equation{min-height:38px;font-size:clamp(15px,1.7vw,22px);line-height:1.1}
+.board-recent-step .answer-placeholder{min-height:1.25em;border-color:#60a5fa;background:#eff6ff;color:#1d4ed8}
+.classroom-drawing-pane .board-live-equation{padding-top:104px}
+.inline-canvas.drawing-enabled .board-recent-steps{opacity:.2}
 
 /* Compact explanation: two lines by default, expandable on demand. */
 .step-explanation{position:relative;margin:10px 0;padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.step-explanation-text{transition:max-height .25s ease}.step-explanation.collapsed .step-explanation-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding-left:96px}.step-explanation button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 10px;font-size:12px;font-weight:900;box-shadow:0 4px 12px #0284c755}.step-explanation.collapsed button{position:absolute;left:9px;bottom:10px}.step-explanation.collapsed:after{content:'';position:absolute;left:0;bottom:0;width:116px;height:2.35em;border-radius:0 0 10px 10px;background:linear-gradient(90deg,#f0f9ff 76%,transparent);pointer-events:none}.step-explanation.collapsed button{z-index:1}.step-explanation.expanded button{display:block;margin:9px 0 0 auto}
