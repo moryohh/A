@@ -208,7 +208,7 @@ const shortExerciseTitle = problem => {
 // Keep the classroom navigator limited to questions that really belong to
 // the selected topic instead of exposing the whole mixed bundle.
 const belongsToSelectedTopic = (topicName, problem) => {
-  const normalizedTopic = String(topicName || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').toLowerCase()
+  const normalizedTopic = String(topicName || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').toLowerCase()
   if (!normalizedTopic.includes('حل المعادله التربيعيه')) return true
   const title = String(problem?.title || problem?.question_text || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').toLowerCase()
   return /معادل|تربيعي|جذر/.test(title)
