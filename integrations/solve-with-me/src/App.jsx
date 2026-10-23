@@ -3,7 +3,7 @@ import katex from 'katex'
 import {
   Apple, ArrowRight, BookOpen, Calculator, ChevronDown, ChevronLeft, Eraser, Heart,
   HelpCircle, Home, Lightbulb, Music2, Palette, Pen, Redo2, Share2, Sparkles,
-  Trash2, Undo2, VolumeX, Wrench, X
+  Trash2, Undo2, VolumeX, X
 } from 'lucide-react'
 
 // Some converted lesson files contain JSON-escaped LaTeX twice (for example
@@ -296,7 +296,7 @@ function DrawingCanvas({ tool, color, size, strokes, setStrokes, history, setHis
   }
   useEffect(redraw, [strokes])
   const point = event => { const r=canvasRef.current?.getBoundingClientRect(); if(!r||r.width<1||r.height<1)return null; return {x:Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.top)/r.height))} }
-  const down = event => { if(readOnly)return;try{event.preventDefault();const first=point(event);if(!first)return;setHistory(h=>[...h,strokes]);setFuture([]);const s={erase:tool==='eraser',color,width:tool==='eraser'?54:size,points:[first]};drawing.current=s;setStrokes(v=>[...v,s])}catch(error){drawing.current=null;console.warn('Pointer start ignored safely:',error)} }
+  const down = event => { if(readOnly||tool==='none')return;try{event.preventDefault();const first=point(event);if(!first)return;setHistory(h=>[...h,strokes]);setFuture([]);const s={erase:tool==='eraser',color,width:tool==='eraser'?42:size,points:[first]};drawing.current=s;setStrokes(v=>[...v,s])}catch(error){drawing.current=null;console.warn('Pointer start ignored safely:',error)} }
   const move = event => { if(!drawing.current)return;try{event.preventDefault();const next=point(event);if(!next)return;const updatedStroke={...drawing.current,points:[...drawing.current.points,next]};drawing.current=updatedStroke;setStrokes(v=>[...v.slice(0,-1),updatedStroke])}catch(error){drawing.current=null;console.warn('Pointer move ignored safely:',error)} }
   const up = () => { drawing.current=null }
   return <canvas ref={canvasRef} className="draw-canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}/>
@@ -356,29 +356,23 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   </div>
 }
 
-function InlineBoard({ onHint, onHelp, step, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
-  const [tool,setTool]=useState('pen'), [color,setColor]=useState('#111827'), [size,setSize]=useState(4)
+function InlineBoard({ onHint, onHelp, step, answers = {}, activeId, onBlank, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
+  const [tool,setTool]=useState('none')
+  const color='#2563eb', size=2
   const [history,setHistory]=useState([]), [future,setFuture]=useState([])
-  const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false), [toolsOpen,setToolsOpen]=useState(false)
+  const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false)
   const [locallyCollapsed,setLocallyCollapsed]=useState(Boolean(collapsed))
-  const canvasRef=useRef(null), toolsRef=useRef(null)
+  const canvasRef=useRef(null)
   useEffect(()=>setLocallyCollapsed(hideCollapse?false:Boolean(collapsed)),[collapsed,hideCollapse])
-  useEffect(()=>{const close=event=>{if(!toolsRef.current?.contains(event.target))setToolsOpen(false)};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close)},[])
   const setStrokes=value=>onStrokesChange?.(value)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
   const toggleBoard=()=>{const next=!locallyCollapsed;setLocallyCollapsed(next);onToggle?.(next)}
   return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
       {!hideCollapse&&<button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>}
-      {(hideCollapse||!locallyCollapsed)&&<div className="board-tool-menu" ref={toolsRef}><button className="board-tool-menu-button" onClick={()=>setToolsOpen(value=>!value)} aria-label="أدوات الصبورة" aria-expanded={toolsOpen}><Wrench/></button>{toolsOpen&&<div className="board-tool-menu-popover"><button className="calc" onClick={()=>{setCalculator(true);setToolsOpen(false)}}><Calculator/><span>حاسبة</span></button><button className="hint" onClick={()=>{hint();setToolsOpen(false)}}><Lightbulb/><span>تلميح</span></button><button className="help" onClick={()=>{onHelp?.();setToolsOpen(false)}}><HelpCircle/><span>مساعدة</span></button></div>}</div>}
+      {(hideCollapse||!locallyCollapsed)&&<div className="compact-board-tools"><button className="mini-tool" onClick={()=>setCalculator(true)} aria-label="حاسبة"><Calculator/></button><button className="mini-tool" onClick={hint} aria-label="تلميح"><Lightbulb/></button><button className="mini-tool" onClick={onHelp} aria-label="مساعدة"><HelpCircle/></button>{!readOnly&&<><button className={`mini-tool ${tool==='eraser'?'active':''}`} onClick={()=>setTool(value=>value==='eraser'?'none':'eraser')} aria-label="ممحاة"><Eraser/></button><button className={`pen-toggle ${tool==='pen'?'active':''}`} onClick={()=>setTool(value=>value==='pen'?'none':'pen')} aria-label={tool==='pen'?'إيقاف الرسم':'تشغيل الرسم'}><Pen/></button></>}{tool==='pen'&&<small className="drawing-mode-label">وضع الرسم مفعّل</small>}</div>}
     </div>
-    {(hideCollapse||!locallyCollapsed)&&<><div className="inline-canvas"><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><PracticeEquation step={step}/>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>
-    {!readOnly&&<div className="inline-tools">
-      <button className={tool==='pen'?'selected':''} onClick={()=>setTool('pen')}><Pen/>قلم</button>
-      <button className={tool==='eraser'?'selected':''} onClick={()=>setTool('eraser')}><Eraser/>ممحاة</button>
-      <label><Palette/>اللون<input type="color" value={color} onChange={e=>setColor(e.target.value)}/></label>
-      <label className="range">السُمك<input type="range" min="2" max="18" value={size} onChange={e=>setSize(+e.target.value)}/></label>
-    </div>}</>}
+    {(hideCollapse||!locallyCollapsed)&&<div className={`inline-canvas ${tool==='pen'?'drawing-enabled':''}`}><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><div className="board-live-equation"><Equation step={step} answers={answers} activeId={activeId} onBlank={readOnly?undefined:onBlank} solved={false}/></div>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>}
     {calculator&&<CalculatorModal onClose={()=>setCalculator(false)}/>} 
   </section>
 }
@@ -391,6 +385,7 @@ function QuestionImages({ problem }) {
 function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, apples, setApples, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '' }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const currentStepRef=useRef(null)
+  const questionsPaneRef=useRef(null), boardTouchY=useRef(null)
   const boardAudioRef=useRef(null)
   const [boardThemeStarted,setBoardThemeStarted]=useState(false)
   const [explanationExpanded,setExplanationExpanded]=useState(false)
@@ -438,6 +433,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   // Never reveal an unsolved future step. The current step appears only when
   // the learner reaches it; completed steps remain as a compact text solution.
   const displayedSteps=problem?problem.steps.slice(0,activeIndex+1):[]
+  useEffect(()=>{if(classroomRole)requestAnimationFrame(()=>{const pane=questionsPaneRef.current;if(pane)pane.scrollTo({top:pane.scrollHeight,behavior:'smooth'})})},[classroomRole,activeIndex])
   // The classroom uses one working board for the active step. Once that step
   // is solved it becomes a compact textual solution, and the same workspace
   // moves to the next step instead of creating a board history for every step.
@@ -487,10 +483,10 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   if(classroomRole){
     const workingStep=problem.steps[activeIndex]||problem.steps.at(-1)
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
-      <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم">
-        <InlineBoard step={workingStep} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
+      <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
+        <InlineBoard step={workingStep} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
       </section>
-      <section className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
+      <section ref={questionsPaneRef} className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
         <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
         <div className="classroom-steps-list">{displayedSteps.map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]),future=i>activeIndex,active=i===activeIndex;return <div ref={active?currentStepRef:null} className={`solution-step ${done?'done':''} ${future?'future-step':''} ${active?'active-step':''}`} key={step.step_id}><div className="step-copy">{!done&&<h3>{step.title} <small>من {problem.steps.length}</small></h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={classroomRole==='student'||future?undefined:open} solved={done}/>{active&&!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}</div></div>})}</div>
         {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}
@@ -499,7 +495,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   }
   return <>{exerciseNavigation}<main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
     <div className="solution-shell">
-    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{displayedSteps.map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]),future=i>activeIndex,active=i===activeIndex,stepHidden=!classroomRole&&!done&&Boolean(collapsedSteps[step.step_id]),boardHidden=Boolean(collapsedBoards[step.step_id]);return <div ref={active?currentStepRef:null} className={`solution-step ${done?'done':''} ${future?'future-step':''} ${active?'active-step':''} ${stepHidden?'step-hidden':''}`} key={step.step_id}>{!classroomRole&&!done&&<button className="step-collapse" onClick={()=>setCollapsedSteps(v=>({...v,[step.step_id]:!v[step.step_id]}))} aria-label={stepHidden?'إظهار الخطوة':'إخفاء الخطوة'}><ChevronDown className={stepHidden?'':'open'}/></button>}{stepHidden?<b className="collapsed-step-title">{step.title}</b>:<><div className="step-copy">{!done&&<h3>{step.title} <small>من {problem.steps.length}</small></h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={classroomRole==='student'||future?undefined:open} solved={done}/>{active&&!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}</div>{active&&<InlineBoard step={step} onHint={boardHint} onHelp={help} strokes={boardStrokes[step.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[step.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[step.step_id]:next}})} collapsed={boardHidden} onToggle={()=>setCollapsedBoards(v=>({...v,[step.step_id]:!v[step.step_id]}))} readOnly={classroomRole==='student'} hideCollapse={Boolean(classroomRole)}/>}</>}</div>})}</section>
+    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{displayedSteps.map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]),future=i>activeIndex,active=i===activeIndex,stepHidden=!classroomRole&&!done&&Boolean(collapsedSteps[step.step_id]),boardHidden=Boolean(collapsedBoards[step.step_id]);return <div ref={active?currentStepRef:null} className={`solution-step ${done?'done':''} ${future?'future-step':''} ${active?'active-step':''} ${stepHidden?'step-hidden':''}`} key={step.step_id}>{!classroomRole&&!done&&<button className="step-collapse" onClick={()=>setCollapsedSteps(v=>({...v,[step.step_id]:!v[step.step_id]}))} aria-label={stepHidden?'إظهار الخطوة':'إخفاء الخطوة'}><ChevronDown className={stepHidden?'':'open'}/></button>}{stepHidden?<b className="collapsed-step-title">{step.title}</b>:<><div className="step-copy">{!done&&<h3>{step.title} <small>من {problem.steps.length}</small></h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={classroomRole==='student'||future?undefined:open} solved={done}/>{active&&!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}</div>{active&&<InlineBoard step={step} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[step.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[step.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[step.step_id]:next}})} collapsed={boardHidden} onToggle={()=>setCollapsedBoards(v=>({...v,[step.step_id]:!v[step.step_id]}))} readOnly={classroomRole==='student'} hideCollapse={Boolean(classroomRole)}/>}</>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
     <Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} readOnly={classroomRole==='student'}/>
   </main></>
