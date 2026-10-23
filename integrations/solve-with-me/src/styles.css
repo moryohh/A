@@ -147,3 +147,17 @@ html,body{overscroll-behavior-y:none}
 
 /* Board music is available but starts muted; the enabled level is 60%. */
 .music-toggle{width:42px;height:42px;flex:none;border:1px solid #38bdf866;border-radius:12px;background:#0c4a6e;color:#7dd3fc;display:grid;place-items:center;box-shadow:0 0 16px #0ea5e933;transition:transform .18s,background .18s,color .18s}.music-toggle:active{transform:scale(.92)}.music-toggle.muted{border-color:#64748b66;background:#1e293b;color:#94a3b8;box-shadow:none}
+
+
+/* Choice feedback: hearts live only inside the answer dialog. */
+.choice-hearts{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:6px;min-width:64px;justify-content:center;padding:7px 11px;border-radius:999px;border:1px solid #fecdd3;background:#fff1f2;color:#e11d48;font-size:18px;font-weight:950;box-shadow:0 6px 18px #e11d4826}
+.choice-hearts svg{filter:drop-shadow(0 2px 3px #e11d4844)}
+.choice-hearts.heart-loss{animation:heart-loss .52s ease both}
+.choices-card.wrong{animation:answer-shake .48s ease}
+.choice-grid button.wrong{border-color:#ef4444!important;background:#fee2e2!important;color:#b91c1c!important;animation:wrong-pulse .5s ease}
+.choice-grid button.correct{border-color:#10b981!important;background:#d1fae5!important;color:#047857!important;animation:correct-pop .62s ease}
+@keyframes heart-loss{0%{transform:scale(1);filter:none}28%{transform:scale(1.28) rotate(-8deg);background:#fecdd3}55%{transform:scale(.9) rotate(7deg);filter:drop-shadow(0 0 10px #ef4444)}100%{transform:scale(1);filter:none}}
+@keyframes answer-shake{0%,100%{transform:translateX(0)}18%{transform:translateX(-10px)}36%{transform:translateX(9px)}54%{transform:translateX(-7px)}72%{transform:translateX(5px)}}
+@keyframes wrong-pulse{0%{transform:scale(1)}45%{transform:scale(.94);box-shadow:0 0 0 8px #ef44442b}100%{transform:scale(1)}}
+@keyframes correct-pop{0%{transform:scale(1)}42%{transform:scale(1.09);box-shadow:0 0 0 10px #10b9812b}100%{transform:scale(1)}}
+@media(max-width:520px){.choices-card{padding-top:62px}.choice-hearts{top:12px;right:14px}}
