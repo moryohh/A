@@ -357,7 +357,7 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   </div>
 }
 
-function InlineBoard({ onHint, onHelp, step, answers = {}, activeId, onBlank, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
+function InlineBoard({ onHint, onHelp, step, recentSteps = [], answers = {}, activeId, onBlank, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
   const [tool,setTool]=useState('none')
   const color='#2563eb', size=2
   const [history,setHistory]=useState([]), [future,setFuture]=useState([])
@@ -374,7 +374,7 @@ function InlineBoard({ onHint, onHelp, step, answers = {}, activeId, onBlank, st
       {!hideCollapse&&<button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>}
       {(hideCollapse||!locallyCollapsed)&&<div className="compact-board-tools"><button className="mini-tool" onClick={()=>setCalculator(true)} aria-label="حاسبة"><Calculator/></button><button className="mini-tool" onClick={hint} aria-label="تلميح"><Lightbulb/></button><button className="mini-tool" onClick={onHelp} aria-label="مساعدة"><HelpCircle/></button>{!readOnly&&<><button className={`mini-tool ${tool==='eraser'?'active':''}`} onClick={()=>setTool(value=>value==='eraser'?'none':'eraser')} aria-label="ممحاة"><Eraser/></button><button className={`pen-toggle ${tool==='pen'?'active':''}`} onClick={()=>setTool(value=>value==='pen'?'none':'pen')} aria-label={tool==='pen'?'إيقاف الرسم':'تشغيل الرسم'}><Pen/></button></>}{tool==='pen'&&<small className="drawing-mode-label">وضع الرسم مفعّل</small>}</div>}
     </div>
-    {(hideCollapse||!locallyCollapsed)&&<div className={`inline-canvas ${tool==='pen'?'drawing-enabled':''}`}><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/><div className="board-live-equation"><Equation step={step} answers={answers} activeId={activeId} onBlank={readOnly?undefined:onBlank} solved={false}/></div>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>}
+    {(hideCollapse||!locallyCollapsed)&&<div className={`inline-canvas ${tool==='pen'?'drawing-enabled':''}`}><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/>{recentSteps.length>0&&<div className="board-recent-steps" aria-label="الخطوتان السابقتان">{recentSteps.map((previous,index)=><div className="board-recent-step" key={previous.step_id}><small>الخطوة {previous.order||index+1}</small><Equation step={previous} answers={answers} solved/></div>)}</div>}<div className="board-live-equation"><Equation step={step} answers={answers} activeId={activeId} onBlank={readOnly?undefined:onBlank} solved={false}/></div>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>}
     {calculator&&<CalculatorModal onClose={()=>setCalculator(false)}/>} 
   </section>
 }
@@ -484,9 +484,10 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
   const exerciseNavigation=!classroomRole&&<div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div>
   if(classroomRole){
     const workingStep=problem.steps[activeIndex]||problem.steps.at(-1)
+    const recentSteps=problem.steps.slice(Math.max(0,activeIndex-2),activeIndex).map((item,index)=>({...item,order:Math.max(1,activeIndex-1)+index}))
     return <>{exerciseNavigation}<main className="classroom-landscape-board">
       <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
-        <InlineBoard step={workingStep} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
+        <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'} hideCollapse/>
       </section>
       <section ref={questionsPaneRef} className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
         <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
