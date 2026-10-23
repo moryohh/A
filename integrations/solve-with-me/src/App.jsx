@@ -273,9 +273,10 @@ function CalculatorModal({ onClose }) {
   const press = key => {
     if (key === 'C') return setValue('0')
     if (key === '=') { try { setValue(String(Function(`return (${value})`)())) } catch { setValue('خطأ') }; return }
-    setValue(v => v === '0' || v === 'خطأ' ? key : v + key)
+    const normalized = {'×':'*','÷':'/','−':'-'}[key] || key
+    setValue(v => v === '0' || v === 'خطأ' ? normalized : v + normalized)
   }
-  return <div className="calculator"><button onClick={onClose}><X size={16}/></button><div className="calc-display">{value}</div><div className="calc-grid">{['C','(',')','/','7','8','9','*','4','5','6','-','1','2','3','+','0','.','='].map(k => <button key={k} onClick={() => press(k)}>{k}</button>)}</div></div>
+  return <div className="calculator"><button className="calculator-close" onClick={onClose} aria-label="إغلاق الحاسبة"><X size={16}/></button><div className="calc-display">{value}</div><div className="calc-grid">{['C','÷','×','−','7','8','9','+','4','5','6','.','1','2','3','=','0'].map(k => <button key={k} onClick={() => press(k)}>{k}</button>)}</div></div>
 }
 
 function DrawingCanvas({ tool, color, size, strokes, setStrokes, history, setHistory, future, setFuture, canvasRef, readOnly = false }) {
@@ -364,6 +365,7 @@ function InlineBoard({ onHint, onHelp, step, answers = {}, activeId, onBlank, st
   const [locallyCollapsed,setLocallyCollapsed]=useState(Boolean(collapsed))
   const canvasRef=useRef(null)
   useEffect(()=>setLocallyCollapsed(hideCollapse?false:Boolean(collapsed)),[collapsed,hideCollapse])
+  useEffect(()=>{setTool('none');setHintText(null);setCalculator(false)},[step?.step_id])
   const setStrokes=value=>onStrokesChange?.(value)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
   const toggleBoard=()=>{const next=!locallyCollapsed;setLocallyCollapsed(next);onToggle?.(next)}
