@@ -203,6 +203,17 @@ const shortExerciseTitle = problem => {
   return clean.split(/\s+/).slice(0, 7).join(' ') || 'تمرين'
 }
 
+// A few legacy page bundles contain review questions from the following
+// subject even though their filename still carries the previous topic id.
+// Keep the classroom navigator limited to questions that really belong to
+// the selected topic instead of exposing the whole mixed bundle.
+const belongsToSelectedTopic = (topicName, problem) => {
+  const normalizedTopic = String(topicName || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').toLowerCase()
+  if (!normalizedTopic.includes('حل المعادله التربيعيه')) return true
+  const title = String(problem?.title || problem?.question_text || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').toLowerCase()
+  return /معادل|تربيعي|جذر/.test(title)
+}
+
 const CONTENT_INDEX_API='https://duha-content-index.rafos72171.workers.dev'
 const CONTENT_R2_API='https://duha-content-r2.rafos72171.workers.dev'
 const boardFileCache=new Map()
@@ -237,6 +248,7 @@ function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom
     Promise.all(topic.files.map(async item => {
       const info=fileInfo(item), questions=await loadBoardFile(info.file)
       return questions.map((problem,index)=>({ ...info, problem, questionIndex:index }))
+        .filter(item=>belongsToSelectedTopic(topic.name,item.problem))
     })).then(groups=>{if(active){const next=groups.flat();setItems(next);onItems?.(next)}}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
   },[topic])
