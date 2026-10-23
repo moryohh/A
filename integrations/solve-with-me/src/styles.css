@@ -113,6 +113,20 @@ html,body{overscroll-behavior-y:none}
 .solution-step.done{margin:0;padding:0 12px;border:0;border-radius:0;background:transparent;box-shadow:none}.solution-step.done .equation{min-height:30px;line-height:1.12}.solution-step.done+.solution-step.done{border-top:0}.solution-step.done+.solution-step:not(.done){margin-top:10px}.problem-card+.solution-step.done{padding-top:5px}
 @media(max-width:700px){.topic-list-button,.exercise-list>button{padding:13px 11px}.exercise-name{font-size:16px}.solution-step.done{padding:0 4px}.solution-step.done .equation{min-height:28px}}
 
+/* Compact classroom overlays and an unmistakable opt-in drawing mode. */
+.calculator{z-index:250;top:58px;bottom:auto;left:12px;width:min(220px,calc(100vw - 24px));padding:9px;border:1px solid #38bdf888;border-radius:15px;background:#0f172af7;box-shadow:0 18px 50px #0008}
+.calculator .calculator-close{position:absolute;z-index:2;top:6px;left:6px;float:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#ef4444;color:#fff}
+.calculator .calc-display{clear:none;min-height:36px;margin:0 0 7px;padding:7px 38px 7px 8px;border-radius:9px;font-size:17px;overflow:hidden}
+.calculator .calc-grid{grid-template-columns:repeat(4,1fr);gap:4px}
+.calculator .calc-grid button{height:31px;padding:0;font-weight:900}
+.calculator .calc-grid button:last-child{grid-column:span 2}
+.inline-hint-bubble{z-index:24;top:12px;left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:min(92%,620px);max-height:34%;overflow:auto;padding:12px 40px 12px 14px;background:#fffffff5;box-shadow:0 8px 24px #0f172a33}
+.inline-hint-bubble button{top:6px;left:6px;width:28px;height:28px;padding:0;display:grid;place-items:center;background:#ef4444;color:#fff}
+@keyframes activePenPulse{0%,100%{color:#22d3ee;filter:drop-shadow(0 0 3px #22d3ee);transform:scale(1)}50%{color:#facc15;filter:drop-shadow(0 0 10px #facc15);transform:scale(1.14)}}
+.inline-board-actions .compact-board-tools .pen-toggle.active{animation:activePenPulse .8s ease-in-out infinite}
+.inline-canvas.drawing-enabled .board-live-equation,.inline-canvas.drawing-enabled .board-live-equation .equation{pointer-events:none}
+.inline-canvas.drawing-enabled .board-live-equation .answer-box{border-color:transparent;background:transparent;box-shadow:none;color:transparent}
+
 /* Compact explanation: two lines by default, expandable on demand. */
 .step-explanation{position:relative;margin:10px 0;padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.step-explanation-text{transition:max-height .25s ease}.step-explanation.collapsed .step-explanation-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding-left:96px}.step-explanation button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 10px;font-size:12px;font-weight:900;box-shadow:0 4px 12px #0284c755}.step-explanation.collapsed button{position:absolute;left:9px;bottom:10px}.step-explanation.collapsed:after{content:'';position:absolute;left:0;bottom:0;width:116px;height:2.35em;border-radius:0 0 10px 10px;background:linear-gradient(90deg,#f0f9ff 76%,transparent);pointer-events:none}.step-explanation.collapsed button{z-index:1}.step-explanation.expanded button{display:block;margin:9px 0 0 auto}
 
