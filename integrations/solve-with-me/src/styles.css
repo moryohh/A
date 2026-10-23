@@ -56,8 +56,19 @@ html,body{overscroll-behavior-y:none}
   box-shadow:0 12px 34px #0f172a22;
 }
 .classroom-drawing-pane .inline-canvas{height:auto;min-height:0;flex:1}
-.classroom-drawing-pane .inline-tools{flex:none}
-.classroom-drawing-pane .inline-board-title{height:44px;min-height:44px;justify-content:flex-start;padding:5px 8px}
+.classroom-drawing-pane .inline-tools{display:none}
+.classroom-drawing-pane .inline-board-title{height:44px;min-height:44px;justify-content:stretch;padding:4px 10px}
+.compact-board-tools{width:100%;height:100%;display:flex;align-items:center;justify-content:space-around;gap:4px;direction:ltr}
+.inline-board-actions .compact-board-tools button{width:30px;min-width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#dbeafe;display:grid;place-items:center;transition:.16s}
+.inline-board-actions .compact-board-tools button svg{width:17px;height:17px}
+.inline-board-actions .compact-board-tools .mini-tool:hover,.inline-board-actions .compact-board-tools .mini-tool.active{background:#075985;color:#7dd3fc;box-shadow:0 0 12px #38bdf877}
+.inline-board-actions .compact-board-tools .pen-toggle{border-radius:0;background:transparent;color:#93c5fd}
+.inline-board-actions .compact-board-tools .pen-toggle.active{color:#38bdf8;filter:drop-shadow(0 0 7px #38bdf8)}
+.drawing-mode-label{margin-inline-start:auto;color:#7dd3fc;font-size:10px;font-weight:900;white-space:nowrap;direction:rtl}
+.inline-canvas:not(.drawing-enabled) .draw-canvas{touch-action:pan-y;cursor:default}
+.inline-canvas.drawing-enabled{box-shadow:inset 0 0 0 2px #38bdf8aa}
+.board-live-equation{position:absolute;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none;padding:18px}
+.board-live-equation .equation{font-size:clamp(25px,3vw,40px);pointer-events:auto}
 .board-tool-menu{position:relative;z-index:24}
 .inline-board-actions .board-tool-menu-button{width:34px;min-width:34px;height:34px;padding:0;border:1px solid #38bdf866;border-radius:10px;background:#172554;color:#e0f2fe;display:grid;place-items:center}
 .inline-board-actions .board-tool-menu-button svg{width:18px;height:18px}
@@ -78,6 +89,7 @@ html,body{overscroll-behavior-y:none}
 .classroom-steps-list{display:grid;gap:7px}
 .classroom-questions-pane .solution-step{margin:0;padding:10px;border-radius:14px;box-shadow:none}
 .classroom-questions-pane .solution-step.active-step{border:2px solid #38bdf8;background:#f0f9ff;box-shadow:0 6px 18px #0284c729}
+.classroom-questions-pane .solution-step.active-step .equation{display:none}
 .classroom-questions-pane .solution-step.future-step{opacity:.62;background:#f8fafc}
 .classroom-questions-pane .solution-step.done{padding:2px 6px;background:transparent}
 .classroom-questions-pane .solution-step:not(.done) .equation{min-height:58px;font-size:25px}
