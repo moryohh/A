@@ -293,10 +293,10 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     <div className="space-y-4 p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] text-right select-none sm:p-4 animate-in fade-in duration-200">
       <section className={`rounded-3xl border p-2 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="دوراتي والتحدي">
-          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => setActiveSection('challenge')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'challenge' ? 'bg-sky-500 text-white shadow-lg' : theme.classes.textMuted}`}>
+          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => setActiveSection('challenge')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'challenge' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'challenge' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
             <Swords className="h-5 w-5" /> التحدّي
           </button>
-          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => setActiveSection('courses')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'courses' ? 'bg-sky-500 text-white shadow-lg' : theme.classes.textMuted}`}>
+          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => setActiveSection('courses')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'courses' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'courses' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
             <BookOpen className="h-5 w-5" /> دوراتي
           </button>
         </div>
@@ -304,33 +304,33 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
       {activeSection === 'challenge' && (
         <div className="space-y-4">
-        <section className="relative overflow-hidden rounded-[28px] border border-cyan-300/45 bg-[radial-gradient(circle_at_50%_-20%,rgba(56,189,248,.35),transparent_42%),linear-gradient(145deg,#071a3a_0%,#0b1e55_52%,#241052_100%)] p-4 text-white shadow-[0_24px_65px_rgba(30,64,175,.28)] sm:p-5">
+        <section className="relative overflow-hidden rounded-[28px] border p-4 shadow-xl sm:p-5" style={{ color: theme.colors.textPrimary, borderColor: theme.colors.border, background: `radial-gradient(circle at 50% -20%, ${theme.colors.primary}35, transparent 42%), linear-gradient(145deg, ${theme.colors.bgCard} 0%, ${theme.colors.bgCardSubtle} 62%, color-mix(in srgb, ${theme.colors.bgCardSubtle} 84%, ${theme.colors.secondary}) 100%)`, boxShadow: `0 24px 65px ${theme.colors.glow}` }}>
           <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 15% 20%, white 0 1px, transparent 1.5px), radial-gradient(circle at 82% 15%, #67e8f9 0 1.5px, transparent 2px)', backgroundSize: '54px 54px, 78px 78px' }} />
-          <div className="pointer-events-none absolute -left-10 top-10 h-36 w-36 rounded-full bg-cyan-400/15 blur-3xl" />
-          <div className="pointer-events-none absolute -right-12 bottom-0 h-40 w-40 rounded-full bg-violet-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-10 top-10 h-36 w-36 rounded-full blur-3xl" style={{ backgroundColor: `${theme.colors.primary}22` }} />
+          <div className="pointer-events-none absolute -right-12 bottom-0 h-40 w-40 rounded-full blur-3xl" style={{ backgroundColor: `${theme.colors.secondary}22` }} />
           <div className="relative mb-4 flex flex-col items-center">
-            <div className="relative grid h-16 w-16 place-items-center rounded-full border border-cyan-200/40 bg-gradient-to-br from-cyan-400/25 to-violet-500/25 shadow-[0_0_34px_rgba(34,211,238,.35)] motion-safe:animate-[pulse_2.4s_ease-in-out_infinite]">
+            <div className="relative grid h-16 w-16 place-items-center rounded-full border motion-safe:animate-[pulse_2.4s_ease-in-out_infinite]" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}66`, background: `linear-gradient(135deg, ${theme.colors.primary}25, ${theme.colors.secondary}25)`, boxShadow: `0 0 34px ${theme.colors.glow}` }}>
               <span className="absolute inset-1 rounded-full border border-white/10" />
-              <Swords className="h-8 w-8 text-cyan-100 drop-shadow-[0_0_10px_rgba(103,232,249,.8)]" />
+              <Swords className="h-8 w-8" />
               <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-amber-300 motion-safe:animate-pulse" />
             </div>
-            <h1 className="mt-2 text-xl font-black tracking-tight text-white">إنشاء غرفة لعب</h1>
-            <p className="mt-1 text-[10px] font-bold text-cyan-100/70">{challengeSubject === 'mathematics' ? 'اختر الفصل والموضوع ثم ابدأ درس حل معي' : 'اختر المادة والفصل واللعبة ثم ابدأ التحدّي'}</p>
+            <h1 className="mt-2 text-xl font-black tracking-tight">إنشاء غرفة لعب</h1>
+            <p className="mt-1 text-[10px] font-bold" style={{ color: theme.colors.textSecondary }}>{challengeSubject === 'mathematics' ? 'اختر الفصل والموضوع ثم ابدأ درس حل معي' : 'اختر المادة والفصل واللعبة ثم ابدأ التحدّي'}</p>
           </div>
-          <div className="relative space-y-2.5 rounded-3xl border border-white/10 bg-black/15 p-2.5 shadow-inner backdrop-blur-sm">
-            <label className="relative flex items-center overflow-hidden rounded-2xl border border-cyan-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-400/20">
-              <BookOpen className="mr-3 h-5 w-5 shrink-0 text-cyan-300" />
-              <select value={challengeSubject} onChange={(event) => { const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none"><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-cyan-200" />
+          <div className="relative space-y-2.5 rounded-3xl border p-2.5 shadow-inner backdrop-blur-sm" style={{ backgroundColor: `${theme.colors.bgCard}88`, borderColor: theme.colors.border }}>
+            <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <BookOpen className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.primary }} />
+              <select value={challengeSubject} onChange={(event) => { const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
             </label>
-            <label className="relative flex items-center overflow-hidden rounded-2xl border border-blue-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-400/20">
-              <GraduationCap className="mr-3 h-5 w-5 shrink-0 text-blue-300" />
-              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none disabled:opacity-45"><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-blue-200" />
+            <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <GraduationCap className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.accent }} />
+              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none disabled:opacity-45" style={{ color: theme.colors.textPrimary }}><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.accent }} />
             </label>
-            {challengeSubject && challengeSubject !== 'mathematics' && <label className="relative flex items-center overflow-hidden rounded-2xl border border-violet-300/35 bg-slate-950/55 shadow-[0_7px_20px_rgba(2,8,23,.28)] transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-400/20">
-              <Gamepad2 className="mr-3 h-5 w-5 shrink-0 text-violet-300" />
-              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none">
+            {challengeSubject && challengeSubject !== 'mathematics' && <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <Gamepad2 className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.secondary }} />
+              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
                 <option value="">اختر نوع اللعبة / النشاط</option>
                 {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
                 {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
@@ -338,22 +338,22 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                 <option value="millionaire">من سيربح المليون</option>
                 <option value="gibha_sah">جبتها صح</option>
               </select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
+              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.secondary }} />
             </label>}
             {challengeSubject && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
-              <div className="rounded-2xl border border-cyan-300/30 bg-slate-950/45 p-2.5">
-                <p className="mb-2 text-center text-[11px] font-black text-cyan-100">تحديد موضوع</p>
-                <label className="mb-2 flex items-center overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
-                  <GraduationCap className="mr-2 h-4 w-4 shrink-0 text-cyan-300" />
-                  <select value={classroomLessonId} onChange={(event) => setClassroomLessonId(event.target.value)} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold text-white outline-none">
+              <div className="rounded-2xl border p-2.5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
+                <p className="mb-2 text-center text-[11px] font-black" style={{ color: theme.colors.textSecondary }}>تحديد موضوع</p>
+                <label className="mb-2 flex items-center overflow-hidden rounded-xl border" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+                  <GraduationCap className="mr-2 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
+                  <select value={classroomLessonId} onChange={(event) => setClassroomLessonId(event.target.value)} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
                     <option value="">تحديد موضوع</option>
                     {challengeLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
                   </select>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-cyan-200" />
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
                 </label>
               </div>
             )}
-            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45" style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
               <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
               <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
               {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'اعرض غرفة الملزمة الأوفلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
@@ -362,29 +362,29 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
           </div>
         </section>
         <section className={`overflow-hidden rounded-3xl border shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
-          <div className="relative overflow-hidden border-b border-cyan-300/20 bg-gradient-to-l from-[#0a1d49] via-[#102b67] to-[#261052] px-4 py-4 text-white">
+          <div className="relative overflow-hidden border-b px-4 py-4" style={{ color: theme.colors.textPrimary, borderColor: theme.colors.border, background: `linear-gradient(120deg, ${theme.colors.bgCardSubtle}, color-mix(in srgb, ${theme.colors.bgCardSubtle} 82%, ${theme.colors.primary}))` }}>
             <div className="pointer-events-none absolute -left-8 -top-10 h-28 w-28 rounded-full bg-violet-400/20 blur-2xl" />
             <div className="relative flex items-center gap-3">
-              <div className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-200/35 bg-cyan-400/15 shadow-[0_0_22px_rgba(34,211,238,.25)]">
-                <DoorOpen className="h-6 w-6 text-cyan-200" />
+              <div className="relative grid h-11 w-11 place-items-center rounded-2xl border" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}66`, backgroundColor: `${theme.colors.primary}18`, boxShadow: `0 0 22px ${theme.colors.glow}` }}>
+                <DoorOpen className="h-6 w-6" />
                 <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.9)] motion-safe:animate-ping" />
               </div>
               <div>
                 <h2 className="text-base font-black">الغرف المتاحة للدخول</h2>
-                <p className="text-[10px] font-bold text-cyan-100/65">اختر غرفة نشطة وانضم إلى المنافسة</p>
+                <p className="text-[10px] font-bold" style={{ color: theme.colors.textSecondary }}>اختر غرفة نشطة وانضم إلى المنافسة</p>
               </div>
             </div>
-            <div className="absolute inset-x-4 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-300 to-violet-400" />
+            <div className="absolute inset-x-4 bottom-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${theme.colors.primary}, ${theme.colors.secondary})` }} />
           </div>
           <div className="space-y-2 p-4">
-            {visibleRooms.length === 0 ? <p className={`rounded-2xl bg-black/15 p-4 text-center text-xs ${theme.classes.textMuted}`}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
+            {visibleRooms.length === 0 ? <p className={`rounded-2xl p-4 text-center text-xs ${theme.classes.textMuted}`} style={{ backgroundColor: theme.colors.bgCardSubtle }}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
               const status = room.status || 'waiting';
               const ended = status === 'ended';
               const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
               const attendance = room.gameType === 'live_classroom'
                 ? `${Math.max(0, room.players - 1)}/${room.capacity || 8} طالب`
                 : `${room.players}/2 لاعبين`;
-              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl bg-slate-800/80 p-3 text-right transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-65"><span className="flex items-center justify-between"><b className="text-lg text-sky-200">#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-200' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-200'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs text-slate-200">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs text-slate-400">{room.gameTitle || room.gameType} · {room.lessonTitle} · {attendance}</span></button>;
+              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{room.gameTitle || room.gameType} · {room.lessonTitle} · {attendance}</span></button>;
             })}
           </div>
         </section>
