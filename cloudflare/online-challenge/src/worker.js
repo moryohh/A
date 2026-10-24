@@ -111,7 +111,7 @@ export default {
             var directCode = String(Math.floor(1000 + Math.random() * 9000));
             var directStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + directCode));
             var directCreated = await directStub.fetch(new Request('https://room/internal/init', {
-              method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
+              method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), studyMode: body.studyMode === 'together' ? 'together' : 'teacher', sharedMission: String(body.sharedMission || '').trim().slice(0, 120), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
             }));
             if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
             if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
@@ -134,7 +134,7 @@ export default {
         return { question: q.question, options: q.options, correctAnswer: q.correctAnswer };
       });
       var created = await stub.fetch(new Request('https://room/internal/init', {
-        method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: questions, roomCode: registrationBody.code, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
+        method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: questions, roomCode: registrationBody.code, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), studyMode: body.studyMode === 'together' ? 'together' : 'teacher', sharedMission: String(body.sharedMission || '').trim().slice(0, 120), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
       }));
       if (!created.ok) {
         await registry.fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: roomId }) }));
@@ -477,7 +477,7 @@ export class ChallengeRoom {
       gibhaRefillVersion: game.gameType === 'gibha_sah' ? game.gibhaRefillVersion || 0 : undefined,
       players: game.players.map(function (p) {
         var profile = p.profile || (this.isBot(p) ? game.botProfile : null);
-        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level, handRaised: Boolean(p.handRaised), micAllowed: Boolean(p.micAllowed), drawAllowed: Boolean(p.drawAllowed), answerFrozen: Boolean(p.answerFrozen), lastAnswer: p.lastAnswer || '', progress: p.progress || null };
+        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level, handRaised: Boolean(p.handRaised), micAllowed: Boolean(p.micAllowed), drawAllowed: Boolean(p.drawAllowed), answerFrozen: Boolean(p.answerFrozen), lastAnswer: p.lastAnswer || '', progress: p.progress || null, mission: p.mission || null, joinedAt: p.joinedAt || null };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length >= 2 && winner === null,
@@ -501,6 +501,8 @@ export class ChallengeRoom {
         strokes: game.strokes || [],
         presenterId: game.presenterId || game.hostId,
         presenterState: game.presenterState || null,
+        studyMode: game.studyMode === 'together' ? 'together' : 'teacher',
+        sharedMission: game.sharedMission || '',
         participants: game.players.map(function (player) {
           return { id: player.id, handRaised: Boolean(player.handRaised), micAllowed: Boolean(player.micAllowed), drawAllowed: Boolean(player.drawAllowed) };
         }),
@@ -519,7 +521,7 @@ export class ChallengeRoom {
       var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
       var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
       var classroomMode = init.gameType === 'live_classroom';
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -580,7 +582,7 @@ export class ChallengeRoom {
           var humans = this.teamHumans(game).length;
           team = humans === 0 || humans === 1 ? 'A' : 'B';
         }
-        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null, micAllowed: false, drawAllowed: false, answerFrozen: false, handRaised: false };
+        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null, micAllowed: false, drawAllowed: false, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null };
         game.players.push(joinedPlayer);
         this.assignCharacter(game, joinedPlayer);
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
@@ -634,6 +636,18 @@ export class ChallengeRoom {
       var isTeacher = sender.userId === liveGame.hostId;
       if (payload.type === 'raise_hand' && senderPlayer && !isTeacher) {
         senderPlayer.handRaised = Boolean(payload.raised);
+      } else if (payload.type === 'classroom_mission' && senderPlayer) {
+        var missionText = String(payload.text || '').trim().slice(0, 100);
+        var missionTarget = Math.max(1, Math.min(100, Number(payload.target) || 1));
+        var missionProgress = Math.max(0, Math.min(missionTarget, Number(payload.progress) || 0));
+        var completionAllowed = Date.now() - Number(senderPlayer.joinedAt || Date.now()) >= 60000;
+        senderPlayer.mission = missionText ? {
+          text: missionText,
+          target: missionTarget,
+          progress: missionProgress,
+          completed: completionAllowed && missionProgress >= missionTarget,
+          updatedAt: Date.now(),
+        } : null;
       } else if (payload.type === 'classroom_answer' && senderPlayer && !isTeacher) {
         if (liveGame.answersLocked || senderPlayer.answerFrozen) return;
         senderPlayer.lastAnswer = String(payload.value || '').slice(0, 500);
@@ -668,6 +682,7 @@ export class ChallengeRoom {
         var action = payload.action;
         var target = liveGame.players.find(function (player) { return player.id === payload.targetId; });
         if (action === 'answers_locked') liveGame.answersLocked = Boolean(payload.value);
+        if (action === 'shared_mission') liveGame.sharedMission = String(payload.value || '').trim().slice(0, 120);
         if (action === 'mic_permission' && target && target.id !== liveGame.hostId) {
           target.micAllowed = Boolean(payload.value);
           if (target.micAllowed) target.handRaised = false;

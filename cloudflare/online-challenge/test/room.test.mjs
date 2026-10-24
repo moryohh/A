@@ -98,6 +98,12 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'restore_presenter' }));
   assert.equal(data.get('game').presenterId, 'teacher');
   assert.equal(data.get('game').players[1].drawAllowed, false);
+  data.get('game').players[1].joinedAt = Date.now() - 61000;
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'classroom_mission', text: 'قراءة أربع صفحات', target: 4, progress: 4 }));
+  assert.deepEqual(data.get('game').players[1].mission.text, 'قراءة أربع صفحات');
+  assert.equal(data.get('game').players[1].mission.completed, true);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'shared_mission', value: 'نقرأ الفصل الأول معًا' }));
+  assert.equal(room.view(data.get('game')).classroom.sharedMission, 'نقرأ الفصل الأول معًا');
   assert.equal(room.view(data.get('game')).classroom.capacity, 50);
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });

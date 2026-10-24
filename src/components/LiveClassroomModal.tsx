@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Apple,
   BookOpen,
+  CheckCircle2,
   Clock3,
   Hand,
   Grid2X2,
@@ -13,6 +14,8 @@ import {
   PenLine,
   Presentation,
   Snowflake,
+  Target,
+  TreePine,
   UnlockKeyhole,
   Users,
   X,
@@ -51,6 +54,14 @@ type Participant = {
   answerFrozen?: boolean;
   lastAnswer?: string;
   progress?: { step?: number; solved?: number; total?: number; answer?: string } | null;
+  joinedAt?: number | null;
+  mission?: {
+    text: string;
+    target: number;
+    progress: number;
+    completed: boolean;
+    updatedAt: number;
+  } | null;
 };
 type ClassroomState = {
   type: "state";
@@ -76,6 +87,8 @@ type ClassroomState = {
     drawingVersion: number;
     presenterId?: string;
     presenterState?: Record<string, unknown> | null;
+    studyMode?: "teacher" | "together";
+    sharedMission?: string;
   };
 };
 
@@ -102,7 +115,7 @@ async function authorization() {
 
 async function profile() {
   const guest = loadGuestSession();
-  if (guest) return { name: guest.name, avatar: "" };
+  if (guest) return { name: guest.name, avatar: localStorage.getItem(`nahnu_maak_avatar_${guest.id}`) || "" };
   const client = getSupabaseClient();
   const { data } = (await client?.auth.getSession()) || {
     data: { session: null },
@@ -115,7 +128,7 @@ async function profile() {
         data.session?.user?.email?.split("@")[0] ||
         "طالب",
     ),
-    avatar: String(meta.avatar_url || meta.picture || ""),
+    avatar: String(localStorage.getItem(`nahnu_maak_avatar_${data.session?.user?.id}`) || meta.avatar_url || meta.picture || ""),
   };
 }
 
@@ -165,6 +178,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
       : "booklet");
   const [capacity, setCapacity] = useState<Capacity>(8);
   const [durationMinutes, setDurationMinutes] = useState(45);
+  const [studyMode, setStudyMode] = useState<"teacher" | "together">("together");
+  const [sharedMissionDraft, setSharedMissionDraft] = useState("");
   const [room, setRoom] = useState("");
   const [entry, setEntry] = useState("");
   const [me, setMe] = useState("");
@@ -187,6 +202,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
   const [classroomApples, setClassroomApples] = useState(100);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [missionOpen, setMissionOpen] = useState(false);
+  const [missionText, setMissionText] = useState("");
+  const [missionTarget, setMissionTarget] = useState(4);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -445,6 +463,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
           lessonTitle,
           capacity,
           durationMinutes,
+          studyMode,
+          sharedMission: sharedMissionDraft,
           contentMode: defaultMode,
           content,
         }),
@@ -546,6 +566,18 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const canAnswer = Boolean(!isTeacher && !classroom?.answersLocked && !self?.answerFrozen);
   const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&canAnswer=${canAnswer ? "1" : "0"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
   const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
+  const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
+  const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
+  const saveMission = (progress = 0) => {
+    const text = missionText.trim();
+    if (!text) return;
+    send({ type: "classroom_mission", text, target: missionTarget, progress });
+    setMissionOpen(false);
+  };
+  const updateMissionProgress = (next: number) => {
+    if (!self?.mission) return;
+    send({ type: "classroom_mission", text: self.mission.text, target: self.mission.target, progress: Math.max(0, Math.min(self.mission.target, next)) });
+  };
   const inviteStudents = async () => {
     const url = `${window.location.origin}${window.location.pathname}?classroom=${encodeURIComponent(room)}#nahnu-maak-app`;
     const shareData = { title: "انضم إلى درس حل معي", text: `رمز الفصل: ${room}`, url };
@@ -606,6 +638,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <option value={45}>45 دقيقة</option>
             <option value={60}>60 دقيقة</option>
           </select>
+          {defaultMode === "booklet" && <>
+            <label className="mt-4 block text-xs font-black">نوع الغرفة</label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setStudyMode("together")} className={`rounded-2xl border p-3 text-right ${studyMode === "together" ? "border-emerald-300 bg-emerald-400/20 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">ندرس معًا</b><small>مهام شخصية وتركيز جماعي</small></button>
+              <button type="button" onClick={() => setStudyMode("teacher")} className={`rounded-2xl border p-3 text-right ${studyMode === "teacher" ? "border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">مع مدرس</b><small>شرح وتحكم كامل للمضيف</small></button>
+            </div>
+            <label className="mt-4 block text-xs font-black">المهمة المشتركة (اختياري)</label>
+            <input value={sharedMissionDraft} maxLength={120} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="مثال: نقرأ الصفحات 1–5 خلال 15 دقيقة" className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3 text-sm" />
+          </>}
           <button
             disabled={busy}
             onClick={create}
@@ -686,6 +727,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
         </div>
       </header>
+      {classroom?.contentMode === "booklet" && <div className="border-b border-amber-200/20 bg-gradient-to-l from-amber-950/95 via-[#17304a] to-emerald-950/95 px-3 py-2">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <Target className="h-5 w-5 shrink-0 text-amber-300" />
+          {isTeacher ? <div className="flex min-w-0 flex-1 gap-2"><input value={sharedMissionDraft || classroom.sharedMission || ""} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="اكتب المهمة المشتركة للغرفة" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white"/><button onClick={() => send({ type: "classroom_control", action: "shared_mission", value: sharedMissionDraft })} className="rounded-xl bg-amber-400 px-3 text-xs font-black text-slate-950">اعتماد</button></div> : <p className="min-w-0 flex-1 truncate text-xs font-bold text-amber-50">{classroom.sharedMission || "حدّد مهمتك وابدأ الدراسة مع زملائك"}</p>}
+          <span className="hidden rounded-full bg-white/10 px-3 py-1 text-[10px] text-emerald-200 sm:inline">{classroom.studyMode === "together" ? "ندرس معًا" : "مع مدرس"}</span>
+        </div>
+      </div>}
       {isTeacher && isMathClassroom && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
         <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
         {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
@@ -772,17 +820,52 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
       )}
-      <main className="relative min-h-0 flex-1 overflow-auto bg-slate-100 text-slate-900">
-        <div className="relative mx-auto h-full min-h-0 w-full">
+      <main className={`relative min-h-0 flex-1 overflow-auto text-slate-900 ${classroom?.contentMode === "booklet" ? "bg-[#102739]" : "bg-slate-100"}`}>
+        <div className={`relative mx-auto h-full min-h-0 w-full ${classroom?.contentMode === "booklet" ? "grid max-w-[1600px] grid-cols-1 gap-3 p-3 lg:grid-cols-[220px_minmax(0,1fr)_190px]" : ""}`}>
           {classroom?.contentMode === "booklet" ? (
-            <div className="p-3">
-              <LessonBookletView
-                bookletData={booklet}
-                isLoading={bookletLoading}
-                  error={bookletError || undefined}
-                lessonTitle={currentContent.lessonTitle || lessonTitle}
-              />
-            </div>
+            <>
+              <aside className="order-2 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-[#0a1a27]/90 p-2 lg:order-1 lg:flex-col lg:overflow-y-auto">
+                <div className="hidden items-center justify-between px-1 text-white lg:flex"><b className="text-xs">رفاق الدراسة</b><span className="text-[10px] text-emerald-300">{state?.players.filter((player) => player.connected).length || 0} متصل</span></div>
+                {state?.players.map((player) => {
+                  const ratio = player.mission ? Math.round((player.mission.progress / Math.max(1, player.mission.target)) * 100) : 0;
+                  return <div key={player.id} className={`relative w-44 shrink-0 overflow-hidden rounded-2xl border p-2 text-white lg:w-full ${player.id === me ? "border-cyan-300/70 bg-cyan-500/15" : player.mission?.completed ? "border-emerald-300/60 bg-emerald-500/15" : "border-white/10 bg-white/5"}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="relative"><img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className={`h-11 w-11 rounded-2xl border-2 object-cover ${player.mission?.completed ? "border-emerald-300" : "border-white/20"}`}/><span className={`absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-[#0a1a27] ${player.connected ? "bg-emerald-400" : "bg-slate-500"}`}/></div>
+                      <div className="min-w-0 flex-1"><b className="block truncate text-xs">{player.id === me ? `${player.name || "طالب"} (أنت)` : player.name || "طالب"}</b><span className="flex items-center gap-1 text-[9px] text-slate-300">{player.micAllowed ? <Mic className="h-3 w-3 text-emerald-300"/> : <MicOff className="h-3 w-3"/>}{player.handRaised ? "رفع يده" : player.mission?.completed ? "أنجز مهمته" : "يدرس الآن"}</span></div>
+                    </div>
+                    <div className="mt-2 min-h-8 rounded-xl bg-black/20 px-2 py-1 text-[10px] text-slate-200">{player.mission?.text || "لم يحدد مهمة بعد"}</div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${player.mission?.completed ? "bg-emerald-400" : "bg-cyan-400"}`} style={{ width: `${ratio}%` }}/></div>
+                    <div className="mt-1 flex justify-between text-[9px] text-slate-400"><span>{player.mission ? `${player.mission.progress}/${player.mission.target}` : "بانتظار المهمة"}</span><span>{ratio}%</span></div>
+                  </div>;
+                })}
+              </aside>
+              <section className="order-1 relative min-h-[55dvh] overflow-auto rounded-[2rem] border-[6px] border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] lg:order-2">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/10 bg-[#fffaf0]/95 px-4 py-2 backdrop-blur"><span className="flex items-center gap-2 text-xs font-black text-amber-950"><BookOpen className="h-4 w-4"/>الملزمة المشتركة</span><span className="text-[10px] text-amber-800">{currentContent.lessonTitle || lessonTitle}</span></div>
+                <div className="p-3"><LessonBookletView bookletData={booklet} isLoading={bookletLoading} error={bookletError || undefined} lessonTitle={currentContent.lessonTitle || lessonTitle}/></div>
+                <canvas
+                  ref={canvasRef}
+                  className={`absolute inset-0 z-20 h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "pointer-events-none"}`}
+                  onPointerDown={(event) => {
+                    if (canDraw) {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      setDraft([point(event)]);
+                    }
+                  }}
+                  onPointerMove={(event) => {
+                    if (canDraw && draft.length) setDraft((value) => [...value, point(event)]);
+                  }}
+                  onPointerUp={(event) => {
+                    if (draft.length > 1) send({ type: "classroom_stroke", stroke: { id: crypto.randomUUID(), color, size, points: [...draft, point(event)] } });
+                    setDraft([]);
+                  }}
+                />
+              </section>
+              <aside className="order-3 hidden flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:flex">
+                <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
+                <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(treeStage).padStart(2, "0")}.png`} alt="شجرة تقدم المجموعة" className="my-3 max-h-48 w-full object-contain drop-shadow-[0_12px_18px_rgba(16,185,129,.25)]"/>
+                <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
+              </aside>
+            </>
           ) : (
             <iframe
               key={`${currentContent.exerciseFile || "first"}:${Number(currentContent.exerciseIndex || 0)}`}
@@ -799,35 +882,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
               allow="fullscreen; clipboard-write"
             />
           )}
-          {classroom?.contentMode === "booklet" && <canvas
-            ref={canvasRef}
-            className={`absolute inset-0 z-20 h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "pointer-events-none"}`}
-            onPointerDown={(event) => {
-              if (canDraw) {
-                event.currentTarget.setPointerCapture(event.pointerId);
-                setDraft([point(event)]);
-              }
-            }}
-            onPointerMove={(event) => {
-              if (canDraw && draft.length) {
-                const nextPoint = point(event);
-                setDraft((value) => [...value, nextPoint]);
-              }
-            }}
-            onPointerUp={(event) => {
-              if (draft.length > 1)
-                send({
-                  type: "classroom_stroke",
-                  stroke: {
-                    id: crypto.randomUUID(),
-                    color,
-                    size,
-                    points: [...draft, point(event)],
-                  },
-                });
-              setDraft([]);
-            }}
-          />}
           {!isTeacher && classroom?.answersLocked && (
             <div className="pointer-events-none fixed inset-x-4 bottom-24 z-30 mx-auto max-w-sm rounded-3xl border border-cyan-200/70 bg-cyan-100/90 p-4 text-center text-cyan-950 shadow-[0_0_35px_rgba(125,211,252,.8)] backdrop-blur">
               <Snowflake className="mx-auto mb-1 animate-pulse" />
@@ -836,8 +890,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
           )}
         </div>
       </main>
+      {missionOpen && <div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" onClick={() => setMissionOpen(false)}><div className="w-full max-w-sm rounded-3xl border border-emerald-300/30 bg-[#0d2230] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><div><b className="flex items-center gap-2 text-emerald-200"><Target className="h-5 w-5"/>مهمتي في الجلسة</b><small className="text-slate-400">اختر هدفًا واضحًا يمكنك إنجازه</small></div><button onClick={() => setMissionOpen(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div><div className="mt-4 grid grid-cols-2 gap-2">{["قراءة صفحات", "حل أسئلة", "تلخيص الدرس", "حفظ تعريفات"].map((preset) => <button key={preset} onClick={() => setMissionText(preset)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-xs hover:border-emerald-300">{preset}</button>)}</div><input value={missionText} maxLength={100} onChange={(event) => setMissionText(event.target.value)} placeholder="اكتب مهمتك" className="mt-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><label className="mt-3 block text-xs font-bold">العدد المطلوب: <b className="text-emerald-300">{missionTarget}</b></label><input type="range" min="1" max="20" value={missionTarget} onChange={(event) => setMissionTarget(Number(event.target.value))} className="mt-2 w-full accent-emerald-400"/><button onClick={() => saveMission(0)} disabled={!missionText.trim()} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-emerald-400 to-cyan-400 py-3 font-black text-slate-950 disabled:opacity-40">ابدأ المهمة</button></div></div>}
       <footer className="border-t border-white/10 bg-slate-950 p-2">
         <div className="flex items-center gap-2">
+          {classroom?.contentMode === "booklet" && <>
+            <button onClick={() => { setMissionText(self?.mission?.text || ""); setMissionTarget(self?.mission?.target || 4); setMissionOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950"><Target className="h-4 w-4"/>{self?.mission ? "تعديل مهمتي" : "اختر مهمتك"}</button>
+            {self?.mission && <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1"><button onClick={() => updateMissionProgress(self.mission!.progress - 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">−</button><span className="min-w-12 text-center text-xs font-black text-white">{self.mission.progress}/{self.mission.target}</span><button onClick={() => updateMissionProgress(self.mission!.progress + 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500 text-slate-950">+</button>{self.mission.completed && <CheckCircle2 className="mx-1 h-5 w-5 text-emerald-300"/>}</div>}
+          </>}
           {canDraw && classroom?.contentMode === "booklet" && (
             <>
               <PenLine className="h-4 w-4 text-cyan-300" />
