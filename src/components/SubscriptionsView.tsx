@@ -333,14 +333,14 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold text-white outline-none">
                 <option value="">اختر نوع اللعبة / النشاط</option>
                 {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
-                {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_booklet">الملزمة</option>}
+                {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
                 <option value="true_false">صواب أم خطأ</option>
                 <option value="millionaire">من سيربح المليون</option>
                 <option value="gibha_sah">جبتها صح</option>
               </select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-violet-200" />
             </label>}
-            {['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
+            {challengeSubject && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
               <div className="rounded-2xl border border-cyan-300/30 bg-slate-950/45 p-2.5">
                 <p className="mb-2 text-center text-[11px] font-black text-cyan-100">تحديد موضوع</p>
                 <label className="mb-2 flex items-center overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
