@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Apple,
+  ArrowLeftRight,
   BookOpen,
   CheckCircle2,
   ChevronLeft,
@@ -236,6 +237,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
+  const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
   const [answerText, setAnswerText] = useState("");
@@ -272,6 +274,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     setClassroomExercises([]);
     setExerciseMenu(false);
+    setBookletItemIndex(0);
+    setBookletAnswerVisible(false);
+    setLessonMenuOpen(false);
   }, [currentContent.lessonId, currentContent.lessonTitle]);
 
   useEffect(() => {
@@ -325,7 +330,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const send = (payload: unknown) => {
     if (offlineBooklet) {
-      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke };
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke };
       setState((previous) => {
         if (!previous) return previous;
         const next: ClassroomState = {
@@ -346,6 +351,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
         }
         if (message.type === "classroom_control") {
           const targetPlayer = next.players.find((player) => player.id === message.targetId);
+          if (message.action === "change_content" && message.content) {
+            next.classroom.content = { ...next.classroom.content, ...message.content };
+          }
           if (message.action === "shared_mission") next.classroom.sharedMission = String(message.value || "").trim().slice(0, 120);
           if (message.action === "mic_permission" && targetPlayer) targetPlayer.micAllowed = Boolean(message.value);
           if (message.action === "select_speaker" && targetPlayer) next.players.forEach((player) => { player.micAllowed = player.id === targetPlayer.id; });
@@ -786,6 +794,23 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <div className="min-w-0"><b className="block truncate text-xs">{currentContent.lessonTitle || lessonTitle}</b><small className="text-[9px] text-emerald-200">غرفة دراسة أوفلاين · {state?.players.length || 0} طلاب</small></div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"><span className="block text-[8px] font-black text-slate-400">مدة الدراسة</span><strong className="block font-mono text-lg tracking-[.18em] text-white">{elapsedTimerText}</strong></div>
+          <div className="absolute left-[31%] top-1/2 z-30 -translate-y-1/2">
+            <button onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-cyan-200/45 bg-gradient-to-br from-cyan-400/25 via-blue-500/20 to-violet-500/30 text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,.18)]" aria-label="تبديل الدرس" title="تبديل الدرس"><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-300"/></button>
+            {lessonMenuOpen && <div className="absolute left-0 top-11 max-h-[70dvh] w-52 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 shadow-2xl backdrop-blur" dir="rtl">
+              <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
+              <div className="grid grid-cols-2 gap-1.5">
+                {lessonChoices.map((lesson, index) => {
+                  const active = lesson.lessonId === currentContent.lessonId || lesson.lessonNumber === Number(currentContent.lesson);
+                  const colors = ["from-cyan-400 to-blue-500", "from-violet-400 to-fuchsia-500", "from-amber-300 to-orange-500", "from-emerald-300 to-teal-500", "from-rose-400 to-pink-500"];
+                  return <button key={lesson.lessonId} onClick={() => send({ type: "classroom_control", action: "change_content", contentMode: "booklet", content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } })} className={`flex min-h-12 items-center gap-2 rounded-xl border px-2 py-1.5 text-right ${active ? "border-white/70 bg-white/15" : "border-white/10 bg-white/5 hover:bg-white/10"}`} title={lesson.title}>
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${colors[index % colors.length]} text-[10px] font-black text-slate-950 shadow-sm`}>{lesson.lessonNumber}</span>
+                    <span className="line-clamp-2 text-[8px] font-bold leading-4 text-white">{lesson.title || `الدرس ${lesson.lessonNumber}`}</span>
+                  </button>;
+                })}
+              </div>
+              {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
+            </div>}
+          </div>
           <button onClick={() => setBookletPanelVisible((visible) => !visible)} className={`absolute right-[31%] grid h-9 w-9 place-items-center rounded-xl border ${bookletPanelVisible ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100" : "border-cyan-300/40 bg-cyan-400/15 text-cyan-100"}`} aria-label={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"} title={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"}>{bookletPanelVisible ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
           <div className="flex items-center gap-1">
             <button onClick={() => void toggleMic()} className={`grid h-9 w-9 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
