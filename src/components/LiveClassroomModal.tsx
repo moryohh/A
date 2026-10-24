@@ -33,6 +33,10 @@ const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
   /\/$/,
   "",
 );
+// Temporary product switch: keep the complete online room implementation
+// below, but present booklet rooms as a local interactive preview until the
+// Cloudflare Durable Objects allowance is available again.
+const OFFLINE_BOOKLET_PREVIEW = true;
 const CAPACITIES = [2, 4, 8, 12, 20, 30, 50] as const;
 type Capacity = (typeof CAPACITIES)[number];
 type Point = { x: number; y: number };
@@ -176,14 +180,42 @@ export const LiveClassroomModal: React.FC<Props> = ({
     (isScienceBoard(openLessonContext?.subjectId || category)
       ? "board"
       : "booklet");
+  const offlineBooklet = OFFLINE_BOOKLET_PREVIEW && defaultMode === "booklet";
+  const offlineGuest = loadGuestSession();
+  const offlineHostAvatar = offlineGuest
+    ? localStorage.getItem(`nahnu_maak_avatar_${offlineGuest.id}`) || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`
+    : `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`;
   const [capacity, setCapacity] = useState<Capacity>(8);
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [studyMode, setStudyMode] = useState<"teacher" | "together">("together");
   const [sharedMissionDraft, setSharedMissionDraft] = useState("");
-  const [room, setRoom] = useState("");
+  const [room, setRoom] = useState(offlineBooklet ? "OFFLINE" : "");
   const [entry, setEntry] = useState("");
-  const [me, setMe] = useState("");
-  const [state, setState] = useState<ClassroomState | null>(null);
+  const [me, setMe] = useState(offlineBooklet ? "offline-host" : "");
+  const [state, setState] = useState<ClassroomState | null>(() => offlineBooklet ? {
+    type: "state",
+    status: "playing",
+    players: [
+      { id: "offline-host", name: offlineGuest?.name || "محمد", avatar: offlineHostAvatar, connected: true, micAllowed: true, drawAllowed: true, joinedAt: Date.now() - 300000, mission: { text: "قراءة أربع صفحات", target: 4, progress: 2, completed: false, updatedAt: Date.now() } },
+      { id: "offline-abdullah", name: "عبدالله", avatar: `${import.meta.env.BASE_URL}avatars/avatar-fox-explorer.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 280000, mission: { text: "تلخيص التعاريف", target: 3, progress: 3, completed: true, updatedAt: Date.now() } },
+      { id: "offline-zahraa", name: "زهراء", avatar: `${import.meta.env.BASE_URL}avatars/avatar-panda-reader.jpg`, connected: true, micAllowed: false, handRaised: true, joinedAt: Date.now() - 240000, mission: { text: "حل ثلاثة أسئلة", target: 3, progress: 1, completed: false, updatedAt: Date.now() } },
+      { id: "offline-ahmed", name: "أحمد", avatar: `${import.meta.env.BASE_URL}avatars/avatar-cat-scientist.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 180000, mission: { text: "مراجعة الفصل الأول", target: 5, progress: 4, completed: false, updatedAt: Date.now() } },
+    ],
+    classroom: {
+      hostId: "offline-host",
+      capacity: 8,
+      answersLocked: true,
+      endsAt: Date.now() + 45 * 60000,
+      contentMode: "booklet",
+      content: { subject: openLessonContext?.subjectId || category, chapter: openLessonContext?.chapterNumber || 1, lesson: openLessonContext?.lessonNumber || 1, lessonId: openLessonContext?.lessonId, lessonTitle },
+      strokes: [],
+      drawingVersion: 0,
+      presenterId: "offline-host",
+      presenterState: null,
+      studyMode: "together",
+      sharedMission: "نقرأ الصفحات 1–5 خلال 15 دقيقة",
+    },
+  } : null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [booklet, setBooklet] = useState<LessonBookletData | null>(null);
@@ -280,6 +312,40 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }, [isTeacher, classroom?.presenterId, classroom?.presenterState, me]);
 
   const send = (payload: unknown) => {
+    if (offlineBooklet) {
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke };
+      setState((previous) => {
+        if (!previous) return previous;
+        const next: ClassroomState = {
+          ...previous,
+          players: previous.players.map((player) => ({ ...player, mission: player.mission ? { ...player.mission } : null })),
+          classroom: { ...previous.classroom, strokes: [...previous.classroom.strokes] },
+        };
+        const selfPlayer = next.players.find((player) => player.id === me);
+        if (message.type === "classroom_mission" && selfPlayer) {
+          const target = Math.max(1, Math.min(100, Number(message.target) || 1));
+          const progress = Math.max(0, Math.min(target, Number(message.progress) || 0));
+          selfPlayer.mission = { text: String(message.text || "").trim().slice(0, 100), target, progress, completed: progress >= target, updatedAt: Date.now() };
+        }
+        if (message.type === "raise_hand" && selfPlayer) selfPlayer.handRaised = Boolean(message.raised);
+        if (message.type === "classroom_stroke" && message.stroke) {
+          next.classroom.strokes = next.classroom.strokes.slice(-299).concat(message.stroke);
+          next.classroom.drawingVersion += 1;
+        }
+        if (message.type === "classroom_control") {
+          const targetPlayer = next.players.find((player) => player.id === message.targetId);
+          if (message.action === "shared_mission") next.classroom.sharedMission = String(message.value || "").trim().slice(0, 120);
+          if (message.action === "mic_permission" && targetPlayer) targetPlayer.micAllowed = Boolean(message.value);
+          if (message.action === "select_speaker" && targetPlayer) next.players.forEach((player) => { player.micAllowed = player.id === targetPlayer.id; });
+          if (message.action === "select_presenter" && targetPlayer) next.classroom.presenterId = targetPlayer.id;
+          if (message.action === "restore_presenter") next.classroom.presenterId = next.classroom.hostId;
+          if (message.action === "answers_locked") next.classroom.answersLocked = Boolean(message.value);
+          if (message.action === "clear_drawing") { next.classroom.strokes = []; next.classroom.drawingVersion += 1; }
+        }
+        return next;
+      });
+      return;
+    }
     if (socketRef.current?.readyState === WebSocket.OPEN)
       socketRef.current.send(JSON.stringify(payload));
   };
@@ -496,7 +562,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     }
   }
   useEffect(() => {
-    if (!initialRoomCode || room || busy) return;
+    if (offlineBooklet || !initialRoomCode || room || busy) return;
     setEntry(initialRoomCode);
     setBusy(true);
     void connect(initialRoomCode)
@@ -506,7 +572,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       .finally(() => setBusy(false));
     // Join a selected classroom once when opened from the room hub.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialRoomCode]);
+  }, [initialRoomCode, offlineBooklet]);
 
   useEffect(() => {
     if (room) void enterClassroomLandscape();
@@ -703,12 +769,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {currentContent.lessonTitle || lessonTitle}
             </b>
             <small className="text-cyan-300">
-              رمز الفصل: {room} ·{" "}
+            {offlineBooklet ? "تجربة أوفلاين" : `رمز الفصل: ${room}`} ·{" "}
               {Math.max(0, (state?.players.length || 1) - 1)}/
               {classroom?.capacity || capacity} طالب
             </small>
           </div>
-          {isTeacher && <button onClick={() => void inviteStudents()} className="flex h-9 items-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 px-2 text-[11px] font-black text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب"><Share2 className="h-4 w-4"/>{inviteCopied ? "تم النسخ" : "دعوة"}</button>}
+          {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="flex h-9 items-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 px-2 text-[11px] font-black text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب"><Share2 className="h-4 w-4"/>{inviteCopied ? "تم النسخ" : "دعوة"}</button>}
+          {offlineBooklet && <span className="rounded-xl border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-100">وضع المعاينة — لا يحتاج إنترنت للغرفة</span>}
         </div>
         {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div className="relative" ref={exerciseMenuRef}>
