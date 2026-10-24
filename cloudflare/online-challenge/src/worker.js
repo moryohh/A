@@ -104,6 +104,19 @@ export default {
       if (!creator) return json({ error: 'unauthorized' }, 401, origin);
       var body = await request.json().catch(function () { return null; });
       if (!body || !validGameType(body.gameType) || !validQuestions(body.questions) || !validRoomMetadata(body)) return json({ error: 'invalid_game' }, 400, origin);
+      if (body.gameType === 'live_classroom') {
+        var directQuestions = body.questions.map(function (q) { return { question: q.question, options: q.options, correctAnswer: q.correctAnswer }; });
+        for (var directAttempt = 0; directAttempt < 20; directAttempt += 1) {
+          var directCode = String(Math.floor(1000 + Math.random() * 9000));
+          var directStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + directCode));
+          var directCreated = await directStub.fetch(new Request('https://room/internal/init', {
+            method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
+          }));
+          if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
+          if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
+        }
+        return json({ error: 'room_code_unavailable' }, 503, origin);
+      }
       var roomId = crypto.randomUUID();
       var registryNamespace = registryBinding(env);
       var registry = registryNamespace.get(registryNamespace.idFromName('active-rooms'));
@@ -140,7 +153,17 @@ export default {
       var publicCode = connectMatch[1];
       var roomId = publicCode;
       if (/^\d{1,4}$/.test(publicCode)) {
+        var directConnectStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + publicCode));
+        var directTicketResponse = await directConnectStub.fetch(new Request('https://room/internal/ticket', {
+          method: 'POST', body: JSON.stringify({ userId: joiner, profile: connectBody.profile || null }),
+        }));
+        if (directTicketResponse.ok) {
+          var directTicketPayload = await directTicketResponse.json();
+          directTicketPayload.roomId = 'c-' + publicCode;
+          return json(directTicketPayload, directTicketResponse.status, origin);
+        }
         var resolveRegistry = registryBinding(env);
+        if (!resolveRegistry) return json({ error: 'room_not_found' }, 404, origin);
         var resolved = await resolveRegistry.get(resolveRegistry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(publicCode)));
         if (!resolved.ok) return json({ error: 'room_not_found' }, 404, origin);
         roomId = (await resolved.json()).roomId;
@@ -166,7 +189,11 @@ export default {
       var leaveCode = leaveMatch[1];
       var leaveRoomId = leaveCode;
       if (/^\d{1,4}$/.test(leaveCode)) {
+        var directLeaveStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + leaveCode));
+        var directLeaveResponse = await directLeaveStub.fetch(new Request('https://room/internal/leave', { method: 'POST', body: JSON.stringify({ userId: leaver }) }));
+        if (directLeaveResponse.ok) return json(await directLeaveResponse.json(), directLeaveResponse.status, origin);
         var leaveRegistry = registryBinding(env);
+        if (!leaveRegistry) return json({ ok: true }, 200, origin);
         var leaveResolved = await leaveRegistry.get(leaveRegistry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(leaveCode)));
         if (!leaveResolved.ok) return json({ ok: true }, 200, origin);
         leaveRoomId = (await leaveResolved.json()).roomId;
@@ -179,11 +206,12 @@ export default {
       return json(leavePayload, leaveResponse.status, origin);
     }
 
-    var socketMatch = url.pathname.match(/^\/rooms\/([0-9a-f-]{36})\/ws$/);
+    var socketMatch = url.pathname.match(/^\/rooms\/([0-9a-f-]{36}|c-\d{4})\/ws$/);
     if (socketMatch && request.method === 'GET' && (request.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       var ticket = url.searchParams.get('ticket');
       if (!ticket) return json({ error: 'ticket_required' }, 401, origin);
-      return env.ROOMS.get(env.ROOMS.idFromName(socketMatch[1])).fetch(new Request(
+      var socketRoomName = socketMatch[1].startsWith('c-') ? 'classroom:' + socketMatch[1].slice(2) : socketMatch[1];
+      return env.ROOMS.get(env.ROOMS.idFromName(socketRoomName)).fetch(new Request(
         'https://room/internal/ws?ticket=' + encodeURIComponent(ticket), { headers: { Upgrade: 'websocket' } },
       ));
     }
