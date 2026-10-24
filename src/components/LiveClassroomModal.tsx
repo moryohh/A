@@ -668,14 +668,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
-  const bookletLessonHeading = useMemo(() => {
-    const firstItem = (booklet?.pages || []).flatMap((page) => page.items || [])[0];
-    if (!firstItem) return currentContent.lessonTitle || lessonTitle;
-    if ("content" in firstItem) return String(firstItem.content || "").trim();
-    if ("title" in firstItem) return String(firstItem.title || "").trim();
-    if ("question" in firstItem) return String(firstItem.question || "").trim();
-    return currentContent.lessonTitle || lessonTitle;
-  }, [booklet, currentContent.lessonTitle, lessonTitle]);
   const saveMission = (progress = 0) => {
     const text = missionText.trim();
     if (!text) return;
@@ -868,10 +860,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
             {bookletPanelVisible && <aside className="relative min-h-0 overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <b className="flex shrink-0 items-center gap-1 text-xs"><BookOpen className="h-4 w-4 text-emerald-700"/>الملزمة</b>
-                  <span className="min-w-0 max-w-[155px] truncate rounded-full bg-emerald-700/10 px-2 py-0.5 text-[8px] font-black text-emerald-800" title={bookletLessonHeading}>{bookletLessonHeading}</span>
-                </div>
+                <span className="flex-1" aria-hidden="true" />
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
               </div>
               <div className="absolute inset-x-0 bottom-[58px] top-[41px] overflow-y-auto overscroll-contain p-4">
