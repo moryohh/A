@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   Lock,
   Mail,
   User,
   CheckCircle2,
   AlertCircle,
   Loader2,
-  HelpCircle,
   ExternalLink,
-  Copy,
-  Check,
-  ShieldCheck,
   ArrowRight,
   SendHorizontal,
   Inbox,
@@ -43,22 +38,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showGoogleSetupGuide, setShowGoogleSetupGuide] = useState(false);
-  const [hasCopiedUrl, setHasCopiedUrl] = useState(false);
 
   // Email confirmation state after registration
   const [registeredEmailForConfirmation, setRegisteredEmailForConfirmation] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
-
-  // Supabase Callback URL for this specific project
-  const callbackUrl = 'https://qlfleszoyujelygwzdgu.supabase.co/auth/v1/callback';
-
-  const copyCallbackUrl = () => {
-    navigator.clipboard.writeText(callbackUrl);
-    setHasCopiedUrl(true);
-    setTimeout(() => setHasCopiedUrl(false), 2500);
-  };
 
   // 1. Google OAuth Sign-in
   const handleGoogleLogin = async () => {
@@ -76,7 +60,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           setErrorMessage(
             'مزود Google غير مفعل حالياً في لوحة تحكم Supabase. يمكنك تفعيله بسهولة من لوحة التحكم أو استخدام بريد Gmail وكلمة المرور أدناه.'
           );
-          setShowGoogleSetupGuide(true);
         } else {
           setErrorMessage(res.error);
         }
@@ -170,9 +153,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-3 sm:p-4 text-right select-none animate-in fade-in duration-300">
+    <div className="min-h-[100dvh] w-full flex items-stretch justify-center p-0 sm:min-h-screen sm:items-center sm:p-4 text-right select-none animate-in fade-in duration-300">
       <div
-        className={`w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border relative overflow-hidden transition-all duration-300 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
+        className={`relative min-h-[100dvh] w-full max-w-none overflow-hidden rounded-none border-x-0 p-5 shadow-2xl transition-all duration-300 sm:min-h-0 sm:max-w-md sm:rounded-3xl sm:border sm:p-6 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
         style={{
           boxShadow: `0 12px 40px ${theme.colors.glow}`,
         }}
@@ -304,20 +287,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
         ) : (
-          <>
+          <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col justify-center sm:min-h-0 sm:block">
             {/* Standard Login & Sign Up View */}
             {/* Brand Header */}
-            <div className="text-center space-y-2 pt-2 mb-6">
-              <div className="inline-flex items-center justify-center gap-1.5 mb-1">
-                <span
-                  className="text-xl font-black filter"
-                  style={{
-                    color: theme.colors.secondary,
-                    filter: `drop-shadow(0 0 10px ${theme.colors.secondary})`,
-                  }}
-                >
-                  ✦
-                </span>
+            <div className="mb-8 pt-2 text-center sm:mb-6">
+              <div className="inline-flex items-center justify-center gap-1.5">
                 <h1 className="text-2xl font-black tracking-wide leading-none flex items-center gap-1.5">
                   <span className={theme.classes.textMain}>منصة</span>
                   <span
@@ -330,12 +304,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   </span>
                 </h1>
               </div>
-
-              <p className={`text-xs ${theme.classes.textMuted} font-medium`}>
-                {authMode === 'login'
-                  ? 'سجل الدخول للمتابعة إلى المحتوى التعليمي والدروس'
-                  : 'أنشئ حسابك كطالب في منصة نحن معك التعليمية'}
-              </p>
             </div>
 
             {/* Feedback Messages */}
@@ -412,71 +380,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 )}
               </button>
 
-              {/* Quick info button to open Google Setup Guide */}
-              <div className="flex items-center justify-between px-1">
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleSetupGuide(!showGoogleSetupGuide)}
-                  className="text-[11px] font-bold text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  <span>كيفية تفعيل تسجيل Google في لوحة Supabase؟</span>
-                </button>
-              </div>
-
-              {/* Collapsible Google Setup Guide */}
-              {showGoogleSetupGuide && (
-                <div
-                  className={`p-3.5 rounded-2xl border text-xs space-y-2.5 animate-in fade-in transition-all ${
-                    theme.isLight ? 'bg-sky-50/80 border-sky-200 text-sky-900' : 'bg-sky-950/40 border-sky-500/30 text-sky-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between font-black text-[12px] text-sky-400">
-                    <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4" />
-                      خطوات تفعيل تسجيل Google (تستغرق دقيقة واحدة):
-                    </span>
-                  </div>
-                  <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed opacity-90">
-                    <li>
-                      ادخل إلى مشروعك في{' '}
-                      <a
-                        href="https://supabase.com/dashboard/project/qlfleszoyujelygwzdgu/auth/providers"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline font-bold text-amber-400 inline-flex items-center gap-0.5"
-                      >
-                        Supabase Providers <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    </li>
-                    <li>اضغط على <b>Google</b> وقم بتفعيل خيار <b>Enable Google provider</b>.</li>
-                    <li>
-                      ضع رابط الـ Callback التالي في Google Cloud Console:
-                      <div className="mt-1 flex items-center gap-1 bg-black/40 p-1.5 rounded-lg border border-white/10 font-mono text-[10px] break-all">
-                        <span className="flex-1 select-all">{callbackUrl}</span>
-                        <button
-                          type="button"
-                          onClick={copyCallbackUrl}
-                          className="px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-[9px] font-bold flex items-center gap-1 shrink-0"
-                        >
-                          {hasCopiedUrl ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          <span>{hasCopiedUrl ? 'تم النسخ' : 'نسخ'}</span>
-                        </button>
-                      </div>
-                    </li>
-                    <li>ألصق الـ <b>Client ID</b> و <b>Client Secret</b> ثم اضغط <b>Save</b>.</li>
-                  </ol>
-                </div>
-              )}
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 my-4">
-                <div className={`flex-1 h-px ${theme.classes.cardBorder} bg-current opacity-20`} />
-                <span className={`text-[11px] font-bold ${theme.classes.textMuted}`}>
-                  أو التسجيل بحساب Gmail معتمد
-                </span>
-                <div className={`flex-1 h-px ${theme.classes.cardBorder} bg-current opacity-20`} />
-              </div>
             </div>
 
             {/* ======================================================== */}
@@ -621,15 +524,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>{authMode === 'login' ? 'دخول للمنصة' : 'إنشاء الحساب وبدء الدراسة'}</span>
-                  </>
+                  <span>{authMode === 'login' ? 'دخول للمنصة' : 'إنشاء الحساب وبدء الدراسة'}</span>
                 )}
               </button>
             </form>
 
-          </>
+          </div>
         )}
       </div>
     </div>
