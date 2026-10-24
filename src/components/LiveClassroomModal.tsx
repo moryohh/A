@@ -575,8 +575,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }, [initialRoomCode, offlineBooklet]);
 
   useEffect(() => {
-    if (room) void enterClassroomLandscape();
-  }, [room]);
+    // The booklet is a reading-first experience on phones. Keeping it in the
+    // device's natural orientation leaves enough vertical space and allows the
+    // student to scroll through the shared pages comfortably.
+    if (room && defaultMode === "board") void enterClassroomLandscape();
+  }, [room, defaultMode]);
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
@@ -753,19 +756,19 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   return (
     <div
-      className="live-classroom-root fixed inset-0 z-[100] flex flex-col bg-[#071126] font-cairo text-white"
+      className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071126] font-cairo text-white"
       dir="rtl"
     >
-      <header className="flex items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-3 py-2 shadow-lg">
-        <div className="flex items-center gap-2">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-2 py-2 shadow-lg sm:px-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             onClick={closeClassroom}
             className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,.35)]"
           >
             <X />
           </button>
-          <div>
-            <b className="block text-sm">
+          <div className="min-w-0">
+            <b className="block truncate text-sm">
               {currentContent.lessonTitle || lessonTitle}
             </b>
             <small className="text-cyan-300">
@@ -775,7 +778,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </small>
           </div>
           {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="flex h-9 items-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 px-2 text-[11px] font-black text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب"><Share2 className="h-4 w-4"/>{inviteCopied ? "تم النسخ" : "دعوة"}</button>}
-          {offlineBooklet && <span className="rounded-xl border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-100">وضع المعاينة — لا يحتاج إنترنت للغرفة</span>}
+          {offlineBooklet && <span className="hidden rounded-xl border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-100 sm:inline">وضع المعاينة — لا يحتاج إنترنت للغرفة</span>}
         </div>
         {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div className="relative" ref={exerciseMenuRef}>
@@ -887,8 +890,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
       )}
-      <main className={`relative min-h-0 flex-1 overflow-auto text-slate-900 ${classroom?.contentMode === "booklet" ? "bg-[#102739]" : "bg-slate-100"}`}>
-        <div className={`relative mx-auto h-full min-h-0 w-full ${classroom?.contentMode === "booklet" ? "grid max-w-[1600px] grid-cols-1 gap-3 p-3 lg:grid-cols-[220px_minmax(0,1fr)_190px]" : ""}`}>
+      <main className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain text-slate-900 ${classroom?.contentMode === "booklet" ? "bg-[#102739]" : "bg-slate-100"}`}>
+        <div className={`relative mx-auto min-h-0 w-full ${classroom?.contentMode === "booklet" ? "grid h-auto max-w-[1600px] grid-cols-1 gap-3 p-2 sm:p-3 lg:h-full lg:grid-cols-[220px_minmax(0,1fr)_190px]" : "h-full"}`}>
           {classroom?.contentMode === "booklet" ? (
             <>
               <aside className="order-2 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-[#0a1a27]/90 p-2 lg:order-1 lg:flex-col lg:overflow-y-auto">
@@ -906,12 +909,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   </div>;
                 })}
               </aside>
-              <section className="order-1 relative min-h-[55dvh] overflow-auto rounded-[2rem] border-[6px] border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] lg:order-2">
+              <section className="order-1 relative min-h-[70dvh] overflow-visible rounded-[1.5rem] border-4 border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] sm:rounded-[2rem] sm:border-[6px] lg:order-2 lg:min-h-0 lg:overflow-auto">
                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/10 bg-[#fffaf0]/95 px-4 py-2 backdrop-blur"><span className="flex items-center gap-2 text-xs font-black text-amber-950"><BookOpen className="h-4 w-4"/>الملزمة المشتركة</span><span className="text-[10px] text-amber-800">{currentContent.lessonTitle || lessonTitle}</span></div>
                 <div className="p-3"><LessonBookletView bookletData={booklet} isLoading={bookletLoading} error={bookletError || undefined} lessonTitle={currentContent.lessonTitle || lessonTitle}/></div>
                 <canvas
                   ref={canvasRef}
-                  className={`absolute inset-0 z-20 h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "pointer-events-none"}`}
+                  className={`pointer-events-none absolute inset-0 z-20 h-full w-full touch-auto lg:touch-none ${canDraw ? "lg:pointer-events-auto lg:cursor-crosshair" : ""}`}
                   onPointerDown={(event) => {
                     if (canDraw) {
                       event.currentTarget.setPointerCapture(event.pointerId);
@@ -958,8 +961,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </div>
       </main>
       {missionOpen && <div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" onClick={() => setMissionOpen(false)}><div className="w-full max-w-sm rounded-3xl border border-emerald-300/30 bg-[#0d2230] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><div><b className="flex items-center gap-2 text-emerald-200"><Target className="h-5 w-5"/>مهمتي في الجلسة</b><small className="text-slate-400">اختر هدفًا واضحًا يمكنك إنجازه</small></div><button onClick={() => setMissionOpen(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div><div className="mt-4 grid grid-cols-2 gap-2">{["قراءة صفحات", "حل أسئلة", "تلخيص الدرس", "حفظ تعريفات"].map((preset) => <button key={preset} onClick={() => setMissionText(preset)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-xs hover:border-emerald-300">{preset}</button>)}</div><input value={missionText} maxLength={100} onChange={(event) => setMissionText(event.target.value)} placeholder="اكتب مهمتك" className="mt-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><label className="mt-3 block text-xs font-bold">العدد المطلوب: <b className="text-emerald-300">{missionTarget}</b></label><input type="range" min="1" max="20" value={missionTarget} onChange={(event) => setMissionTarget(Number(event.target.value))} className="mt-2 w-full accent-emerald-400"/><button onClick={() => saveMission(0)} disabled={!missionText.trim()} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-emerald-400 to-cyan-400 py-3 font-black text-slate-950 disabled:opacity-40">ابدأ المهمة</button></div></div>}
-      <footer className="border-t border-white/10 bg-slate-950 p-2">
-        <div className="flex items-center gap-2">
+      <footer className="shrink-0 overflow-x-auto border-t border-white/10 bg-slate-950 p-2">
+        <div className="flex min-w-max items-center gap-2">
           {classroom?.contentMode === "booklet" && <>
             <button onClick={() => { setMissionText(self?.mission?.text || ""); setMissionTarget(self?.mission?.target || 4); setMissionOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950"><Target className="h-4 w-4"/>{self?.mission ? "تعديل مهمتي" : "اختر مهمتك"}</button>
             {self?.mission && <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1"><button onClick={() => updateMissionProgress(self.mission!.progress - 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">−</button><span className="min-w-12 text-center text-xs font-black text-white">{self.mission.progress}/{self.mission.target}</span><button onClick={() => updateMissionProgress(self.mission!.progress + 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500 text-slate-950">+</button>{self.mission.completed && <CheckCircle2 className="mx-1 h-5 w-5 text-emerald-300"/>}</div>}
