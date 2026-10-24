@@ -786,6 +786,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <div className="min-w-0"><b className="block truncate text-xs">{currentContent.lessonTitle || lessonTitle}</b><small className="text-[9px] text-emerald-200">غرفة دراسة أوفلاين · {state?.players.length || 0} طلاب</small></div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"><span className="block text-[8px] font-black text-slate-400">مدة الدراسة</span><strong className="block font-mono text-lg tracking-[.18em] text-white">{elapsedTimerText}</strong></div>
+          <button onClick={() => setBookletPanelVisible((visible) => !visible)} className={`absolute right-[31%] grid h-9 w-9 place-items-center rounded-xl border ${bookletPanelVisible ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100" : "border-cyan-300/40 bg-cyan-400/15 text-cyan-100"}`} aria-label={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"} title={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"}>{bookletPanelVisible ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
           <div className="flex items-center gap-1">
             <button onClick={() => void toggleMic()} className={`grid h-9 w-9 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
             <button onClick={() => setRoomSoundOn((enabled) => !enabled)} className={`grid h-9 w-9 place-items-center rounded-xl border ${roomSoundOn ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-400"}`} aria-label={roomSoundOn ? "كتم سماعة الغرفة" : "تشغيل سماعة الغرفة"}>{roomSoundOn ? <Volume2 className="h-4 w-4"/> : <VolumeX className="h-4 w-4"/>}</button>
@@ -832,28 +833,26 @@ export const LiveClassroomModal: React.FC<Props> = ({
               <div className="sticky bottom-1 mx-auto mt-3 flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white/90 px-3 py-1 shadow-sm"><img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(timedTreeStage).padStart(2, "0")}.png`} alt={`مرحلة نمو الغرفة ${timedTreeStage}`} className="h-8 w-8 object-contain"/><small className="text-[8px] font-black text-emerald-800">نمو الغرفة · كل 30 ثانية</small></div>
             </main>
 
-            {bookletPanelVisible && <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
+            {bookletPanelVisible && <aside className="relative min-h-0 overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 <b className="flex items-center gap-1 text-xs"><BookOpen className="h-4 w-4 text-emerald-700"/>الملزمة</b>
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto p-4">
+              <div className="absolute inset-x-0 bottom-[58px] top-[41px] overflow-y-auto overscroll-contain p-4">
                 {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
-                  <div className="mb-3 flex items-center gap-2 self-start">
+                  <div className="mb-3 flex items-center gap-2">
                     <button onClick={() => setBookletAnswerVisible((visible) => !visible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
-                    <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-slate-300 bg-white/70 text-slate-600" aria-label="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
                   </div>
                   <span className="mb-2 text-[9px] font-black text-emerald-700">السؤال {bookletItemIndex + 1}</span>
                   <p className="text-sm font-black leading-7">{bookletQuestion.question}</p>
                   {bookletAnswerVisible && <div className="mt-3 rounded-xl border border-emerald-700/15 bg-white/70 p-3 text-xs font-bold leading-6 text-emerald-950">{bookletQuestion.answer}</div>}
                 </> : <p className="text-center text-xs leading-6 text-slate-500">لا توجد أسئلة مفردة في ملزمة هذا الدرس.</p>}
               </div>
-              <div className="sticky bottom-0 z-10 grid shrink-0 grid-cols-2 gap-2 border-t border-[#d7c9a4] bg-[#f4f0e4] p-2 shadow-[0_-8px_18px_rgba(36,51,46,.08)]">
+              <div className="absolute inset-x-0 bottom-0 z-10 grid h-[58px] grid-cols-2 gap-2 border-t border-[#d7c9a4] bg-[#f4f0e4] p-2 shadow-[0_-8px_18px_rgba(36,51,46,.08)]">
                 <button disabled={bookletItemIndex <= 0} onClick={() => { setBookletItemIndex((index) => Math.max(0, index - 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
                 <button disabled={bookletItemIndex >= bookletQuestions.length - 1} onClick={() => { setBookletItemIndex((index) => Math.min(bookletQuestions.length - 1, index + 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
               </div>
             </aside>}
-            {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="fixed bottom-3 right-3 z-20 flex items-center gap-1 rounded-xl bg-emerald-700 px-3 py-2 text-[10px] font-black text-white shadow-lg" dir="rtl"><Eye className="h-4 w-4"/>إظهار الملزمة</button>}
           </div>
         </div>
       </div>
