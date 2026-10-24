@@ -3,7 +3,11 @@ import {
   Apple,
   BookOpen,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
+  Eye,
+  EyeOff,
   Hand,
   Grid2X2,
   LockKeyhole,
@@ -27,7 +31,7 @@ import { fetchLessonCurriculum } from "../services/curriculumService";
 import { getSubjectIndex } from "../services/lessonsService";
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
-import type { LessonBookletData } from "../data/lessonBooklet";
+import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
 
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
   /\/$/,
@@ -225,6 +229,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [size, setSize] = useState(4);
   const [draft, setDraft] = useState<Point[]>([]);
   const [seconds, setSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [bookletItemIndex, setBookletItemIndex] = useState(0);
+  const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
+  const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [answerText, setAnswerText] = useState("");
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
@@ -367,6 +375,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [classroom?.endsAt]);
+  useEffect(() => {
+    if (!room || classroom?.contentMode !== "booklet") return;
+    const startedAt = Date.now();
+    const update = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [room, classroom?.contentMode]);
   useEffect(() => {
     if (classroom?.contentMode !== "booklet") return;
     setBookletLoading(true);
@@ -575,10 +591,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }, [initialRoomCode, offlineBooklet]);
 
   useEffect(() => {
-    // The booklet is a reading-first experience on phones. Keeping it in the
-    // device's natural orientation leaves enough vertical space and allows the
-    // student to scroll through the shared pages comfortably.
-    if (room && defaultMode === "board") void enterClassroomLandscape();
+    if (room) void enterClassroomLandscape();
   }, [room, defaultMode]);
 
   useEffect(() => {
@@ -627,6 +640,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     };
   };
   const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const elapsedTimerText = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
   const isBoardPresenter = Boolean(isTeacher || classroom?.presenterId === me);
   const selectClassroomExercise = (item: { file: string; questionIndex: number; number: number }) => {
     send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: item.file, exerciseIndex: item.questionIndex, exerciseNumber: item.number } });
@@ -637,6 +651,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
   const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
   const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
+  const timedTreeStage = Math.min(12, Math.floor(elapsedSeconds / 30));
+  const bookletQuestions = useMemo(() => (booklet?.pages || [])
+    .flatMap((page) => page.items || [])
+    .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
+  const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
   const saveMission = (progress = 0) => {
     const text = missionText.trim();
     if (!text) return;
@@ -750,6 +769,80 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {error}
             </p>
           )}
+        </div>
+      </div>
+    );
+
+  if (classroom?.contentMode === "booklet")
+    return (
+      <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#0b1d24] font-cairo text-white" dir="rtl">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-[#102832] px-3 shadow-lg">
+          <div className="flex min-w-0 items-center gap-2">
+            <button onClick={closeClassroom} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-500" aria-label="إغلاق الغرفة"><X className="h-5 w-5"/></button>
+            <div className="min-w-0"><b className="block truncate text-xs">{currentContent.lessonTitle || lessonTitle}</b><small className="text-[9px] text-emerald-200">غرفة دراسة أوفلاين · {state?.players.length || 0} طلاب</small></div>
+          </div>
+          <button onClick={() => setBookletPanelVisible((visible) => !visible)} className="flex items-center gap-1 rounded-xl border border-emerald-200/25 bg-white/5 px-3 py-2 text-[10px] font-black text-emerald-100">
+            {bookletPanelVisible ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+            {bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"}
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden" dir="ltr">
+          <div className={`grid h-full min-w-[680px] gap-2 p-2 ${bookletPanelVisible ? "grid-cols-[145px_minmax(260px,1fr)_290px]" : "grid-cols-[145px_minmax(420px,1fr)]"}`}>
+            <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
+              <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
+              <div className="space-y-2">
+                {state?.players.map((player, index) => {
+                  const progress = player.mission?.progress || 0;
+                  const target = Math.max(1, player.mission?.target || 1);
+                  const ratio = Math.round((progress / target) * 100);
+                  const shieldTier = Math.min(4, Math.floor((index + 1) / 2));
+                  return <div key={player.id} className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                    <div className="flex items-center gap-1.5 text-right">
+                      <img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className="h-8 w-8 rounded-xl border border-emerald-300/40 object-cover"/>
+                      <div className="min-w-0 flex-1"><b className="block truncate text-[10px]">{player.name || "طالب"}</b><span className="text-[8px] text-slate-300">المستوى {index + 1}</span></div>
+                      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldTier}.png`} alt="درع الطالب" className="h-7 w-7 object-contain"/>
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{width: `${ratio}%`}}/></div>
+                    <span className="mt-1 block text-[8px] text-emerald-200">إنجاز الدرس {progress}/{target}</span>
+                  </div>;
+                })}
+              </div>
+            </aside>
+
+            <main className="relative min-h-0 overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] shadow-inner" dir="rtl">
+              <div className="absolute inset-x-0 top-[10%] text-center">
+                <span className="text-[9px] font-black text-slate-400">مدة الدراسة</span>
+                <strong className="mt-1 block font-mono text-4xl tracking-widest text-slate-700">{elapsedTimerText}</strong>
+              </div>
+              <div className="absolute inset-x-0 bottom-2 flex flex-col items-center">
+                <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(timedTreeStage).padStart(2, "0")}.png`} alt={`مرحلة نمو النبتة ${timedTreeStage}`} className="h-[34dvh] max-h-44 min-h-20 w-auto object-contain drop-shadow-[0_10px_12px_rgba(16,185,129,.2)]"/>
+                <div className="-mt-1 flex max-w-[90%] flex-wrap justify-center gap-1">
+                  {state?.players.map((player) => <span key={player.id} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-800">{player.name || "طالب"}</span>)}
+                </div>
+                <small className="mt-1 text-[8px] text-slate-400">تنمو النبتة كل 30 ثانية</small>
+              </div>
+            </main>
+
+            {bookletPanelVisible && <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
+              <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
+                <b className="flex items-center gap-1 text-xs"><BookOpen className="h-4 w-4 text-emerald-700"/>الملزمة</b>
+                <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto p-4">
+                {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
+                  <span className="mb-2 text-[9px] font-black text-emerald-700">السؤال {bookletItemIndex + 1}</span>
+                  <p className="text-sm font-black leading-7">{bookletQuestion.question}</p>
+                  <button onClick={() => setBookletAnswerVisible((visible) => !visible)} className="mt-4 rounded-xl border border-emerald-700/20 bg-emerald-800 px-3 py-2 text-xs font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
+                  {bookletAnswerVisible && <div className="mt-3 rounded-xl border border-emerald-700/15 bg-white/70 p-3 text-xs font-bold leading-6 text-emerald-950">{bookletQuestion.answer}</div>}
+                </> : <p className="text-center text-xs leading-6 text-slate-500">لا توجد أسئلة مفردة في ملزمة هذا الدرس.</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-2 border-t border-[#d7c9a4] p-2">
+                <button disabled={bookletItemIndex <= 0} onClick={() => { setBookletItemIndex((index) => Math.max(0, index - 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
+                <button disabled={bookletItemIndex >= bookletQuestions.length - 1} onClick={() => { setBookletItemIndex((index) => Math.min(bookletQuestions.length - 1, index + 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
+              </div>
+            </aside>}
+          </div>
         </div>
       </div>
     );
