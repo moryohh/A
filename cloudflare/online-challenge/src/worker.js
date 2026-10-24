@@ -105,15 +105,19 @@ export default {
       var body = await request.json().catch(function () { return null; });
       if (!body || !validGameType(body.gameType) || !validQuestions(body.questions) || !validRoomMetadata(body)) return json({ error: 'invalid_game' }, 400, origin);
       if (body.gameType === 'live_classroom') {
-        var directQuestions = body.questions.map(function (q) { return { question: q.question, options: q.options, correctAnswer: q.correctAnswer }; });
-        for (var directAttempt = 0; directAttempt < 20; directAttempt += 1) {
-          var directCode = String(Math.floor(1000 + Math.random() * 9000));
-          var directStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + directCode));
-          var directCreated = await directStub.fetch(new Request('https://room/internal/init', {
-            method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
-          }));
-          if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
-          if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
+        try {
+          var directQuestions = body.questions.map(function (q) { return { question: q.question, options: q.options, correctAnswer: q.correctAnswer }; });
+          for (var directAttempt = 0; directAttempt < 20; directAttempt += 1) {
+            var directCode = String(Math.floor(1000 + Math.random() * 9000));
+            var directStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + directCode));
+            var directCreated = await directStub.fetch(new Request('https://room/internal/init', {
+              method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
+            }));
+            if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
+            if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
+          }
+        } catch (error) {
+          return json({ error: 'room_runtime_unavailable', detail: String(error && error.message || error).slice(0, 240), roomsBinding: Boolean(env.ROOMS) }, 503, origin);
         }
         return json({ error: 'room_code_unavailable' }, 503, origin);
       }
