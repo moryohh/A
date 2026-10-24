@@ -15,12 +15,16 @@ function validGuestId(value) {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isChallengePreviewOrigin(origin) {
+  return /^https:\/\/[a-z0-9-]+\.duha-challenge-preview\.pages\.dev$/i.test(origin);
+}
+
 async function authenticate(request, env, origin) {
   var header = request.headers.get('Authorization') || '';
   var guestMatch = header.match(/^Guest ([0-9a-f-]{36})$/i);
   if (guestMatch) {
     var guestOrigins = (env.PREVIEW_GUEST_ORIGINS || env.PREVIEW_GUEST_ORIGIN || '').split(',').map(function (item) { return item.trim(); }).filter(Boolean);
-    if (env.ALLOW_PREVIEW_GUESTS !== 'true' || !guestOrigins.includes(origin) || !validGuestId(guestMatch[1])) return null;
+    if (env.ALLOW_PREVIEW_GUESTS !== 'true' || (!guestOrigins.includes(origin) && !isChallengePreviewOrigin(origin)) || !validGuestId(guestMatch[1])) return null;
     return 'guest:' + guestMatch[1].toLowerCase();
   }
   var match = header.match(/^Bearer (.+)$/i);
@@ -77,7 +81,7 @@ function validRoomMetadata(body) {
 function allowedOrigin(request, env) {
   var configured = (env.ALLOWED_ORIGINS || env.ALLOWED_ORIGIN || 'https://a-1q1.pages.dev').split(',').map(function (item) { return item.trim(); });
   var origin = request.headers.get('Origin') || '';
-  return origin && !configured.includes(origin) ? null : (origin || configured[0]);
+  return origin && !configured.includes(origin) && !isChallengePreviewOrigin(origin) ? null : (origin || configured[0]);
 }
 
 export default {

@@ -21,7 +21,11 @@ test('guest access accepts both stable and deployment preview origins', async ()
     ALLOW_PREVIEW_GUESTS: 'true',
     PREVIEW_GUEST_ORIGINS: 'https://duha-challenge-preview.pages.dev,https://abc123.duha-challenge-preview.pages.dev',
   };
-  for (const origin of env.PREVIEW_GUEST_ORIGINS.split(',')) {
+  const origins = [
+    ...env.PREVIEW_GUEST_ORIGINS.split(','),
+    'https://older-build.duha-challenge-preview.pages.dev',
+  ];
+  for (const origin of origins) {
     const response = await worker.fetch(new Request('https://worker/rooms', {
       method: 'POST',
       headers: {
