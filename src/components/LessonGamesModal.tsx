@@ -19,6 +19,8 @@ import {
   Users,
   BookOpen,
   Presentation,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   EducationalGame,
@@ -34,6 +36,7 @@ import {
   TrueFalseAuthenticIcon,
   GibhaSahAuthenticIcon,
   DailyExamAuthenticIcon,
+  BookletStudyIcon,
 } from "./GameIcons";
 import { gameAudio } from "../utils/gameAudio";
 import {
@@ -106,6 +109,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   const [liveClassroomMode, setLiveClassroomMode] = useState<
     "board" | "booklet"
   >("board");
+  const [expandedMenuGame, setExpandedMenuGame] = useState<
+    "millionaire" | "true_false" | "gibha_sah" | null
+  >(null);
   const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>(
     [],
   );
@@ -184,6 +190,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     if (isOpen) {
       setActiveGameMode("menu");
       setGamesBundle(null);
+      setExpandedMenuGame(null);
       setBundleLoadError(false);
       setIsLoadingBundle(true);
       if (openLessonContext) {
@@ -551,7 +558,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       </small>
                     </div>
                   </div>
-                  <div className={`relative grid gap-2 ${supportsSolveBoard && !isMathLesson ? "grid-cols-2" : "grid-cols-1"}`}>
+                  <div className="relative grid grid-cols-1 gap-2">
                     {supportsSolveBoard && !isMathLesson && <button
                       type="button"
                       onClick={() => {
@@ -559,13 +566,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         setActiveGameMode("live_classroom");
                       }}
                       disabled={!import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
-                      className="flex min-h-24 flex-col items-center justify-center rounded-2xl border border-sky-300/50 bg-sky-400/15 p-3 text-center text-white transition active:scale-95 disabled:opacity-40"
+                      className="flex min-h-24 items-center justify-between rounded-2xl border border-sky-300/50 bg-gradient-to-l from-sky-400/20 to-blue-950/60 p-4 text-right text-white transition active:scale-[.98] disabled:opacity-40"
                     >
-                      <Presentation className="mb-2 h-8 w-8 text-sky-200" />
-                      <b className="text-sm">حل معي</b>
-                      <small className="mt-1 text-[9px] text-sky-100/75">
-                        صبورة تفاعلية أونلاين
-                      </small>
+                      <span><b className="block text-sm">حل معي</b><small className="mt-1 block text-[9px] text-sky-100/75">صبورة تفاعلية أونلاين</small></span>
+                      <Presentation className="h-12 w-12 text-sky-200" />
                     </button>}
                     {!isMathLesson && <button
                       type="button"
@@ -574,13 +578,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         setActiveGameMode("live_classroom");
                       }}
                       disabled={!import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
-                      className="flex min-h-24 flex-col items-center justify-center rounded-2xl border border-emerald-300/50 bg-emerald-400/15 p-3 text-center text-white transition active:scale-95 disabled:opacity-40"
+                      className="flex min-h-24 items-center justify-between rounded-2xl border border-emerald-300/50 bg-gradient-to-l from-emerald-400/20 to-teal-950/60 p-4 text-right text-white transition active:scale-[.98] disabled:opacity-40"
                     >
-                      <BookOpen className="mb-2 h-8 w-8 text-emerald-200" />
-                      <b className="text-sm">الملزمة</b>
-                      <small className="mt-1 text-[9px] text-emerald-100/75">
-                        غرفة دراسة تجريبية أوفلاين
-                      </small>
+                      <span><b className="block text-sm">الملزمة</b><small className="mt-1 block text-[9px] text-emerald-100/75">غرفة دراسة تجريبية أوفلاين</small></span>
+                      <BookletStudyIcon className="h-16 w-20" />
                     </button>}
                   </div>
                 </section>
@@ -609,82 +610,38 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                 </div>
               ) : null}
 
-              {/* 2x2 Grid (4 Quadrants / Square Sides) */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              {/* Wide game artwork cards; tap the artwork to enter or reveal modes. */}
+              <div className="grid grid-cols-1 gap-3 pt-1">
                 {/* 1. TOP RIGHT: امتحان يومي (الأول على اليمين) */}
                 <div className="bg-gradient-to-b from-[#25133d] via-[#1a0c2c] to-[#0e0719] border-2 border-purple-500/40 hover:border-purple-400 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center shadow-xl relative overflow-hidden group transition-all">
                   <div className="absolute -top-8 -right-8 w-20 h-20 bg-purple-500/15 rounded-full blur-xl pointer-events-none" />
 
-                  <div className="flex flex-col items-center">
+                  <button type="button" disabled={!canOpenDailyExam} onClick={() => { if (!canOpenDailyExam) return; gameAudio.playGameStart(); gameAudio.playExamSessionTheme(); setActiveGameMode("daily_exam"); }} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
+                    <span><h4 className="text-sm font-black text-white">امتحان يومي</h4><small className="mt-1 block text-[10px] text-purple-100/75">اضغط على المجسّم للبدء</small></span>
                     <DailyExamAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                    <h4 className="text-xs sm:text-sm font-black text-white mt-2">
-                      امتحان يومي
-                    </h4>
-                  </div>
-
-                  <p className="mt-3 text-[10px] font-bold text-amber-100">
-                    اختر طريقة اللعب
-                  </p>
-                  <div className="mt-1.5 grid w-full grid-cols-1 gap-2">
-                    <button
-                      onClick={() => {
-                        if (!canOpenDailyExam) return;
-                        gameAudio.playGameStart();
-                        // Start during the user's tap so Android browsers cannot block it.
-                        gameAudio.playExamSessionTheme();
-                        setActiveGameMode("daily_exam");
-                      }}
-                      disabled={!canOpenDailyExam}
-                      className="w-full mt-3 py-2 px-2.5 bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 hover:from-purple-400 hover:to-indigo-400 text-white font-bold rounded-xl text-xs shadow-md shadow-purple-600/25 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <span>{hasDailyExam ? "ابدأ الآن" : "غير متوفر"}</span>
-                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                    </button>
-                  </div>
+                  </button>
+                </div>
 
                   {/* 2. TOP LEFT: من سيربح المليون */}
                   <div className="bg-gradient-to-b from-[#251c14] via-[#1a140d] to-[#0e0a05] border-2 border-amber-500/40 hover:border-amber-400 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center shadow-xl relative overflow-hidden group transition-all">
                     <div className="absolute -top-8 -left-8 w-20 h-20 bg-amber-500/15 rounded-full blur-xl pointer-events-none" />
 
-                    <div className="flex flex-col items-center">
+                    <button type="button" disabled={!canOpenMillionaire} onClick={() => { if (!canOpenMillionaire) return; gameAudio.playGameStart(); setActiveGameMode("millionaire"); }} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
+                      <span><h4 className="text-sm font-black text-white">من سيربح المليون</h4><small className="mt-1 block text-[10px] text-amber-100/75">اضغط على المجسّم للبدء</small></span>
                       <MillionaireAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                      <h4 className="text-xs sm:text-sm font-black text-white mt-2">
-                        من سيربح المليون
-                      </h4>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (!canOpenMillionaire) return;
-                        gameAudio.playGameStart();
-                        setActiveGameMode("millionaire");
-                      }}
-                      disabled={!canOpenMillionaire}
-                      className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <User className="w-4 h-4" />
-                      <span>
-                        {hasMillionaireQuestions ? "لعب فردي" : "غير متوفر"}
-                      </span>
                     </button>
                   </div>
-                </div>
 
                 {/* 3. BOTTOM RIGHT: صواب أم خطأ */}
                 <div className="bg-gradient-to-b from-[#0f231e] via-[#091814] to-[#040e0b] border-2 border-emerald-500/40 hover:border-emerald-400 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center shadow-xl relative overflow-hidden group transition-all">
                   <div className="absolute -bottom-8 -right-8 w-20 h-20 bg-emerald-500/15 rounded-full blur-xl pointer-events-none" />
 
-                  <div className="flex flex-col items-center">
+                  <button type="button" disabled={!canOpenTrueFalse} onClick={() => setExpandedMenuGame((current) => current === "true_false" ? null : "true_false")} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
+                    <span><h4 className="text-sm font-black text-white">صواب أم خطأ</h4><small className="mt-1 block text-[10px] text-emerald-100/75">اضغط لعرض طرق اللعب</small></span>
                     <TrueFalseAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                    <h4 className="text-xs sm:text-sm font-black text-white mt-2">
-                      صواب أم خطأ
-                    </h4>
-                  </div>
-
-                  <p className="mt-3 text-[10px] font-bold text-emerald-100">
-                    اختر طريقة اللعب
-                  </p>
-                  <div className="mt-1.5 grid w-full grid-cols-1 gap-2">
+                    {expandedMenuGame === "true_false" ? <ChevronUp className="h-4 w-4 text-emerald-200" /> : <ChevronDown className="h-4 w-4 text-emerald-200" />}
+                  </button>
+                  {expandedMenuGame === "true_false" && <div className="mt-1.5 grid w-full grid-cols-2 gap-2 animate-in slide-in-from-top-2">
                     <button
                       onClick={() => {
                         if (!canOpenTrueFalse) return;
@@ -692,7 +649,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         setActiveGameMode("true_false");
                       }}
                       disabled={!canOpenTrueFalse}
-                      className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                      className="min-h-14 py-2.5 px-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black rounded-xl text-xs shadow-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50"
                     >
                       <User className="w-4 h-4" />
                       <span>
@@ -705,29 +662,24 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         !canOpenTrueFalse ||
                         !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL
                       }
-                      className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"
+                      className="min-h-14 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex flex-col items-center justify-center gap-1 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"
                     >
                       <Users className="w-4 h-4" />
                       <span>لعب جماعي</span>
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* 4. BOTTOM LEFT: جبتها صح */}
                 <div className="bg-gradient-to-b from-[#0b2130] via-[#071622] to-[#040c14] border-2 border-cyan-400/45 hover:border-cyan-300 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center shadow-xl relative overflow-hidden group transition-all">
                   <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-cyan-400/15 rounded-full blur-xl pointer-events-none" />
 
-                  <div className="flex flex-col items-center">
+                  <button type="button" disabled={!canOpenGibhaSah} onClick={() => setExpandedMenuGame((current) => current === "gibha_sah" ? null : "gibha_sah")} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
+                    <span><h4 className="text-sm font-black text-white">جبتها صح</h4><small className="mt-1 block text-[10px] text-cyan-100/75">اضغط لعرض طرق اللعب</small></span>
                     <GibhaSahAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                    <h4 className="text-xs sm:text-sm font-black text-white mt-2">
-                      جبتها صح 🎯
-                    </h4>
-                  </div>
-
-                  <p className="mt-3 text-[10px] font-bold text-cyan-100">
-                    اختر طريقة اللعب
-                  </p>
-                  <div className="mt-1.5 grid w-full grid-cols-1 gap-2">
+                    {expandedMenuGame === "gibha_sah" ? <ChevronUp className="h-4 w-4 text-cyan-200" /> : <ChevronDown className="h-4 w-4 text-cyan-200" />}
+                  </button>
+                  {expandedMenuGame === "gibha_sah" && <div className="mt-1.5 grid w-full grid-cols-2 gap-2 animate-in slide-in-from-top-2">
                     <button
                       onClick={() => {
                         if (!canOpenGibhaSah) return;
@@ -735,7 +687,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         setActiveGameMode("gibha_sah");
                       }}
                       disabled={!canOpenGibhaSah}
-                      className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-black font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                      className="min-h-14 py-2.5 px-2 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-black font-black rounded-xl text-xs shadow-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50"
                     >
                       <User className="w-4 h-4" />
                       <span>{hasGibhaSahCards ? "لعب فردي" : "غير متوفر"}</span>
@@ -746,12 +698,12 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         !canOpenGibhaSah ||
                         !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL
                       }
-                      className="min-h-10 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"
+                      className="min-h-14 py-2.5 px-2 bg-gradient-to-r from-sky-600 to-blue-500 text-white font-black rounded-xl text-xs flex flex-col items-center justify-center gap-1 shadow-md shadow-sky-500/20 transition-all active:scale-95 disabled:opacity-40"
                     >
                       <Users className="w-4 h-4" />
                       <span>لعب جماعي</span>
                     </button>
-                  </div>
+                  </div>}
                 </div>
               </div>
             </div>
