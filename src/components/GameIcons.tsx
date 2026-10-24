@@ -190,7 +190,7 @@ export const GibhaSahAuthenticIcon: React.FC<{ className?: string }> = ({
 }) => {
   return (
     <div className={`relative flex items-center justify-center shrink-0 ${className}`}>
-      <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_14px_rgba(6,182,212,0.45)]">
+      <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full drop-shadow-[0_0_14px_rgba(16,185,129,0.5)]">
         <defs>
           <filter id="gs-glow" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -199,75 +199,46 @@ export const GibhaSahAuthenticIcon: React.FC<{ className?: string }> = ({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <radialGradient id="gs-bg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#0E2A3A" />
-            <stop offset="60%" stopColor="#081A26" />
-            <stop offset="100%" stopColor="#030B12" />
+          <radialGradient id="gs-impact" cx="50%" cy="50%" r="55%">
+            <stop offset="0%" stopColor="#F0FDF4" />
+            <stop offset="58%" stopColor="#22C55E" />
+            <stop offset="100%" stopColor="#047857" />
           </radialGradient>
-          <linearGradient id="gs-border" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#06B6D4" />
-            <stop offset="50%" stopColor="#F59E0B" />
-            <stop offset="100%" stopColor="#10B981" />
-          </linearGradient>
         </defs>
-
-        {/* Outer Circular Rim */}
-        <circle cx="60" cy="60" r="56" fill="url(#gs-bg)" stroke="url(#gs-border)" strokeWidth="3" />
-
-        {/* Inner Geometric Grid Overlay (Representing the 12 Game Cards) */}
-        <g opacity="0.25" stroke="#38BDF8" strokeWidth="1">
-          <rect x="25" y="25" width="20" height="15" rx="3" fill="none" />
-          <rect x="50" y="25" width="20" height="15" rx="3" fill="none" />
-          <rect x="75" y="25" width="20" height="15" rx="3" fill="none" />
-          <rect x="25" y="80" width="20" height="15" rx="3" fill="none" />
-          <rect x="50" y="80" width="20" height="15" rx="3" fill="none" />
-          <rect x="75" y="80" width="20" height="15" rx="3" fill="none" />
+        <path d="M60 7L66 23L83 14L80 32L100 29L88 44L108 51L89 59L105 72L84 72L89 92L72 82L64 109L54 84L35 98L39 76L16 79L31 62L10 53L32 44L18 28L40 32L39 12L54 24L60 7Z" fill="#FACC15" fillOpacity=".35" />
+        <circle cx="58" cy="57" r="38" fill="url(#gs-impact)" stroke="#A7F3D0" strokeWidth="4" filter="url(#gs-glow)" />
+        <path d="M39 57L52 70L78 42" stroke="white" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+        <g transform="rotate(-36 87 83)">
+          <rect x="82" y="58" width="10" height="48" rx="5" fill="#92400E" stroke="#FBBF24" strokeWidth="2" />
+          <rect x="79" y="54" width="16" height="12" rx="4" fill="#F59E0B" />
         </g>
-
-        {/* Circular TV Frame */}
-        <circle cx="60" cy="60" r="42" fill="#061622" stroke="#00E5FF" strokeWidth="1.5" strokeDasharray="4 2" />
-
-        {/* Small Floating Checkmark and Cross Icons */}
-        <circle cx="36" cy="38" r="5" fill="#10B981" fillOpacity="0.3" stroke="#34D399" strokeWidth="1.2" />
-        <path d="M33.5 38L35.5 40L38.5 36" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-
-        <circle cx="84" cy="38" r="5" fill="#F43F5E" fillOpacity="0.3" stroke="#FB7185" strokeWidth="1.2" />
-        <path d="M81.5 35.5L86.5 40.5M86.5 35.5L81.5 40.5" stroke="#FB7185" strokeWidth="1.5" strokeLinecap="round" />
-
-        {/* Main 3D Text 'جيبها' in Teal/Cyan */}
-        <text
-          x="60"
-          y="56"
-          fill="#38BDF8"
-          fontSize="16"
-          fontWeight="900"
-          textAnchor="middle"
-          fontFamily="'Cairo', 'Tajawal', sans-serif"
-          filter="url(#gs-glow)"
-        >
-          جِيبْـهَا
-        </text>
-
-        {/* Secondary 3D Text 'صح' in Orange/Amber */}
-        <text
-          x="60"
-          y="76"
-          fill="#FBBF24"
-          fontSize="17"
-          fontWeight="900"
-          textAnchor="middle"
-          fontFamily="'Cairo', 'Tajawal', sans-serif"
-          filter="url(#gs-glow)"
-        >
-          صَــــح
-        </text>
-
-        {/* Bottom Sparkle Dot */}
-        <circle cx="60" cy="85" r="2.5" fill="#10B981" />
+        <path d="M92 24L97 16M101 31L112 27M93 36L101 43" stroke="#67E8F9" strokeWidth="3" strokeLinecap="round" />
       </svg>
     </div>
   );
 };
+
+export const BookletStudyIcon: React.FC<{ className?: string }> = ({
+  className = 'w-20 h-16',
+}) => (
+  <div className={`relative flex shrink-0 items-center justify-center ${className}`}>
+    <svg viewBox="0 0 140 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full drop-shadow-[0_0_14px_rgba(52,211,153,.35)]">
+      <defs>
+        <linearGradient id="booklet-paper" x1="20" y1="15" x2="120" y2="90" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#D1FAE5" />
+        </linearGradient>
+      </defs>
+      <path d="M69 28C57 17 38 14 20 20V80C38 74 56 77 69 88V28Z" fill="url(#booklet-paper)" stroke="#6EE7B7" strokeWidth="3" />
+      <path d="M71 28C83 17 102 14 120 20V80C102 74 84 77 71 88V28Z" fill="url(#booklet-paper)" stroke="#6EE7B7" strokeWidth="3" />
+      <path d="M70 29V88" stroke="#047857" strokeWidth="3" />
+      <path d="M31 38H58M31 49H58M31 60H53M83 39H108M83 50H108M83 61H103" stroke="#10B981" strokeWidth="3" strokeLinecap="round" opacity=".75" />
+      <path d="M105 17H116V34L110.5 30L105 34V17Z" fill="#FBBF24" />
+      <path d="M65 21C62 12 56 8 49 7C50 15 55 20 65 21Z" fill="#4ADE80" />
+      <path d="M75 21C78 12 84 8 91 7C90 15 85 20 75 21Z" fill="#22C55E" />
+    </svg>
+  </div>
+);
 
 export const DailyExamAuthenticIcon: React.FC<{ className?: string }> = ({
   className = 'w-14 h-14',
