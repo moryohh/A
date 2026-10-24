@@ -5,12 +5,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "ChallengeRoom" },
-      { "name": "REGISTRY", "class_name": "ChallengeRegistry" }
+      { "name": "REGISTRY", "class_name": "ChallengeRegistry" },
+      { "name": "REGISTRY_V2", "class_name": "ChallengeRegistryV2" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["ChallengeRoom"] },
-    { "tag": "v2", "new_sqlite_classes": ["ChallengeRegistry"] }
+    { "tag": "v2", "new_sqlite_classes": ["ChallengeRegistry"] },
+    { "tag": "v3", "new_sqlite_classes": ["ChallengeRegistryV2"] }
   ],
   "vars": {
     "SUPABASE_URL": "https://qlfleszoyujelygwzdgu.supabase.co",

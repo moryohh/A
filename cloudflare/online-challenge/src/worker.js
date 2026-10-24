@@ -55,6 +55,10 @@ function classroomCapacity(value) {
   return [2, 4, 8, 12, 20, 30, 50].includes(Number(value)) ? Number(value) : 8;
 }
 
+function registryBinding(env) {
+  return env.REGISTRY_V2 || env.REGISTRY;
+}
+
 var BOT_ID = 'bot:duha-challenge';
 var TEAM_BOT_PREFIX = 'bot:team:';
 var BOT_ANSWER_DELAY_MS = 2000;
@@ -101,7 +105,8 @@ export default {
       var body = await request.json().catch(function () { return null; });
       if (!body || !validGameType(body.gameType) || !validQuestions(body.questions) || !validRoomMetadata(body)) return json({ error: 'invalid_game' }, 400, origin);
       var roomId = crypto.randomUUID();
-      var registry = env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms'));
+      var registryNamespace = registryBinding(env);
+      var registry = registryNamespace.get(registryNamespace.idFromName('active-rooms'));
       var registration = await registry.fetch(new Request('https://registry/internal/register', {
         method: 'POST', body: JSON.stringify({ roomId: roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity) }),
       }));
@@ -122,7 +127,8 @@ export default {
     }
 
     if (url.pathname === '/rooms' && request.method === 'GET') {
-      var list = await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/list'));
+      var listRegistry = registryBinding(env);
+      var list = await listRegistry.get(listRegistry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/list'));
       return json(await list.json(), list.status, origin);
     }
 
@@ -134,7 +140,8 @@ export default {
       var publicCode = connectMatch[1];
       var roomId = publicCode;
       if (/^\d{1,4}$/.test(publicCode)) {
-        var resolved = await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(publicCode)));
+        var resolveRegistry = registryBinding(env);
+        var resolved = await resolveRegistry.get(resolveRegistry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(publicCode)));
         if (!resolved.ok) return json({ error: 'room_not_found' }, 404, origin);
         roomId = (await resolved.json()).roomId;
       } else if (!/^[0-9a-f-]{36}$/i.test(publicCode)) {
@@ -159,7 +166,8 @@ export default {
       var leaveCode = leaveMatch[1];
       var leaveRoomId = leaveCode;
       if (/^\d{1,4}$/.test(leaveCode)) {
-        var leaveResolved = await env.REGISTRY.get(env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(leaveCode)));
+        var leaveRegistry = registryBinding(env);
+        var leaveResolved = await leaveRegistry.get(leaveRegistry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/resolve?code=' + encodeURIComponent(leaveCode)));
         if (!leaveResolved.ok) return json({ ok: true }, 200, origin);
         leaveRoomId = (await leaveResolved.json()).roomId;
       } else if (!/^[0-9a-f-]{36}$/i.test(leaveCode)) {
@@ -409,9 +417,10 @@ export class ChallengeRoom {
     return true;
   }
   async updateRegistry(status, game) {
-    if (!this.env || !this.env.REGISTRY || !game || !game.roomCode) return;
+    if (!this.env || !registryBinding(this.env) || !game || !game.roomCode) return;
     try {
-      await this.env.REGISTRY.get(this.env.REGISTRY.idFromName('active-rooms')).fetch(new Request('https://registry/internal/update', {
+      var registry = registryBinding(this.env);
+      await registry.get(registry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/update', {
         method: 'POST',
         body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: game.players.length }),
       }));
@@ -1081,3 +1090,7 @@ export class ChallengeRegistry {
     return json({ error: 'not_found' }, 404, '');
   }
 }
+
+// A fresh registry generation avoids carrying forward an oversized or corrupted
+// single-value room index. Rooms are ephemeral, so rotating the registry is safe.
+export class ChallengeRegistryV2 extends ChallengeRegistry {}
