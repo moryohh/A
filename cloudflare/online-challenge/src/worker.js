@@ -116,8 +116,8 @@ export default {
             if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
             if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
           }
-        } catch (error) {
-          return json({ error: 'room_runtime_unavailable', detail: String(error && error.message || error).slice(0, 240), roomsBinding: Boolean(env.ROOMS) }, 503, origin);
+        } catch (_) {
+          return json({ error: 'room_runtime_unavailable' }, 503, origin);
         }
         return json({ error: 'room_code_unavailable' }, 503, origin);
       }

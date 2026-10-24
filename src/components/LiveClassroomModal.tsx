@@ -449,8 +449,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
           content,
         }),
       });
-      if (!response.ok) throw new Error("تعذر إنشاء الفصل.");
-      const data = await response.json();
+      const data = await response.json().catch(() => ({ error: "network_error" }));
+      if (!response.ok) {
+        if (data.error === "room_runtime_unavailable")
+          throw new Error("غرف الأونلاين متوقفة مؤقتًا بسبب بلوغ حصة Cloudflare. حاول لاحقًا.");
+        throw new Error("تعذر إنشاء الفصل.");
+      }
       await connect(data.roomCode);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "تعذر إنشاء الفصل.");
