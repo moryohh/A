@@ -212,7 +212,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
         : challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
-        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — درس أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
+        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — غرفة تجريبية أوفلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
         setChallengeMessage('');
         return;
       }
@@ -356,7 +356,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-l from-violet-500 via-blue-500 to-cyan-400 px-4 py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(37,99,235,.4)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45">
               <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
               <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
-              {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? 'ابدأ الدرس الأونلاين' : 'أنشئ غرفة من درس عشوائي'}
+              {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'اعرض غرفة الملزمة الأوفلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
             </button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
           </div>

@@ -576,7 +576,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       <BookOpen className="mb-2 h-8 w-8 text-emerald-200" />
                       <b className="text-sm">الملزمة</b>
                       <small className="mt-1 text-[9px] text-emerald-100/75">
-                        شرح الملزمة أونلاين
+                        غرفة دراسة تجريبية أوفلاين
                       </small>
                     </button>
                   </div>
