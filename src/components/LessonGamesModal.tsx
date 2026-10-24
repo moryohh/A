@@ -142,7 +142,10 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   const isMathLesson = subjectKey.includes("math") || subjectKey.includes("رياض");
   const isPhysicsLesson = subjectKey.includes("phys") || subjectKey.includes("فيز");
   const isChemistryLesson = subjectKey.includes("chem") || subjectKey.includes("كيمي");
-  const supportsLiveLesson = isMathLesson || isPhysicsLesson || isChemistryLesson;
+  // Every subject can open the booklet study room. The interactive "solve
+  // with me" board keeps its existing subject restrictions.
+  const supportsLiveLesson = Boolean(openLessonContext?.subjectId || category);
+  const supportsSolveBoard = isMathLesson || isPhysicsLesson || isChemistryLesson;
 
   const lessonRewardIdentity = [
     playerId || "anonymous",
@@ -544,12 +547,12 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         قسم الدرس الأونلاين
                       </b>
                       <small className="text-[10px] text-cyan-200/75">
-                        {isMathLesson ? "ابدأ صبورة حل معي المباشرة" : "اختر حل معي أو الملزمة لبدء درس مباشر"}
+                        {isMathLesson ? "ابدأ صبورة حل معي المباشرة" : supportsSolveBoard ? "اختر حل معي أو الملزمة" : "افتح الملزمة وادرس مع زملائك"}
                       </small>
                     </div>
                   </div>
-                  <div className={`relative grid gap-2 ${isMathLesson ? "grid-cols-1" : "grid-cols-2"}`}>
-                    {!isMathLesson && <button
+                  <div className={`relative grid gap-2 ${supportsSolveBoard && !isMathLesson ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {supportsSolveBoard && !isMathLesson && <button
                       type="button"
                       onClick={() => {
                         setLiveClassroomMode("board");
@@ -564,7 +567,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         صبورة تفاعلية أونلاين
                       </small>
                     </button>}
-                    <button
+                    {!isMathLesson && <button
                       type="button"
                       onClick={() => {
                         setLiveClassroomMode("booklet");
@@ -578,7 +581,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       <small className="mt-1 text-[9px] text-emerald-100/75">
                         غرفة دراسة تجريبية أوفلاين
                       </small>
-                    </button>
+                    </button>}
                   </div>
                 </section>
               )}
