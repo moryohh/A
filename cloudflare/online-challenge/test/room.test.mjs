@@ -511,6 +511,31 @@ test('registry exposes room lifecycle states for the challenge center', async ()
   assert.equal(payload.rooms[0].players, 2);
 });
 
+test('registry accepts a classroom code and exposes it in available rooms', async () => {
+  const data = new Map();
+  const registry = new ChallengeRegistry({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) } });
+  const registered = await registry.fetch(new Request('https://registry/internal/register', {
+    method: 'POST',
+    body: JSON.stringify({ code: '9938', roomId: 'classroom:9938', subject: 'biology', chapter: 1, lesson: 5, lessonTitle: 'الدرس 5', gameType: 'live_classroom', gameTitle: 'الملزمة — غرفة دراسة أونلاين', capacity: 8 }),
+  }));
+  assert.equal(registered.status, 201);
+  assert.deepEqual(await registered.json(), { code: '9938' });
+
+  const listed = await registry.fetch(new Request('https://registry/internal/list'));
+  const payload = await listed.json();
+  assert.equal(payload.rooms.length, 1);
+  assert.equal(payload.rooms[0].code, '9938');
+  assert.equal(payload.rooms[0].roomId, 'classroom:9938');
+  assert.equal(payload.rooms[0].gameType, 'live_classroom');
+  assert.equal(payload.rooms[0].status, 'playing');
+
+  const duplicate = await registry.fetch(new Request('https://registry/internal/register', {
+    method: 'POST',
+    body: JSON.stringify({ code: '9938', roomId: 'classroom:other', subject: 'biology', chapter: 1, lesson: 5, lessonTitle: 'الدرس 5', gameType: 'live_classroom' }),
+  }));
+  assert.equal(duplicate.status, 409);
+});
+
 test('room relays a trimmed chat message to both players', async () => {
   const received = [];
   const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => received.push(JSON.parse(message)) };
