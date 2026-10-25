@@ -107,13 +107,22 @@ export default {
       if (body.gameType === 'live_classroom') {
         try {
           var directQuestions = body.questions.map(function (q) { return { question: q.question, options: q.options, correctAnswer: q.correctAnswer }; });
+          var directRegistryNamespace = registryBinding(env);
+          var directRegistry = directRegistryNamespace.get(directRegistryNamespace.idFromName('active-rooms'));
           for (var directAttempt = 0; directAttempt < 20; directAttempt += 1) {
             var directCode = String(Math.floor(1000 + Math.random() * 9000));
-            var directStub = env.ROOMS.get(env.ROOMS.idFromName('classroom:' + directCode));
+            var directRoomId = 'classroom:' + directCode;
+            var directRegistration = await directRegistry.fetch(new Request('https://registry/internal/register', {
+              method: 'POST', body: JSON.stringify({ code: directCode, roomId: directRoomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity) }),
+            }));
+            if (directRegistration.status === 409) continue;
+            if (!directRegistration.ok) return json({ error: 'room_code_unavailable' }, 503, origin);
+            var directStub = env.ROOMS.get(env.ROOMS.idFromName(directRoomId));
             var directCreated = await directStub.fetch(new Request('https://room/internal/init', {
               method: 'POST', body: JSON.stringify({ hostId: creator, gameType: body.gameType, questions: directQuestions, roomCode: directCode, capacity: classroomCapacity(body.capacity), durationMinutes: Math.max(5, Math.min(180, Number(body.durationMinutes) || 45)), studyMode: body.studyMode === 'together' ? 'together' : 'teacher', sharedMission: String(body.sharedMission || '').trim().slice(0, 120), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', content: body.content || null }),
             }));
             if (directCreated.ok) return json({ roomCode: directCode }, 201, origin);
+            await directRegistry.fetch(new Request('https://registry/internal/remove', { method: 'POST', body: JSON.stringify({ roomId: directRoomId }) }));
             if (directCreated.status !== 409) return json({ error: 'room_create_failed' }, 500, origin);
           }
         } catch (_) {
@@ -1094,10 +1103,13 @@ export class ChallengeRegistry {
     if (url.pathname === '/internal/register' && request.method === 'POST') {
       var body = await request.json().catch(function () { return null; });
       if (!body || typeof body.roomId !== 'string' || !validGameType(body.gameType)) return json({ error: 'invalid_room' }, 400, '');
-      var code = null;
-      for (var attempt = 0; attempt < 12; attempt += 1) {
-        var candidate = String(Math.floor(1000 + Math.random() * 9000));
-        if (!rooms[candidate]) { code = candidate; break; }
+      var code = typeof body.code === 'string' && /^\d{4}$/.test(body.code) ? body.code : null;
+      if (code && rooms[code]) return json({ error: 'room_code_taken' }, 409, '');
+      if (!code) {
+        for (var attempt = 0; attempt < 12; attempt += 1) {
+          var candidate = String(Math.floor(1000 + Math.random() * 9000));
+          if (!rooms[candidate]) { code = candidate; break; }
+        }
       }
       if (!code) return json({ error: 'no_room_code' }, 503, '');
       rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now() };
