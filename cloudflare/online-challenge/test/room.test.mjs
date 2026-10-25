@@ -516,7 +516,7 @@ test('registry accepts a classroom code and exposes it in available rooms', asyn
   const registry = new ChallengeRegistry({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)) } });
   const registered = await registry.fetch(new Request('https://registry/internal/register', {
     method: 'POST',
-    body: JSON.stringify({ code: '9938', roomId: 'classroom:9938', subject: 'biology', chapter: 1, lesson: 5, lessonTitle: 'الدرس 5', gameType: 'live_classroom', gameTitle: 'الملزمة — غرفة دراسة أونلاين', capacity: 8 }),
+    body: JSON.stringify({ code: '9938', roomId: 'classroom:9938', subject: 'biology', chapter: 1, lesson: 5, lessonTitle: 'الدرس 5', gameType: 'live_classroom', gameTitle: 'الملزمة — غرفة دراسة أونلاين', capacity: 8, contentMode: 'booklet' }),
   }));
   assert.equal(registered.status, 201);
   assert.deepEqual(await registered.json(), { code: '9938' });
@@ -527,6 +527,7 @@ test('registry accepts a classroom code and exposes it in available rooms', asyn
   assert.equal(payload.rooms[0].code, '9938');
   assert.equal(payload.rooms[0].roomId, 'classroom:9938');
   assert.equal(payload.rooms[0].gameType, 'live_classroom');
+  assert.equal(payload.rooms[0].contentMode, 'booklet');
   assert.equal(payload.rooms[0].status, 'playing');
 
   const duplicate = await registry.fetch(new Request('https://registry/internal/register', {
