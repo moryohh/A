@@ -37,7 +37,7 @@ const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').repl
 type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah' | 'live_classroom';
 type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
-type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; contentMode?: 'board' | 'booklet'; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
@@ -380,11 +380,12 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             {visibleRooms.length === 0 ? <p className={`rounded-2xl p-4 text-center text-xs ${theme.classes.textMuted}`} style={{ backgroundColor: theme.colors.bgCardSubtle }}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
               const status = room.status || 'waiting';
               const ended = status === 'ended';
+              const classroomJoinable = room.gameType === 'live_classroom' && status === 'playing';
               const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
               const attendance = room.gameType === 'live_classroom'
                 ? `${Math.max(0, room.players - 1)}/${room.capacity || 8} طالب`
                 : `${room.players}/2 لاعبين`;
-              return <button key={room.code} type="button" disabled={ended || status === 'playing' || status === 'reconnecting'} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{room.gameTitle || room.gameType} · {room.lessonTitle} · {attendance}</span></button>;
+              return <button key={room.code} type="button" disabled={ended || (!classroomJoinable && (status === 'playing' || status === 'reconnecting'))} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' || classroomJoinable ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{classroomJoinable ? 'متاحة للدخول' : statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{room.gameTitle || room.gameType} · {room.lessonTitle} · {attendance}</span></button>;
             })}
           </div>
         </section>
