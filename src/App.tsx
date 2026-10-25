@@ -1373,7 +1373,7 @@ function AppContent() {
               onOpenChallenge={() => { setChallengeRoomCode(undefined); setChallengeConfig(null); setIsChallengeHubOpen(true); }}
               onJoinChallenge={(room) => {
                 setChallengeRoomCode(room.code);
-                setChallengeConfig({ questions: [], lessonTitle: room.lessonTitle, gameType: room.gameType, gameTitle: room.gameTitle, subject: room.subject, chapterNumber: room.chapter, lessonNumber: room.lesson });
+                setChallengeConfig({ questions: [], lessonTitle: room.lessonTitle, gameType: room.gameType, gameTitle: room.gameTitle, subject: room.subject, chapterNumber: room.chapter, lessonNumber: room.lesson, contentMode: room.contentMode });
                 setIsChallengeHubOpen(true);
               }}
               onCreateChallenge={(config) => { setChallengeRoomCode(undefined); setChallengeConfig(config); setIsChallengeHubOpen(true); }}
