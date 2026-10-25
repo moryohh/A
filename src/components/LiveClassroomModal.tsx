@@ -63,6 +63,8 @@ type Participant = {
   lastAnswer?: string;
   progress?: { step?: number; solved?: number; total?: number; answer?: string } | null;
   joinedAt?: number | null;
+  activity?: string;
+  activityAt?: number | null;
   mission?: {
     text: string;
     target: number;
@@ -97,6 +99,8 @@ type ClassroomState = {
     presenterState?: Record<string, unknown> | null;
     studyMode?: "teacher" | "together";
     sharedMission?: string;
+    bookletIndex?: number;
+    bookletAnswerVisible?: boolean;
   };
 };
 
@@ -332,7 +336,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const send = (payload: unknown) => {
     if (offlineBooklet) {
-      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke };
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; index?: number; answerVisible?: boolean };
       setState((previous) => {
         if (!previous) return previous;
         const next: ClassroomState = {
@@ -347,6 +351,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
           selfPlayer.mission = { text: String(message.text || "").trim().slice(0, 100), target, progress, completed: progress >= target, updatedAt: Date.now() };
         }
         if (message.type === "raise_hand" && selfPlayer) selfPlayer.handRaised = Boolean(message.raised);
+        if (message.type === "classroom_booklet_navigation") {
+          next.classroom.bookletIndex = Math.max(0, Number(message.index) || 0);
+          next.classroom.bookletAnswerVisible = Boolean(message.answerVisible);
+        }
         if (message.type === "classroom_stroke" && message.stroke) {
           next.classroom.strokes = next.classroom.strokes.slice(-299).concat(message.stroke);
           next.classroom.drawingVersion += 1;
@@ -670,6 +678,16 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
+  useEffect(() => {
+    setBookletItemIndex(Math.max(0, Math.min(bookletQuestions.length - 1, Number(classroom?.bookletIndex) || 0)));
+  }, [classroom?.bookletIndex, bookletQuestions.length]);
+  useEffect(() => setBookletAnswerVisible(Boolean(classroom?.bookletAnswerVisible)), [classroom?.bookletAnswerVisible]);
+  const navigateBooklet = (index: number, answerVisible = false) => {
+    const nextIndex = Math.max(0, Math.min(bookletQuestions.length - 1, index));
+    setBookletItemIndex(nextIndex);
+    setBookletAnswerVisible(answerVisible);
+    send({ type: "classroom_booklet_navigation", index: nextIndex, answerVisible });
+  };
   const saveMission = (progress = 0) => {
     const text = missionText.trim();
     if (!text) return;
@@ -827,7 +845,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
               <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
               <div className="space-y-2">
-                {state?.players.map((player, index) => {
+                {state?.players.filter((player) => player.connected || offlineBooklet).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
                   const ratio = Math.round((progress / target) * 100);
@@ -847,39 +865,42 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
             <main className="min-h-0 overflow-y-auto rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-3 shadow-inner" dir="rtl">
               <div className="mx-auto grid max-w-xl grid-cols-2 gap-2">
-                {[...(state?.players || [])].sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
+                {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
                   const points = Math.round((progress / target) * 100);
+                  const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
+                  const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
+                  const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
                   return <div key={player.id} className={`relative flex min-h-32 flex-col items-center justify-center rounded-2xl border p-2 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <img src={MEMBER_SPROUT_IMAGE} alt={`نبتة ${player.name || "طالب"}`} className="h-16 w-16 object-contain drop-shadow-md"/>
+                    <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-14 w-14 object-contain drop-shadow-md ${personalAnimation}`}/>
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
+                    <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
                   </div>;
                 })}
               </div>
-              <div className="sticky bottom-1 mx-auto mt-3 flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white/90 px-3 py-1 shadow-sm"><img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(timedTreeStage).padStart(2, "0")}.png`} alt={`مرحلة نمو الغرفة ${timedTreeStage}`} className="h-8 w-8 object-contain"/><small className="text-[8px] font-black text-emerald-800">نمو الغرفة · كل 30 ثانية</small></div>
             </main>
 
-            {bookletPanelVisible && <aside className="relative min-h-0 overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
+            {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 <span className="flex-1" aria-hidden="true" />
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
               </div>
-              <div className="absolute inset-x-0 bottom-[58px] top-[41px] overflow-y-auto overscroll-contain p-4">
+              <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
                 {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
                   <div className="mb-3 flex items-center gap-2">
-                    <button onClick={() => setBookletAnswerVisible((visible) => !visible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
+                    <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
                   </div>
                   <span className="mb-2 text-[9px] font-black text-emerald-700">السؤال {bookletItemIndex + 1}</span>
                   <p className="text-sm font-black leading-7">{bookletQuestion.question}</p>
                   {bookletAnswerVisible && <div className="mt-3 rounded-xl border border-emerald-700/15 bg-white/70 p-3 text-xs font-bold leading-6 text-emerald-950">{bookletQuestion.answer}</div>}
                 </> : <p className="text-center text-xs leading-6 text-slate-500">لا توجد أسئلة مفردة في ملزمة هذا الدرس.</p>}
               </div>
-              <div className="absolute inset-x-0 bottom-0 z-10 grid h-[58px] grid-cols-2 gap-2 border-t border-[#d7c9a4] bg-[#f4f0e4] p-2 shadow-[0_-8px_18px_rgba(36,51,46,.08)]">
-                <button disabled={bookletItemIndex <= 0} onClick={() => { setBookletItemIndex((index) => Math.max(0, index - 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
-                <button disabled={bookletItemIndex >= bookletQuestions.length - 1} onClick={() => { setBookletItemIndex((index) => Math.min(bookletQuestions.length - 1, index + 1)); setBookletAnswerVisible(false); }} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
+              <div className="z-10 grid h-[58px] grid-cols-2 gap-2 border-t border-[#d7c9a4] bg-[#f4f0e4] p-2 shadow-[0_-8px_18px_rgba(36,51,46,.08)]">
+                <button disabled={bookletItemIndex <= 0} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
+                <button disabled={bookletItemIndex >= bookletQuestions.length - 1} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
               </div>
             </aside>}
           </div>
