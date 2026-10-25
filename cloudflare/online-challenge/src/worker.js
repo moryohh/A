@@ -272,7 +272,7 @@ export class ChallengeRoom {
     }, this);
   }
   async scheduleNextAlarm(game) {
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].filter(function (value) {
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -486,7 +486,7 @@ export class ChallengeRoom {
       gibhaRefillVersion: game.gameType === 'gibha_sah' ? game.gibhaRefillVersion || 0 : undefined,
       players: game.players.map(function (p) {
         var profile = p.profile || (this.isBot(p) ? game.botProfile : null);
-        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level, handRaised: Boolean(p.handRaised), micAllowed: Boolean(p.micAllowed), drawAllowed: Boolean(p.drawAllowed), answerFrozen: Boolean(p.answerFrozen), lastAnswer: p.lastAnswer || '', progress: p.progress || null, mission: p.mission || null, joinedAt: p.joinedAt || null };
+        return { id: p.id, team: p.team || null, score: p.score, streak: p.streak || 0, answered: p.answer !== null, connected: this.connected(p.id), bot: this.isBot(p), name: profile && profile.name, avatar: profile && profile.avatar, character: p.character || (this.isBot(p) ? 'student2' : null), city: profile && profile.city, school: profile && profile.school, badge: profile && profile.badge, level: profile && profile.level, handRaised: Boolean(p.handRaised), micAllowed: Boolean(p.micAllowed), drawAllowed: Boolean(p.drawAllowed), answerFrozen: Boolean(p.answerFrozen), lastAnswer: p.lastAnswer || '', progress: p.progress || null, mission: p.mission || null, joinedAt: p.joinedAt || null, activity: p.activity || '', activityAt: p.activityAt || null };
       }, this),
       winner: winner,
       tie: game.status === 'finished' && game.players.length >= 2 && winner === null,
@@ -512,6 +512,8 @@ export class ChallengeRoom {
         presenterState: game.presenterState || null,
         studyMode: game.studyMode === 'together' ? 'together' : 'teacher',
         sharedMission: game.sharedMission || '',
+        bookletIndex: Math.max(0, Number(game.bookletIndex) || 0),
+        bookletAnswerVisible: Boolean(game.bookletAnswerVisible),
         participants: game.players.map(function (player) {
           return { id: player.id, handRaised: Boolean(player.handRaised), micAllowed: Boolean(player.micAllowed), drawAllowed: Boolean(player.drawAllowed) };
         }),
@@ -530,7 +532,7 @@ export class ChallengeRoom {
       var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
       var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
       var classroomMode = init.gameType === 'live_classroom';
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null, activity: classroomMode ? 'أنشأ الغرفة' : undefined, activityAt: classroomMode ? Date.now() : undefined }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, bookletIndex: classroomMode ? 0 : undefined, bookletAnswerVisible: classroomMode ? false : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -552,12 +554,22 @@ export class ChallengeRoom {
     if (url.pathname === '/internal/leave' && request.method === 'POST') {
       var leaveBody = await request.json().catch(function () { return null; });
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
-      if (game.gameType === 'live_classroom' && leaveBody.userId !== game.hostId) {
+      if (game.gameType === 'live_classroom') {
         game.players = game.players.filter(function (player) { return player.id !== leaveBody.userId; });
+        if (game.players.length && leaveBody.userId === game.hostId) {
+          game.hostId = game.players[0].id;
+          game.presenterId = game.hostId;
+          game.players[0].micAllowed = true;
+          game.players[0].drawAllowed = true;
+          game.players[0].activity = 'أصبح مضيف الغرفة';
+          game.players[0].activityAt = Date.now();
+        }
+        if (!game.players.length) game.emptyDeadline = Date.now() + 60000;
         await this.ctx.storage.put('game', game);
         this.broadcast(this.view(game));
         await this.updateRegistry('playing', game);
-        return json({ ok: true, closed: false }, 200, '');
+        await this.scheduleNextAlarm(game);
+        return json({ ok: true, closed: false, emptyGraceSeconds: game.players.length ? 0 : 60 }, 200, '');
       }
       if (game.status === 'playing' && game.players.some(function (player) { return player.id === leaveBody.userId; }) && (game.players.length >= 2 || game.gameType === 'millionaire_team')) {
         await this.replacePlayerWithBot(game, leaveBody.userId);
@@ -591,8 +603,17 @@ export class ChallengeRoom {
           var humans = this.teamHumans(game).length;
           team = humans === 0 || humans === 1 ? 'A' : 'B';
         }
-        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null, micAllowed: false, drawAllowed: false, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null };
+        var joinedPlayer = { id: userId, team: team, score: 0, streak: 0, answer: null, profile: ticketRecord.profile || null, micAllowed: false, drawAllowed: false, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null, activity: game.gameType === 'live_classroom' ? 'انضم إلى الغرفة' : undefined, activityAt: game.gameType === 'live_classroom' ? Date.now() : undefined };
         game.players.push(joinedPlayer);
+        if (game.gameType === 'live_classroom') {
+          delete game.emptyDeadline;
+          if (!game.players.some(function (player) { return player.id === game.hostId; })) {
+            game.hostId = userId;
+            game.presenterId = userId;
+            joinedPlayer.micAllowed = true;
+            joinedPlayer.drawAllowed = true;
+          }
+        }
         this.assignCharacter(game, joinedPlayer);
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
         if (game.gameType === 'gibha_sah' && game.players.length === 4) game.status = 'playing';
@@ -645,6 +666,8 @@ export class ChallengeRoom {
       var isTeacher = sender.userId === liveGame.hostId;
       if (payload.type === 'raise_hand' && senderPlayer && !isTeacher) {
         senderPlayer.handRaised = Boolean(payload.raised);
+        senderPlayer.activity = senderPlayer.handRaised ? 'رفع يده' : 'يتابع الدرس';
+        senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_mission' && senderPlayer) {
         var missionText = String(payload.text || '').trim().slice(0, 100);
         var missionTarget = Math.max(1, Math.min(100, Number(payload.target) || 1));
@@ -657,10 +680,14 @@ export class ChallengeRoom {
           completed: completionAllowed && missionProgress >= missionTarget,
           updatedAt: Date.now(),
         } : null;
+        senderPlayer.activity = missionProgress >= missionTarget ? 'أنجز مهمته' : 'ينجز مهمته';
+        senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_answer' && senderPlayer && !isTeacher) {
         if (liveGame.answersLocked || senderPlayer.answerFrozen) return;
         senderPlayer.lastAnswer = String(payload.value || '').slice(0, 500);
         senderPlayer.progress = payload.progress && typeof payload.progress === 'object' ? payload.progress : senderPlayer.progress;
+        senderPlayer.activity = 'يكتب إجابة';
+        senderPlayer.activityAt = Date.now();
         this.broadcast({ type: 'classroom_answer', from: sender.userId, value: senderPlayer.lastAnswer, sentAt: Date.now() });
       } else if (payload.type === 'classroom_progress' && senderPlayer && !isTeacher) {
         if (liveGame.answersLocked || senderPlayer.answerFrozen || !payload.progress || typeof payload.progress !== 'object') return;
@@ -671,6 +698,13 @@ export class ChallengeRoom {
           answer: String(payload.progress.answer || '').slice(0, 120),
         };
         senderPlayer.lastAnswer = senderPlayer.progress.answer;
+        senderPlayer.activity = 'يحل الآن';
+        senderPlayer.activityAt = Date.now();
+      } else if (payload.type === 'classroom_booklet_navigation' && senderPlayer) {
+        liveGame.bookletIndex = Math.max(0, Math.min(999, Number(payload.index) || 0));
+        liveGame.bookletAnswerVisible = Boolean(payload.answerVisible);
+        senderPlayer.activity = 'يتنقل في الملزمة';
+        senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_presenter_state' && (isTeacher || sender.userId === liveGame.presenterId)) {
         var serializedPresenterState = JSON.stringify(payload.state || {});
         if (serializedPresenterState.length > 220000) return;
@@ -702,6 +736,8 @@ export class ChallengeRoom {
           liveGame.presenterId = target.id;
           liveGame.players.forEach(function (player) { if (player.id !== liveGame.hostId) player.drawAllowed = player.id === target.id; });
           target.handRaised = false;
+          target.activity = 'يشرح الآن';
+          target.activityAt = Date.now();
         }
         if (action === 'restore_presenter') {
           liveGame.presenterId = liveGame.hostId;
@@ -711,6 +747,8 @@ export class ChallengeRoom {
         if (action === 'select_speaker' && target && target.id !== liveGame.hostId) {
           liveGame.players.forEach(function (player) { if (player.id !== liveGame.hostId) player.micAllowed = player.id === target.id; });
           target.handRaised = false;
+          target.activity = 'يتحدث الآن';
+          target.activityAt = Date.now();
         }
         if (action === 'clear_drawing') { liveGame.strokes = []; liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1; }
         if (action === 'extend_time') liveGame.endsAt = Math.max(Date.now(), Number(liveGame.endsAt) || Date.now()) + Math.max(1, Math.min(60, Number(payload.minutes) || 5)) * 60000;
@@ -933,6 +971,23 @@ export class ChallengeRoom {
     // A closing socket can remain in getWebSockets() briefly. Exclude the socket
     // that raised this event, otherwise the reconnect grace period never starts.
     if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId, socket)) return;
+    if (game.gameType === 'live_classroom') {
+      game.players = game.players.filter(function (player) { return player.id !== userId; });
+      if (game.players.length && userId === game.hostId) {
+        game.hostId = game.players[0].id;
+        game.presenterId = game.hostId;
+        game.players[0].micAllowed = true;
+        game.players[0].drawAllowed = true;
+        game.players[0].activity = 'أصبح مضيف الغرفة';
+        game.players[0].activityAt = Date.now();
+      }
+      if (!game.players.length) game.emptyDeadline = Date.now() + 60000;
+      await this.ctx.storage.put('game', game);
+      this.broadcast(this.view(game));
+      await this.updateRegistry('playing', game);
+      await this.scheduleNextAlarm(game);
+      return;
+    }
     game.disconnectUserId = userId;
     game.disconnectDeadline = Date.now() + 30000;
     await this.ctx.storage.put('game', game);
@@ -944,6 +999,17 @@ export class ChallengeRoom {
     var game = await this.read();
     if (!game || ['closed', 'finished', 'abandoned'].includes(game.status)) return;
     var now = Date.now();
+    if (game.gameType === 'live_classroom' && game.emptyDeadline && now >= game.emptyDeadline) {
+      if (!game.players.length) {
+        game.status = 'closed';
+        game.endedReason = 'empty_room';
+        delete game.emptyDeadline;
+        await this.ctx.storage.put('game', game);
+        await this.updateRegistry('ended', game);
+        return;
+      }
+      delete game.emptyDeadline;
+    }
     if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' || game.players.length === 1) && this.connected(game.players[0].id)) {
       if (game.gameType === 'millionaire_team') {
         while (game.players.length < 4) {
