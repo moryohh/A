@@ -108,6 +108,7 @@ interface Props {
   initialRoomCode?: string;
   initialContentMode?: "board" | "booklet";
   offlinePreview?: boolean;
+  offlineRole?: "teacher" | "student";
 }
 
 async function authorization() {
@@ -180,6 +181,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   initialRoomCode,
   initialContentMode,
   offlinePreview = false,
+  offlineRole = "teacher",
 }) => {
   const defaultMode: "board" | "booklet" =
     initialContentMode ||
@@ -197,12 +199,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [sharedMissionDraft, setSharedMissionDraft] = useState("");
   const [room, setRoom] = useState(offlineBooklet ? "OFFLINE" : "");
   const [entry, setEntry] = useState("");
-  const [me, setMe] = useState(offlineBooklet ? "offline-host" : "");
+  const offlineViewerId = offlineRole === "student" ? "offline-viewer" : "offline-host";
+  const [me, setMe] = useState(offlineBooklet ? offlineViewerId : "");
   const [state, setState] = useState<ClassroomState | null>(() => offlineBooklet ? {
     type: "state",
     status: "playing",
     players: [
       { id: "offline-host", name: offlineGuest?.name || "محمد", avatar: offlineHostAvatar, connected: true, micAllowed: true, drawAllowed: true, joinedAt: Date.now() - 300000, mission: { text: "قراءة أربع صفحات", target: 4, progress: 2, completed: false, updatedAt: Date.now() } },
+      { id: "offline-viewer", name: offlineRole === "student" ? (offlineGuest?.name || "أنت") : "حسن", avatar: offlineHostAvatar, connected: true, micAllowed: false, drawAllowed: false, joinedAt: Date.now() - 295000, mission: { text: "مراجعة سؤالين", target: 2, progress: 1, completed: false, updatedAt: Date.now() } },
       { id: "offline-abdullah", name: "عبدالله", avatar: `${import.meta.env.BASE_URL}avatars/avatar-fox-explorer.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 280000, mission: { text: "تلخيص التعاريف", target: 3, progress: 3, completed: true, updatedAt: Date.now() } },
       { id: "offline-zahraa", name: "زهراء", avatar: `${import.meta.env.BASE_URL}avatars/avatar-panda-reader.jpg`, connected: true, micAllowed: false, handRaised: true, joinedAt: Date.now() - 240000, mission: { text: "حل ثلاثة أسئلة", target: 3, progress: 1, completed: false, updatedAt: Date.now() } },
       { id: "offline-ahmed", name: "أحمد", avatar: `${import.meta.env.BASE_URL}avatars/avatar-cat-scientist.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 180000, mission: { text: "مراجعة الفصل الأول", target: 5, progress: 4, completed: false, updatedAt: Date.now() } },
