@@ -19,8 +19,6 @@ import {
   Users,
   BookOpen,
   Presentation,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import {
   EducationalGame,
@@ -111,8 +109,9 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     "board" | "booklet"
   >("board");
   const [expandedMenuGame, setExpandedMenuGame] = useState<
-    "millionaire" | "true_false" | "gibha_sah" | null
+    "millionaire" | "true_false" | "gibha_sah" | "offline_booklet" | null
   >(null);
+  const [offlineBookletRole, setOfflineBookletRole] = useState<"teacher" | "student">("teacher");
   const [teamQuestions, setTeamQuestions] = useState<OnlineChallengeQuestion[]>(
     [],
   );
@@ -411,6 +410,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
         openLessonContext={openLessonContext}
         initialContentMode="booklet"
         offlinePreview
+        offlineRole={offlineBookletRole}
       />
     );
 
@@ -596,14 +596,20 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       <span><b className="block text-sm">الملزمة أونلاين</b><small className="mt-1 block text-[9px] text-emerald-100/75">أنشئ غرفة وادعُ الطلاب للدراسة معًا</small></span>
                       <BookletStudyIcon className="h-16 w-20" />
                     </button>}
-                    {!isMathLesson && <button
-                      type="button"
-                      onClick={() => setActiveGameMode("offline_booklet")}
-                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-amber-300/35 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 transition active:scale-[.98]"
-                    >
-                      <BookOpen className="h-4 w-4" />
-                      معاينة الملزمة الأوفلاين المحفوظة
-                    </button>}
+                    {!isMathLesson && <div className="overflow-hidden rounded-2xl border border-amber-300/35 bg-amber-400/10">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedMenuGame((current) => current === "offline_booklet" ? null : "offline_booklet")}
+                        className="flex min-h-12 w-full items-center justify-center gap-2 px-4 py-2 text-xs font-black text-amber-100 transition active:scale-[.98]"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        معاينة الملزمة الأوفلاين
+                      </button>
+                      {expandedMenuGame === "offline_booklet" && <div className="grid grid-cols-2 gap-2 border-t border-amber-200/20 p-2">
+                        <button type="button" onClick={() => { setOfflineBookletRole("teacher"); setActiveGameMode("offline_booklet"); }} className="rounded-xl bg-amber-300 px-3 py-3 text-xs font-black text-slate-950"><Presentation className="mx-auto mb-1 h-4 w-4"/>الدخول كمدرس</button>
+                        <button type="button" onClick={() => { setOfflineBookletRole("student"); setActiveGameMode("offline_booklet"); }} className="rounded-xl bg-white/10 px-3 py-3 text-xs font-black text-white"><User className="mx-auto mb-1 h-4 w-4"/>الدخول كطالب</button>
+                      </div>}
+                    </div>}
                   </div>
                 </section>
               )}
@@ -660,7 +666,6 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                   <button type="button" disabled={!canOpenTrueFalse} onClick={() => setExpandedMenuGame((current) => current === "true_false" ? null : "true_false")} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
                     <span><h4 className="text-sm font-black text-white">صواب أم خطأ</h4><small className="mt-1 block text-[10px] text-emerald-100/75">اضغط لعرض طرق اللعب</small></span>
                     <TrueFalseAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                    {expandedMenuGame === "true_false" ? <ChevronUp className="h-4 w-4 text-emerald-200" /> : <ChevronDown className="h-4 w-4 text-emerald-200" />}
                   </button>
                   {expandedMenuGame === "true_false" && <div className="mt-1.5 grid w-full grid-cols-2 gap-2 animate-in slide-in-from-top-2">
                     <button
@@ -698,7 +703,6 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                   <button type="button" disabled={!canOpenGibhaSah} onClick={() => setExpandedMenuGame((current) => current === "gibha_sah" ? null : "gibha_sah")} className="flex min-h-28 w-full items-center justify-between rounded-2xl px-3 text-right transition active:scale-[.98] disabled:opacity-45">
                     <span><h4 className="text-sm font-black text-white">جبتها صح</h4><small className="mt-1 block text-[10px] text-cyan-100/75">اضغط لعرض طرق اللعب</small></span>
                     <GibhaSahAuthenticIcon className="w-16 h-16 transform group-hover:scale-105 transition-transform duration-300" />
-                    {expandedMenuGame === "gibha_sah" ? <ChevronUp className="h-4 w-4 text-cyan-200" /> : <ChevronDown className="h-4 w-4 text-cyan-200" />}
                   </button>
                   {expandedMenuGame === "gibha_sah" && <div className="mt-1.5 grid w-full grid-cols-2 gap-2 animate-in slide-in-from-top-2">
                     <button
