@@ -103,6 +103,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     | "quick"
     | "online"
     | "live_classroom"
+    | "offline_booklet"
   >("menu");
   const [onlineGameType, setOnlineGameType] =
     useState<OnlineChallengeGameType>("millionaire");
@@ -401,6 +402,18 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
       />
     );
 
+  if (activeGameMode === "offline_booklet")
+    return (
+      <LiveClassroomModal
+        onClose={() => setActiveGameMode("menu")}
+        lessonTitle={openLessonContext?.lessonTitle || lessonTitle}
+        category={openLessonContext?.subjectId || category}
+        openLessonContext={openLessonContext}
+        initialContentMode="booklet"
+        offlinePreview
+      />
+    );
+
   // Render Millionaire Modal (MCQ)
   if (activeGameMode === "millionaire") {
     return (
@@ -580,8 +593,16 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       disabled={!import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
                       className="flex min-h-24 items-center justify-between rounded-2xl border border-emerald-300/50 bg-gradient-to-l from-emerald-400/20 to-teal-950/60 p-4 text-right text-white transition active:scale-[.98] disabled:opacity-40"
                     >
-                      <span><b className="block text-sm">الملزمة</b><small className="mt-1 block text-[9px] text-emerald-100/75">غرفة دراسة تجريبية أوفلاين</small></span>
+                      <span><b className="block text-sm">الملزمة أونلاين</b><small className="mt-1 block text-[9px] text-emerald-100/75">أنشئ غرفة وادعُ الطلاب للدراسة معًا</small></span>
                       <BookletStudyIcon className="h-16 w-20" />
+                    </button>}
+                    {!isMathLesson && <button
+                      type="button"
+                      onClick={() => setActiveGameMode("offline_booklet")}
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-amber-300/35 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 transition active:scale-[.98]"
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      معاينة الملزمة الأوفلاين المحفوظة
                     </button>}
                   </div>
                 </section>
