@@ -567,12 +567,12 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         قسم الدرس الأونلاين
                       </b>
                       <small className="text-[10px] text-cyan-200/75">
-                        {isMathLesson ? "ابدأ صبورة حل معي المباشرة" : supportsSolveBoard ? "اختر حل معي أو الملزمة" : "افتح الملزمة وادرس مع زملائك"}
+                        {supportsSolveBoard ? "اختر حل معي أو الملزمة" : "افتح الملزمة وادرس مع زملائك"}
                       </small>
                     </div>
                   </div>
                   <div className="relative grid grid-cols-1 gap-2">
-                    {supportsSolveBoard && !isMathLesson && <button
+                    {supportsSolveBoard && <button
                       type="button"
                       onClick={() => {
                         setLiveClassroomMode("board");
@@ -584,7 +584,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                       <span><b className="block text-sm">حل معي</b><small className="mt-1 block text-[9px] text-sky-100/75">صبورة تفاعلية أونلاين</small></span>
                       <Presentation className="h-12 w-12 text-sky-200" />
                     </button>}
-                    {!isMathLesson && <button
+                    <button
                       type="button"
                       onClick={() => {
                         setLiveClassroomMode("booklet");
@@ -595,8 +595,8 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                     >
                       <span><b className="block text-sm">الملزمة أونلاين</b><small className="mt-1 block text-[9px] text-emerald-100/75">أنشئ غرفة وادعُ الطلاب للدراسة معًا</small></span>
                       <BookletStudyIcon className="h-16 w-20" />
-                    </button>}
-                    {!isMathLesson && <div className="overflow-hidden rounded-2xl border border-amber-300/35 bg-amber-400/10">
+                    </button>
+                    <div className="overflow-hidden rounded-2xl border border-amber-300/35 bg-amber-400/10">
                       <button
                         type="button"
                         onClick={() => setExpandedMenuGame((current) => current === "offline_booklet" ? null : "offline_booklet")}
@@ -609,7 +609,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
                         <button type="button" onClick={() => { setOfflineBookletRole("teacher"); setActiveGameMode("offline_booklet"); }} className="rounded-xl bg-amber-300 px-3 py-3 text-xs font-black text-slate-950"><Presentation className="mx-auto mb-1 h-4 w-4"/>الدخول كمدرس</button>
                         <button type="button" onClick={() => { setOfflineBookletRole("student"); setActiveGameMode("offline_booklet"); }} className="rounded-xl bg-white/10 px-3 py-3 text-xs font-black text-white"><User className="mx-auto mb-1 h-4 w-4"/>الدخول كطالب</button>
                       </div>}
-                    </div>}
+                    </div>
                   </div>
                 </section>
               )}

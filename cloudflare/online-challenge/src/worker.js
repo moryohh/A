@@ -731,6 +731,9 @@ export class ChallengeRoom {
           owner: sender.userId,
           color: typeof stroke.color === 'string' ? stroke.color.slice(0, 20) : '#facc15',
           size: Math.max(1, Math.min(24, Number(stroke.size) || 4)),
+          tool: ['pen', 'eraser', 'text'].includes(stroke.tool) ? stroke.tool : 'pen',
+          text: stroke.tool === 'text' ? String(stroke.text || '').trim().slice(0, 120) : undefined,
+          fontSize: stroke.tool === 'text' ? Math.max(12, Math.min(72, Number(stroke.fontSize) || 24)) : undefined,
           points: stroke.points.map(function (point) { return { x: Math.max(0, Math.min(1, Number(point.x) || 0)), y: Math.max(0, Math.min(1, Number(point.y) || 0)) }; }),
         };
         liveGame.strokes = (liveGame.strokes || []).slice(-299).concat(normalized);

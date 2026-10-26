@@ -9,6 +9,7 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  Eraser,
   Hand,
   Grid2X2,
   GraduationCap,
@@ -23,6 +24,8 @@ import {
   Snowflake,
   Target,
   TreePine,
+  Trash2,
+  Type,
   UnlockKeyhole,
   Users,
   Volume2,
@@ -52,6 +55,9 @@ type Stroke = {
   color: string;
   size: number;
   points: Point[];
+  tool?: "pen" | "eraser" | "text";
+  text?: string;
+  fontSize?: number;
 };
 type Participant = {
   id: string;
@@ -180,6 +186,111 @@ async function enterClassroomLandscape() {
   }
 }
 
+function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }: {
+  strokes: Stroke[];
+  drawingVersion: number;
+  canDraw: boolean;
+  onStroke: (stroke: Stroke) => void;
+  onClear: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [tool, setTool] = useState<"pen" | "eraser" | "text">("pen");
+  const [color, setColor] = useState("#173f5f");
+  const [size, setSize] = useState(4);
+  const [textValue, setTextValue] = useState("");
+  const [draft, setDraft] = useState<Point[]>([]);
+  const [canvasVersion, setCanvasVersion] = useState(0);
+
+  const normalizedPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(rect.width * ratio));
+      canvas.height = Math.max(1, Math.round(rect.height * ratio));
+      setCanvasVersion((value) => value + 1);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const scale = Math.max(.55, Math.min(rect.width, rect.height) / 520);
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, rect.width, rect.height);
+    context.fillStyle = "#fffef9";
+    context.fillRect(0, 0, rect.width, rect.height);
+    [...strokes, ...(draft.length > 1 ? [{ id: "draft", owner: "draft", color, size, points: draft, tool }] as Stroke[] : [])].forEach((stroke) => {
+      const first = stroke.points[0];
+      if (!first) return;
+      if (stroke.tool === "text" && stroke.text) {
+        context.fillStyle = stroke.color;
+        context.font = `700 ${Math.max(12, (stroke.fontSize || 24) * scale)}px Cairo, sans-serif`;
+        context.textAlign = "right";
+        context.textBaseline = "top";
+        context.fillText(stroke.text, first.x * rect.width, first.y * rect.height);
+        return;
+      }
+      if (stroke.points.length < 2) return;
+      context.strokeStyle = stroke.tool === "eraser" ? "#fffef9" : stroke.color;
+      context.lineWidth = Math.max(1, stroke.size * scale * (stroke.tool === "eraser" ? 3 : 1));
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.beginPath();
+      stroke.points.forEach((point, index) => index ? context.lineTo(point.x * rect.width, point.y * rect.height) : context.moveTo(point.x * rect.width, point.y * rect.height));
+      context.stroke();
+    });
+  }, [strokes, drawingVersion, draft, color, size, tool, canvasVersion]);
+
+  return <div className="relative h-full min-h-44 overflow-hidden bg-[#fffef9]">
+    <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-1 shadow-md" dir="rtl">
+      <button onClick={() => setTool("pen")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "pen" ? "bg-cyan-500 text-white" : "bg-slate-100 text-slate-600"}`} title="قلم"><PenLine className="h-4 w-4"/></button>
+      <button onClick={() => setTool("eraser")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "eraser" ? "bg-amber-400 text-slate-950" : "bg-slate-100 text-slate-600"}`} title="ممحاة"><Eraser className="h-4 w-4"/></button>
+      <button onClick={() => setTool("text")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "text" ? "bg-violet-500 text-white" : "bg-slate-100 text-slate-600"}`} title="كتابة نص"><Type className="h-4 w-4"/></button>
+      {tool === "text" && <input value={textValue} onChange={(event) => setTextValue(event.target.value)} placeholder="اكتب ثم المس السبورة" className="h-8 min-w-28 flex-1 rounded-lg border border-slate-200 px-2 text-[10px] text-slate-800 outline-none"/>}
+      <input type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-8 w-8 shrink-0 rounded-lg" title="لون القلم"/>
+      <input type="range" min="2" max="18" value={size} onChange={(event) => setSize(Number(event.target.value))} className="w-20 shrink-0 accent-cyan-500" title={tool === "text" ? "حجم الخط" : "سمك القلم"}/>
+      {canDraw && <button onClick={onClear} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600" title="مسح السبورة"><Trash2 className="h-4 w-4"/></button>}
+    </div>
+    <canvas ref={canvasRef} className={`h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "cursor-not-allowed"}`}
+      onPointerDown={(event) => {
+        if (!canDraw) return;
+        const point = normalizedPoint(event);
+        if (tool === "text") {
+          const value = textValue.trim();
+          if (!value) return;
+          onStroke({ id: crypto.randomUUID(), owner: "", color, size, points: [point, point], tool: "text", text: value.slice(0, 120), fontSize: Math.max(14, size * 2.2) });
+          setTextValue("");
+          return;
+        }
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setDraft([point]);
+      }}
+      onPointerMove={(event) => { if (canDraw && draft.length) setDraft((points) => [...points, normalizedPoint(event)]); }}
+      onPointerUp={(event) => {
+        if (draft.length) {
+          const points = [...draft, normalizedPoint(event)];
+          if (points.length > 1) onStroke({ id: crypto.randomUUID(), owner: "", color, size, points, tool });
+        }
+        setDraft([]);
+      }}/>
+  </div>;
+}
+
 export const LiveClassroomModal: React.FC<Props> = ({
   onClose,
   lessonTitle,
@@ -246,7 +357,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
-  const [studyWorkspace, setStudyWorkspace] = useState<"board" | "teachers">("board");
+  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers">("plants");
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
@@ -875,8 +986,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>}
           </div>
           <div className="absolute left-[40%] top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
-            <button onClick={() => { setStudyWorkspace("board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
-            <button onClick={() => setStudyWorkspace("teachers")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
+            <button onClick={() => { setStudyWorkspace((current) => current === "board" ? "plants" : "board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
+            <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
           </div>
           <div className="flex items-center gap-1">
             {!offlineBooklet && <span className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
@@ -911,7 +1022,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </aside>
 
             <main className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner" dir="rtl">
-              <div className="mx-auto grid max-h-[36%] w-full max-w-xl shrink-0 grid-cols-2 gap-2 overflow-y-auto">
+              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-xl grid-cols-2 gap-2 overflow-y-auto content-start">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
@@ -929,39 +1040,37 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     {shareCount > 0 && <button onClick={() => setOpenSharedBy(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${shareCount} أسئلة مشاركة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/><b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{shareCount}</b></button>}
                   </div>;
                 })}
-              </div>
-              <div ref={studyWorkspaceRef} className="relative mt-2 min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
-                {studyWorkspace === "board" ? (
-                  <iframe
-                    key={`booklet-board:${currentContent.lessonId || currentContent.lesson || 1}`}
-                    ref={boardFrameRef}
-                    src={boardUrl}
-                    title="السبورة التفاعلية"
-                    className="h-full min-h-44 w-full border-0 bg-white"
-                    allow="fullscreen; clipboard-write"
-                  />
-                ) : selectedTeacherVideo?.youtubeId ? (
-                  <iframe
-                    key={selectedTeacherVideo.youtubeId}
-                    className="h-full min-h-44 w-full border-0 bg-black"
-                    src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=1&rel=0&playsinline=1`}
-                    title={`شرح ${selectedTeacherVideo.teacherName}`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  />
-                ) : (
-                  <div className="h-full min-h-44 overflow-y-auto bg-gradient-to-b from-slate-50 to-emerald-50/60 p-3">
-                    <div className="mb-2 flex items-center gap-2 text-emerald-900"><GraduationCap className="h-5 w-5"/><b className="text-xs">مدرسو هذا الدرس</b></div>
-                    {teachersLoading ? <p className="py-8 text-center text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? <div className="space-y-2">{lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-white p-2 text-right shadow-sm transition hover:border-violet-300 hover:bg-violet-50">
-                      <img src={story.avatar || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-11 w-16 rounded-lg object-cover"/>
-                      <span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-900">{story.teacherName || "مدرس المادة"}</b><small className="block truncate text-[9px] text-slate-500">{story.title || currentContent.lessonTitle || lessonTitle}</small></span>
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-red-600 text-[9px] font-black text-white">▶</span>
-                    </button>)}</div> : <p className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-center text-xs leading-6 text-slate-500">لا توجد فيديوهات مدرسين مرتبطة بهذا الدرس حاليًا.</p>}
+              </div> : <div ref={studyWorkspaceRef} className="relative min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
+                {studyWorkspace === "board" ? <BlankStudyBoard
+                  strokes={classroom?.strokes || []}
+                  drawingVersion={classroom?.drawingVersion || 0}
+                  canDraw={canDraw}
+                  onStroke={(stroke) => send({ type: "classroom_stroke", stroke })}
+                  onClear={() => send({ type: "classroom_control", action: "clear_drawing" })}
+                /> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
+                  <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white/95 p-2" dir="rtl">
+                    <div className="flex min-w-max items-start gap-3">
+                      {teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center">
+                        <span className={`mx-auto block h-14 w-14 overflow-hidden rounded-full border-2 bg-slate-100 shadow-md transition ${selectedTeacherVideo?.id === story.id ? "border-cyan-400 ring-2 ring-cyan-200" : "border-white"}`}><img src={story.storyImage || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-full w-full object-cover"/></span>
+                        <b className="mt-1 block truncate text-[9px] text-slate-900">{story.teacherName || "مدرس المادة"}</b>
+                        <small className="block truncate text-[8px] text-slate-500">{story.channelName || story.teacherName}</small>
+                      </button>) : <p className="px-5 py-4 text-xs text-slate-500">لا توجد فيديوهات مدرسين مرتبطة بهذا الدرس حاليًا.</p>}
+                    </div>
                   </div>
-                )}
+                  <div className="min-h-0 flex-1 bg-slate-950">
+                    {selectedTeacherVideo?.youtubeId ? <iframe
+                      key={selectedTeacherVideo.youtubeId}
+                      className="h-full w-full border-0 bg-black"
+                      src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=1&rel=0&playsinline=1`}
+                      title={`شرح ${selectedTeacherVideo.teacherName}`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    /> : <div className="grid h-full place-items-center p-4 text-center text-slate-300"><div><GraduationCap className="mx-auto mb-2 h-8 w-8 text-cyan-300"/><b className="block text-xs">اختر مدرسًا من الشريط لعرض الفيديو</b><small className="text-[9px] text-slate-500">لن يبدأ أي فيديو تلقائيًا</small></div></div>}
+                  </div>
+                </div>}
                 <button onClick={() => void studyWorkspaceRef.current?.requestFullscreen?.()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
-              </div>
+              </div>}
             </main>
 
             {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
