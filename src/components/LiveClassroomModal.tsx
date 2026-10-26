@@ -928,7 +928,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071126] font-cairo text-white"
       dir="rtl"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-2 py-2 shadow-lg sm:px-3">
+      <header className={`flex shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-2 py-2 shadow-lg sm:px-3 ${classroom?.contentMode === "board" ? "flex-nowrap" : "flex-wrap"}`}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             onClick={closeClassroom}
@@ -946,10 +946,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {classroom?.capacity || capacity} طالب
             </small>
           </div>
-          {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="flex h-9 items-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 px-2 text-[11px] font-black text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب"><Share2 className="h-4 w-4"/>{inviteCopied ? "تم النسخ" : "دعوة"}</button>}
+          {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className={`flex h-9 items-center justify-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-[11px] font-black text-cyan-50 transition active:scale-95 ${classroom?.contentMode === "board" ? "w-9 shrink-0" : "px-2"}`} aria-label="دعوة الطلاب" title={inviteCopied ? "تم نسخ الدعوة" : "دعوة الطلاب"}><Share2 className="h-4 w-4"/>{classroom?.contentMode !== "board" && (inviteCopied ? "تم النسخ" : "دعوة")}</button>}
           {offlineBooklet && <span className="hidden rounded-xl border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-100 sm:inline">وضع المعاينة — لا يحتاج إنترنت للغرفة</span>}
         </div>
-        {isTeacher && isMathClassroom && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+        {isTeacher && classroom?.contentMode === "board" && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div className="relative" ref={exerciseMenuRef}>
             <button onClick={()=>setExerciseMenu(value=>!value)} className="flex h-9 items-center gap-1.5 rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-400/30 to-teal-700/60 px-3 text-xs font-black text-white shadow-lg" aria-label="عرض قائمة التمارين"><Grid2X2 className="h-4 w-4"/><span>التمارين {classroomExercises.length?activeExercisePosition+1:0}/{classroomExercises.length}</span></button>
             {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-48 -translate-x-1/2 grid-cols-4 gap-1.5 overflow-y-auto rounded-2xl border border-emerald-300/35 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`rounded-xl px-2 py-2 text-xs font-black ${index===activeExercisePosition?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-emerald-600"}`}>{index+1}</button>)}</div>}
@@ -973,12 +973,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
           <span className="hidden rounded-full bg-white/10 px-3 py-1 text-[10px] text-emerald-200 sm:inline">{classroom.studyMode === "together" ? "ندرس معًا" : "مع مدرس"}</span>
         </div>
       </div>}
-      {isTeacher && isMathClassroom && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
+      {isTeacher && classroom?.contentMode === "board" && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
         <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
         {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
         <div className="space-y-2">{state?.players.filter(player=>player.id!==me).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}</small></div></div>{player.lastAnswer&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {player.lastAnswer}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح":"تجميد"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>شرح</button></div></div>)}</div>
       </div>}
-      {isTeacher && !isMathClassroom && (
+      {isTeacher && classroom?.contentMode === "booklet" && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
           {!isMathClassroom && (
             <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
