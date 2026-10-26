@@ -101,6 +101,7 @@ type ClassroomState = {
     sharedMission?: string;
     bookletIndex?: number;
     bookletAnswerVisible?: boolean;
+    bookletShares?: Array<{ id: string; from: string; index: number; question: string; answer: string; createdAt: number }>;
   };
 };
 
@@ -243,6 +244,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
+  const [openSharedBy, setOpenSharedBy] = useState<string | null>(null);
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
@@ -336,7 +338,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const send = (payload: unknown) => {
     if (offlineBooklet) {
-      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; index?: number; answerVisible?: boolean };
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; index?: number; answerVisible?: boolean; question?: string; answer?: string };
       setState((previous) => {
         if (!previous) return previous;
         const next: ClassroomState = {
@@ -354,6 +356,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
         if (message.type === "classroom_booklet_navigation") {
           next.classroom.bookletIndex = Math.max(0, Number(message.index) || 0);
           next.classroom.bookletAnswerVisible = Boolean(message.answerVisible);
+        }
+        if (message.type === "classroom_booklet_share" && selfPlayer && message.question) {
+          next.classroom.bookletShares = [...(next.classroom.bookletShares || []), { id: crypto.randomUUID(), from: selfPlayer.id, index: Number(message.index) || 0, question: message.question, answer: message.answer || "", createdAt: Date.now() }].slice(-50);
+          selfPlayer.activity = "شارك سؤالاً";
         }
         if (message.type === "classroom_stroke" && message.stroke) {
           next.classroom.strokes = next.classroom.strokes.slice(-299).concat(message.stroke);
@@ -678,15 +684,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
+  const openShares = openSharedBy ? (classroom?.bookletShares || []).filter((share) => share.from === openSharedBy) : [];
   useEffect(() => {
+    if (classroom?.studyMode !== "teacher") return;
     setBookletItemIndex(Math.max(0, Math.min(bookletQuestions.length - 1, Number(classroom?.bookletIndex) || 0)));
-  }, [classroom?.bookletIndex, bookletQuestions.length]);
-  useEffect(() => setBookletAnswerVisible(Boolean(classroom?.bookletAnswerVisible)), [classroom?.bookletAnswerVisible]);
+  }, [classroom?.bookletIndex, classroom?.studyMode, bookletQuestions.length]);
+  useEffect(() => { if (classroom?.studyMode === "teacher") setBookletAnswerVisible(Boolean(classroom?.bookletAnswerVisible)); }, [classroom?.bookletAnswerVisible, classroom?.studyMode]);
   const navigateBooklet = (index: number, answerVisible = false) => {
     const nextIndex = Math.max(0, Math.min(bookletQuestions.length - 1, index));
     setBookletItemIndex(nextIndex);
     setBookletAnswerVisible(answerVisible);
-    send({ type: "classroom_booklet_navigation", index: nextIndex, answerVisible });
+    if (classroom?.studyMode === "teacher" && isTeacher) send({ type: "classroom_booklet_navigation", index: nextIndex, answerVisible });
+  };
+  const shareCurrentQuestion = () => {
+    if (!bookletQuestion) return;
+    send({ type: "classroom_booklet_share", index: bookletItemIndex, question: bookletQuestion.question, answer: bookletQuestion.answer });
   };
   const saveMission = (progress = 0) => {
     const text = missionText.trim();
@@ -872,12 +884,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
                   const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
                   const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
+                  const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
                   return <div key={player.id} className={`relative flex min-h-32 flex-col items-center justify-center rounded-2xl border p-2 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
                     <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-14 w-14 object-contain drop-shadow-md ${personalAnimation}`}/>
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
+                    {shareCount > 0 && <button onClick={() => setOpenSharedBy(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${shareCount} أسئلة مشاركة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/><b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{shareCount}</b></button>}
                   </div>;
                 })}
               </div>
@@ -885,7 +899,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
             {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
-                <span className="flex-1" aria-hidden="true" />
+                {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label="مشاركة السؤال مع الأعضاء"><Share2 className="h-4 w-4 text-cyan-600"/>مشاركة</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
               </div>
               <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
@@ -899,12 +913,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 </> : <p className="text-center text-xs leading-6 text-slate-500">لا توجد أسئلة مفردة في ملزمة هذا الدرس.</p>}
               </div>
               <div className="z-10 grid h-[58px] grid-cols-2 gap-2 border-t border-[#d7c9a4] bg-[#f4f0e4] p-2 shadow-[0_-8px_18px_rgba(36,51,46,.08)]">
-                <button disabled={bookletItemIndex <= 0} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
-                <button disabled={bookletItemIndex >= bookletQuestions.length - 1} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
+                <button disabled={bookletItemIndex <= 0 || (classroom?.studyMode === "teacher" && !isTeacher)} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex items-center justify-center gap-1 rounded-xl bg-white/70 py-2 text-[10px] font-black disabled:opacity-35"><ChevronRight className="h-4 w-4"/>السابق</button>
+                <button disabled={bookletItemIndex >= bookletQuestions.length - 1 || (classroom?.studyMode === "teacher" && !isTeacher)} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-2 text-[10px] font-black text-white disabled:opacity-35">التالي<ChevronLeft className="h-4 w-4"/></button>
               </div>
             </aside>}
           </div>
         </div>
+        {openSharedBy && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setOpenSharedBy(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[72vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-200 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><b className="text-sm">الأسئلة المشاركة</b><button onClick={() => setOpenSharedBy(null)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="space-y-3">{openShares.slice().reverse().map((share) => <article key={share.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3"><small className="font-black text-emerald-700">السؤال {share.index + 1}</small><p className="mt-1 text-sm font-black leading-7">{share.question}</p><div className="mt-2 rounded-xl bg-white p-3 text-xs font-bold leading-6">{share.answer || "لا توجد إجابة مسجلة."}</div></article>)}</div></section></div>}
       </div>
     );
 
