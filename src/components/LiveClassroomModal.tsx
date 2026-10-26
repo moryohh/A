@@ -209,17 +209,27 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let frame = 0;
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.round(rect.width * ratio));
-      canvas.height = Math.max(1, Math.round(rect.height * ratio));
-      setCanvasVersion((value) => value + 1);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const nextWidth = Math.max(1, Math.round(rect.width * ratio));
+        const nextHeight = Math.max(1, Math.round(rect.height * ratio));
+        if (canvas.width === nextWidth && canvas.height === nextHeight) return;
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+        setCanvasVersion((value) => value + 1);
+      });
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
