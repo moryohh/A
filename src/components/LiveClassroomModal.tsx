@@ -36,7 +36,7 @@ import { OpenLessonContext, TeacherStory } from "../types";
 import { getSupabaseClient } from "../lib/supabase";
 import { loadGuestSession } from "../services/guestPreviewService";
 import { fetchLessonCurriculum } from "../services/curriculumService";
-import { getLessonDetails, getSubjectIndex } from "../services/lessonsService";
+import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/lessonsService";
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
@@ -382,6 +382,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
   const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
+  const closingRef = useRef(false);
+  const workspaceFullscreenRef = useRef(false);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -506,8 +508,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   useEffect(
     () => () => {
+      closingRef.current = true;
       socketRef.current?.close();
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     },
     [],
   );
@@ -539,7 +544,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       lessonNumber: Number(currentContent.lesson) || 1,
       lessonId:
         currentContent.lessonId || `lesson-${currentContent.lesson || 1}`,
-      lessonKey: `${currentContent.subject || category}-ch${currentContent.chapter || 1}-les${currentContent.lesson || 1}`,
+      lessonKey: buildLessonKey(currentContent.subject || category, Number(currentContent.chapter) || 1, Number(currentContent.lesson) || 1),
       title: currentContent.lessonTitle || lessonTitle,
       lessonTitle: currentContent.lessonTitle || lessonTitle,
     };
@@ -566,7 +571,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       chapterNumber: Number(currentContent.chapter) || 1,
       lessonNumber: Number(currentContent.lesson) || 1,
       lessonId: currentContent.lessonId || `lesson-${currentContent.lesson || 1}`,
-      lessonKey: `${currentContent.subject || category}-ch${currentContent.chapter || 1}-les${currentContent.lesson || 1}`,
+      lessonKey: buildLessonKey(currentContent.subject || category, Number(currentContent.chapter) || 1, Number(currentContent.lesson) || 1),
       title: currentContent.lessonTitle || lessonTitle,
       lessonTitle: currentContent.lessonTitle || lessonTitle,
     };
@@ -765,6 +770,34 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }, [room, defaultMode]);
 
   useEffect(() => {
+    if (!room) return;
+    const handleFullscreenExit = () => {
+      if (document.fullscreenElement || closingRef.current) return;
+      if (workspaceFullscreenRef.current) {
+        workspaceFullscreenRef.current = false;
+        return;
+      }
+      closingRef.current = true;
+      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
+      socketRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      onClose();
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenExit);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
+  }, [room, onClose]);
+
+  const openStudyFullscreen = async () => {
+    if (!studyWorkspaceRef.current?.requestFullscreen) return;
+    workspaceFullscreenRef.current = true;
+    try {
+      await studyWorkspaceRef.current.requestFullscreen();
+    } catch {
+      workspaceFullscreenRef.current = false;
+    }
+  };
+
+  useEffect(() => {
     const close = (event: PointerEvent) => {
       if (!exerciseMenuRef.current?.contains(event.target as Node))
         setExerciseMenu(false);
@@ -774,6 +807,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   }, []);
 
   const closeClassroom = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    socketRef.current?.close();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     try {
       (screen.orientation as LockableScreenOrientation).unlock?.();
     } catch {
@@ -1069,7 +1106,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     /> : <div className="grid h-full place-items-center p-4 text-center text-slate-300"><div><GraduationCap className="mx-auto mb-2 h-8 w-8 text-cyan-300"/><b className="block text-xs">اختر مدرسًا من الشريط لعرض الفيديو</b><small className="text-[9px] text-slate-500">لن يبدأ أي فيديو تلقائيًا</small></div></div>}
                   </div>
                 </div>}
-                <button onClick={() => void studyWorkspaceRef.current?.requestFullscreen?.()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
+                <button onClick={() => void openStudyFullscreen()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
               </div>}
             </main>
 
