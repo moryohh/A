@@ -11,7 +11,9 @@ import {
   EyeOff,
   Hand,
   Grid2X2,
+  GraduationCap,
   LockKeyhole,
+  Maximize2,
   Mic,
   MicOff,
   Radio,
@@ -27,11 +29,11 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { OpenLessonContext } from "../types";
+import { OpenLessonContext, TeacherStory } from "../types";
 import { getSupabaseClient } from "../lib/supabase";
 import { loadGuestSession } from "../services/guestPreviewService";
 import { fetchLessonCurriculum } from "../services/curriculumService";
-import { getSubjectIndex } from "../services/lessonsService";
+import { getLessonDetails, getSubjectIndex } from "../services/lessonsService";
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
@@ -244,6 +246,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
+  const [studyWorkspace, setStudyWorkspace] = useState<"board" | "teachers">("board");
+  const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
+  const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
+  const [teachersLoading, setTeachersLoading] = useState(false);
   const [openSharedBy, setOpenSharedBy] = useState<string | null>(null);
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -263,6 +269,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
 
   const classroom = state?.classroom;
@@ -438,6 +445,30 @@ export const LiveClassroomModal: React.FC<Props> = ({
     currentContent.lesson,
     currentContent.lessonId,
   ]);
+  useEffect(() => {
+    if (classroom?.contentMode !== "booklet") return;
+    let cancelled = false;
+    setTeachersLoading(true);
+    setSelectedTeacherVideo(null);
+    const context: OpenLessonContext = {
+      subjectId: currentContent.subject || category,
+      chapterNumber: Number(currentContent.chapter) || 1,
+      lessonNumber: Number(currentContent.lesson) || 1,
+      lessonId: currentContent.lessonId || `lesson-${currentContent.lesson || 1}`,
+      lessonKey: `${currentContent.subject || category}-ch${currentContent.chapter || 1}-les${currentContent.lesson || 1}`,
+      title: currentContent.lessonTitle || lessonTitle,
+      lessonTitle: currentContent.lessonTitle || lessonTitle,
+    };
+    getLessonDetails(context)
+      .then((result) => {
+        if (cancelled) return;
+        const teachers = (result.data?.teacherStories || []).filter((story) => Boolean(story.youtubeId));
+        setLessonTeachers(teachers);
+      })
+      .catch(() => { if (!cancelled) setLessonTeachers([]); })
+      .finally(() => { if (!cancelled) setTeachersLoading(false); });
+    return () => { cancelled = true; };
+  }, [classroom?.contentMode, currentContent.subject, currentContent.chapter, currentContent.lesson, currentContent.lessonId, currentContent.lessonTitle, category, lessonTitle]);
   useEffect(() => {
     if (!room || !isTeacher) return;
     let cancelled = false;
@@ -843,7 +874,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
             </div>}
           </div>
-          <button onClick={() => setBookletPanelVisible((visible) => !visible)} className={`absolute right-[31%] grid h-9 w-9 place-items-center rounded-xl border ${bookletPanelVisible ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100" : "border-cyan-300/40 bg-cyan-400/15 text-cyan-100"}`} aria-label={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"} title={bookletPanelVisible ? "إخفاء الملزمة" : "إظهار الملزمة"}>{bookletPanelVisible ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
+          <div className="absolute left-[40%] top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
+            <button onClick={() => { setStudyWorkspace("board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
+            <button onClick={() => setStudyWorkspace("teachers")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
+          </div>
           <div className="flex items-center gap-1">
             {!offlineBooklet && <span className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
             {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
@@ -853,7 +887,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </header>
 
         <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden" dir="ltr">
-          <div className={`grid h-full min-w-[680px] gap-2 p-2 ${bookletPanelVisible ? "grid-cols-[145px_minmax(260px,1fr)_290px]" : "grid-cols-[145px_minmax(420px,1fr)]"}`}>
+          <div className={`relative grid h-full min-w-[680px] gap-2 p-2 ${bookletPanelVisible ? "grid-cols-[145px_minmax(260px,1fr)_290px]" : "grid-cols-[145px_minmax(420px,1fr)]"}`}>
+            {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
             <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
               <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
               <div className="space-y-2">
@@ -875,8 +910,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
             </aside>
 
-            <main className="min-h-0 overflow-y-auto rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-3 shadow-inner" dir="rtl">
-              <div className="mx-auto grid max-w-xl grid-cols-2 gap-2">
+            <main className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner" dir="rtl">
+              <div className="mx-auto grid max-h-[36%] w-full max-w-xl shrink-0 grid-cols-2 gap-2 overflow-y-auto">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
@@ -885,9 +920,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
                   const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
-                  return <div key={player.id} className={`relative flex min-h-32 flex-col items-center justify-center rounded-2xl border p-2 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
+                  return <div key={player.id} className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-14 w-14 object-contain drop-shadow-md ${personalAnimation}`}/>
+                    <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-10 w-10 object-contain drop-shadow-md ${personalAnimation}`}/>
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
@@ -895,12 +930,45 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   </div>;
                 })}
               </div>
+              <div ref={studyWorkspaceRef} className="relative mt-2 min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
+                {studyWorkspace === "board" ? (
+                  <iframe
+                    key={`booklet-board:${currentContent.lessonId || currentContent.lesson || 1}`}
+                    ref={boardFrameRef}
+                    src={boardUrl}
+                    title="السبورة التفاعلية"
+                    className="h-full min-h-44 w-full border-0 bg-white"
+                    allow="fullscreen; clipboard-write"
+                  />
+                ) : selectedTeacherVideo?.youtubeId ? (
+                  <iframe
+                    key={selectedTeacherVideo.youtubeId}
+                    className="h-full min-h-44 w-full border-0 bg-black"
+                    src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=1&rel=0&playsinline=1`}
+                    title={`شرح ${selectedTeacherVideo.teacherName}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="h-full min-h-44 overflow-y-auto bg-gradient-to-b from-slate-50 to-emerald-50/60 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-emerald-900"><GraduationCap className="h-5 w-5"/><b className="text-xs">مدرسو هذا الدرس</b></div>
+                    {teachersLoading ? <p className="py-8 text-center text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? <div className="space-y-2">{lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-white p-2 text-right shadow-sm transition hover:border-violet-300 hover:bg-violet-50">
+                      <img src={story.avatar || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-11 w-16 rounded-lg object-cover"/>
+                      <span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-900">{story.teacherName || "مدرس المادة"}</b><small className="block truncate text-[9px] text-slate-500">{story.title || currentContent.lessonTitle || lessonTitle}</small></span>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-red-600 text-[9px] font-black text-white">▶</span>
+                    </button>)}</div> : <p className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-center text-xs leading-6 text-slate-500">لا توجد فيديوهات مدرسين مرتبطة بهذا الدرس حاليًا.</p>}
+                  </div>
+                )}
+                <button onClick={() => void studyWorkspaceRef.current?.requestFullscreen?.()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
+              </div>
             </main>
 
             {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label="مشاركة السؤال مع الأعضاء"><Share2 className="h-4 w-4 text-cyan-600"/>مشاركة</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
+                <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
               </div>
               <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
                 {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
