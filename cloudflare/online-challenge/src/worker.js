@@ -514,6 +514,7 @@ export class ChallengeRoom {
         sharedMission: game.sharedMission || '',
         bookletIndex: Math.max(0, Number(game.bookletIndex) || 0),
         bookletAnswerVisible: Boolean(game.bookletAnswerVisible),
+        bookletShares: Array.isArray(game.bookletShares) ? game.bookletShares.slice(-50) : [],
         participants: game.players.map(function (player) {
           return { id: player.id, handRaised: Boolean(player.handRaised), micAllowed: Boolean(player.micAllowed), drawAllowed: Boolean(player.drawAllowed) };
         }),
@@ -700,10 +701,23 @@ export class ChallengeRoom {
         senderPlayer.lastAnswer = senderPlayer.progress.answer;
         senderPlayer.activity = 'يحل الآن';
         senderPlayer.activityAt = Date.now();
-      } else if (payload.type === 'classroom_booklet_navigation' && senderPlayer) {
+      } else if (payload.type === 'classroom_booklet_navigation' && senderPlayer && liveGame.studyMode === 'teacher' && isTeacher) {
         liveGame.bookletIndex = Math.max(0, Math.min(999, Number(payload.index) || 0));
         liveGame.bookletAnswerVisible = Boolean(payload.answerVisible);
         senderPlayer.activity = 'يتنقل في الملزمة';
+        senderPlayer.activityAt = Date.now();
+      } else if (payload.type === 'classroom_booklet_share' && senderPlayer) {
+        var sharedQuestion = String(payload.question || '').trim().slice(0, 1200);
+        if (!sharedQuestion) return;
+        liveGame.bookletShares = (liveGame.bookletShares || []).slice(-49).concat({
+          id: crypto.randomUUID(),
+          from: sender.userId,
+          index: Math.max(0, Math.min(999, Number(payload.index) || 0)),
+          question: sharedQuestion,
+          answer: String(payload.answer || '').trim().slice(0, 1800),
+          createdAt: Date.now(),
+        });
+        senderPlayer.activity = 'شارك سؤالاً';
         senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_presenter_state' && (isTeacher || sender.userId === liveGame.presenterId)) {
         var serializedPresenterState = JSON.stringify(payload.state || {});
