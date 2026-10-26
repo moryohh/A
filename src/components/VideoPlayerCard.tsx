@@ -101,33 +101,53 @@ const LessonBlankBoard: React.FC = () => {
   const pointFromEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
-      x: (event.clientX - rect.left) / Math.max(1, rect.width),
-      y: (event.clientY - rect.top) / Math.max(1, rect.height),
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
     };
   };
 
-  return <div className="relative h-[min(620px,68dvh)] min-h-[360px] overflow-hidden rounded-2xl border border-emerald-500/30 bg-[#fffef9] shadow-[0_12px_36px_rgba(16,185,129,0.12)]">
+  return <div
+    className="relative isolate h-[min(620px,68dvh)] min-h-[360px] overflow-hidden overscroll-contain rounded-2xl border border-emerald-500/30 bg-[#fffef9] shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
+    onClick={(event) => event.stopPropagation()}
+    onContextMenu={(event) => event.preventDefault()}
+  >
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 h-full w-full touch-none bg-[#fffef9]"
+      className="absolute inset-0 block h-full w-full touch-none select-none bg-[#fffef9]"
+      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
       aria-label="سبورة بيضاء فارغة للرسم"
       onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         activeLineRef.current = { color, width, erase: tool === 'eraser', points: [pointFromEvent(event)] };
       }}
       onPointerMove={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (!activeLineRef.current) return;
         activeLineRef.current.points.push(pointFromEvent(event));
         drawBoard();
       }}
       onPointerUp={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (!activeLineRef.current) return;
         activeLineRef.current.points.push(pointFromEvent(event));
         linesRef.current.push(activeLineRef.current);
         activeLineRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
         drawBoard();
       }}
-      onPointerCancel={() => { activeLineRef.current = null; drawBoard(); }}
+      onPointerCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        activeLineRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        drawBoard();
+      }}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
     />
     <div className="absolute inset-x-2 top-2 z-10 flex items-center justify-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md" dir="rtl">
       <button type="button" onClick={() => setTool('pen')} aria-label="قلم" className={`rounded-lg p-2 ${tool === 'pen' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}><PenLine className="h-5 w-5" /></button>

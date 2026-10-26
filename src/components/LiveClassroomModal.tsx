@@ -203,7 +203,10 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
 
   const normalizedPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
+    };
   };
 
   useEffect(() => {
@@ -266,7 +269,11 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
     });
   }, [strokes, drawingVersion, draft, color, size, tool, canvasVersion]);
 
-  return <div className="relative h-full min-h-44 overflow-hidden bg-[#fffef9]">
+  return <div
+    className="relative isolate h-full min-h-44 overflow-hidden overscroll-contain bg-[#fffef9]"
+    onClick={(event) => event.stopPropagation()}
+    onContextMenu={(event) => event.preventDefault()}
+  >
     <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-1 shadow-md" dir="rtl">
       <button onClick={() => setTool("pen")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "pen" ? "bg-cyan-500 text-white" : "bg-slate-100 text-slate-600"}`} title="قلم"><PenLine className="h-4 w-4"/></button>
       <button onClick={() => setTool("eraser")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "eraser" ? "bg-amber-400 text-slate-950" : "bg-slate-100 text-slate-600"}`} title="ممحاة"><Eraser className="h-4 w-4"/></button>
@@ -276,8 +283,12 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
       <input type="range" min="2" max="18" value={size} onChange={(event) => setSize(Number(event.target.value))} className="w-20 shrink-0 accent-cyan-500" title={tool === "text" ? "حجم الخط" : "سمك القلم"}/>
       {canDraw && <button onClick={onClear} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600" title="مسح السبورة"><Trash2 className="h-4 w-4"/></button>}
     </div>
-    <canvas ref={canvasRef} className={`h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "cursor-not-allowed"}`}
+    <canvas ref={canvasRef} className={`block h-full w-full touch-none select-none ${canDraw ? "cursor-crosshair" : "cursor-not-allowed"}`}
+      style={{ touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}
       onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.pointerType === "mouse" && event.button !== 0) return;
         if (!canDraw) return;
         const point = normalizedPoint(event);
         if (tool === "text") {
@@ -290,14 +301,28 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
         event.currentTarget.setPointerCapture(event.pointerId);
         setDraft([point]);
       }}
-      onPointerMove={(event) => { if (canDraw && draft.length) setDraft((points) => [...points, normalizedPoint(event)]); }}
+      onPointerMove={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (canDraw && draft.length) setDraft((points) => [...points, normalizedPoint(event)]);
+      }}
       onPointerUp={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (draft.length) {
           const points = [...draft, normalizedPoint(event)];
           if (points.length > 1) onStroke({ id: crypto.randomUUID(), owner: "", color, size, points, tool });
         }
         setDraft([]);
-      }}/>
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setDraft([]);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}/>
   </div>;
 }
 
