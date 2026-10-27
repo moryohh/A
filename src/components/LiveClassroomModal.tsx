@@ -440,6 +440,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const closingRef = useRef(false);
   const workspaceFullscreenRef = useRef(false);
   const historyEntryRef = useRef(false);
+  const previousOrientationRef = useRef<"portrait" | "landscape">("portrait");
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -844,37 +845,33 @@ export const LiveClassroomModal: React.FC<Props> = ({
     return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
   }, [room]);
 
+  const closeStudyFullscreen = () => {
+    if (!workspaceFullscreenRef.current) return;
+    workspaceFullscreenRef.current = false;
+    setWorkspaceExpanded(false);
+    void (screen.orientation as LockableScreenOrientation).lock?.(previousOrientationRef.current).catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
+  };
+
   useEffect(() => {
-    if (!room || offlineBooklet || historyEntryRef.current) return;
-    window.history.pushState({ ...window.history.state, liveClassroom: true }, "", window.location.href);
-    historyEntryRef.current = true;
-    const handleBack = () => {
-      if (!historyEntryRef.current || closingRef.current) return;
-      if (workspaceFullscreenRef.current) {
-        workspaceFullscreenRef.current = false;
-        setWorkspaceExpanded(false);
-        try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
-        window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
-        return;
-      }
-      historyEntryRef.current = false;
-      closingRef.current = true;
-      socketRef.current?.close();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      void restoreClassroomDisplay().finally(onClose);
+    if (!room) return;
+    const handleClassroomBack = (event: Event) => {
+      if (!workspaceFullscreenRef.current) return;
+      event.preventDefault();
+      closeStudyFullscreen();
     };
-    window.addEventListener("popstate", handleBack);
-    return () => window.removeEventListener("popstate", handleBack);
-  }, [room, offlineBooklet, onClose]);
+    window.addEventListener("duha-live-classroom-back", handleClassroomBack);
+    return () => window.removeEventListener("duha-live-classroom-back", handleClassroomBack);
+  }, [room]);
 
   const openStudyFullscreen = () => {
     if (workspaceFullscreenRef.current) {
-      window.history.back();
+      closeStudyFullscreen();
       return;
     }
+    previousOrientationRef.current = screen.orientation?.type?.startsWith("landscape") ? "landscape" : "portrait";
     workspaceFullscreenRef.current = true;
     setWorkspaceExpanded(true);
-    window.history.pushState({ ...window.history.state, classroomWorkspace: true }, "", window.location.href);
     void (screen.orientation as LockableScreenOrientation).lock?.("landscape").catch(() => undefined);
     window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
   };
@@ -890,10 +887,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const closeClassroom = () => {
     if (closingRef.current) return;
-    if (historyEntryRef.current) {
-      window.history.back();
-      return;
-    }
     closingRef.current = true;
     socketRef.current?.close();
     streamRef.current?.getTracks().forEach((track) => track.stop());

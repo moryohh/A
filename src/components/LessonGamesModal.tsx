@@ -147,6 +147,14 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   useEffect(() => {
     const handleHardwareBack = (event: Event) => {
       if (activeGameMode === "menu") return;
+      if (activeGameMode === "live_classroom") {
+        const classroomBack = new Event("duha-live-classroom-back", { cancelable: true });
+        window.dispatchEvent(classroomBack);
+        if (classroomBack.defaultPrevented) {
+          event.preventDefault();
+          return;
+        }
+      }
       event.preventDefault();
       setActiveGameMode("menu");
     };
