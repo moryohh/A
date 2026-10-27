@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Apple,
   ArrowLeftRight,
@@ -15,6 +16,7 @@ import {
   GraduationCap,
   LockKeyhole,
   Maximize2,
+  Minimize2,
   Mic,
   MicOff,
   Radio,
@@ -39,6 +41,7 @@ import { fetchLessonCurriculum } from "../services/curriculumService";
 import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/lessonsService";
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
+import { PlantStageVideo } from "./PlantStageVideo";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
 
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
@@ -184,6 +187,20 @@ async function enterClassroomLandscape() {
   } catch {
     // Unsupported browsers keep the same two-column landscape canvas.
   }
+}
+
+async function restoreClassroomDisplay() {
+  try {
+    (screen.orientation as LockableScreenOrientation).unlock?.();
+  } catch {
+    // Orientation locking is not available in every mobile browser.
+  }
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+  } catch {
+    // Fullscreen cleanup is best effort.
+  }
+  window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
 }
 
 function BlankStudyBoard({ strokes, drawingVersion, canDraw, onShare }: {
@@ -413,6 +430,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [missionOpen, setMissionOpen] = useState(false);
   const [missionText, setMissionText] = useState("");
   const [missionTarget, setMissionTarget] = useState(4);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -421,6 +439,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
   const closingRef = useRef(false);
   const workspaceFullscreenRef = useRef(false);
+  const historyEntryRef = useRef(false);
+  const previousOrientationRef = useRef<"portrait" | "landscape">("portrait");
+  const preserveDisplayOnUnmountRef = useRef(false);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -435,6 +456,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   };
   const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
+
+  useEffect(() => {
+    if (studyWorkspace === "board") setStudyWorkspace("plants");
+  }, [studyWorkspace]);
 
   useEffect(() => {
     setClassroomExercises([]);
@@ -554,8 +579,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       closingRef.current = true;
       socketRef.current?.close();
       streamRef.current?.getTracks().forEach((track) => track.stop());
-      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      if (!preserveDisplayOnUnmountRef.current) void restoreClassroomDisplay();
     },
     [],
   );
@@ -816,28 +840,44 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (!room) return;
     const handleFullscreenExit = () => {
       if (document.fullscreenElement || closingRef.current) return;
-      if (workspaceFullscreenRef.current) {
-        workspaceFullscreenRef.current = false;
-        return;
-      }
-      closingRef.current = true;
-      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
-      socketRef.current?.close();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      onClose();
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
     };
     document.addEventListener("fullscreenchange", handleFullscreenExit);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
-  }, [room, onClose]);
+  }, [room]);
 
-  const openStudyFullscreen = async () => {
-    if (!studyWorkspaceRef.current?.requestFullscreen) return;
-    workspaceFullscreenRef.current = true;
-    try {
-      await studyWorkspaceRef.current.requestFullscreen();
-    } catch {
-      workspaceFullscreenRef.current = false;
+  const closeStudyFullscreen = () => {
+    if (!workspaceFullscreenRef.current) return;
+    workspaceFullscreenRef.current = false;
+    setWorkspaceExpanded(false);
+    void (screen.orientation as LockableScreenOrientation).lock?.(previousOrientationRef.current).catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
+  };
+
+  useEffect(() => {
+    if (!room) return;
+    const handleClassroomBack = (event: Event) => {
+      if (workspaceFullscreenRef.current) {
+        event.preventDefault();
+        closeStudyFullscreen();
+        return;
+      }
+      preserveDisplayOnUnmountRef.current = true;
+    };
+    window.addEventListener("duha-live-classroom-back", handleClassroomBack);
+    return () => window.removeEventListener("duha-live-classroom-back", handleClassroomBack);
+  }, [room]);
+
+  const openStudyFullscreen = () => {
+    if (workspaceFullscreenRef.current) {
+      closeStudyFullscreen();
+      return;
     }
+    previousOrientationRef.current = screen.orientation?.type?.startsWith("landscape") ? "landscape" : "portrait";
+    workspaceFullscreenRef.current = true;
+    setWorkspaceExpanded(true);
+    void (screen.orientation as LockableScreenOrientation).lock?.("landscape").catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
   };
 
   useEffect(() => {
@@ -854,14 +894,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     closingRef.current = true;
     socketRef.current?.close();
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    try {
-      (screen.orientation as LockableScreenOrientation).unlock?.();
-    } catch {
-      /* orientation unlocking is optional */
-    }
-    if (document.fullscreenElement)
-      void document.exitFullscreen().catch(() => undefined);
-    onClose();
+    void restoreClassroomDisplay().finally(onClose);
   };
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
@@ -1072,7 +1105,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>}
           </div>
           <div className="z-20 flex items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
-            <button onClick={() => { setStudyWorkspace((current) => current === "board" ? "plants" : "board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
             <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
           </div>
           </div>
@@ -1085,9 +1117,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
-          <div className={`relative grid h-full min-h-[360px] min-w-0 gap-1.5 p-1.5 sm:gap-2 sm:p-2 ${bookletPanelVisible ? "grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
+          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
-            <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
+            <aside className="max-h-36 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
               <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
               <div className="space-y-2">
                 {state?.players.filter((player) => player.connected || offlineBooklet).map((player, index) => {
@@ -1108,27 +1140,27 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
             </aside>
 
-            <main className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner" dir="rtl">
+            <main className="flex min-h-[55dvh] flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner min-[600px]:min-h-0" dir="rtl">
               {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-xl grid-cols-2 gap-2 overflow-y-auto content-start">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
                   const points = Math.round((progress / target) * 100);
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
-                  const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
-                  const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
+                  const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
                   const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
                   return <div key={player.id} className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-10 w-10 object-contain drop-shadow-md ${personalAnimation}`}/>
+                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="drop-shadow-md" />
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
                     {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
                   </div>;
                 })}
-              </div> : <div ref={studyWorkspaceRef} className="relative min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
+              </div> : (() => {
+                const workspace = <div ref={studyWorkspaceRef} className={`${workspaceExpanded ? "fixed inset-0 z-[130] min-h-0 rounded-none border-0" : "relative min-h-44 flex-1 rounded-2xl border border-emerald-200"} overflow-hidden bg-white shadow-inner`}>
                 {studyWorkspace === "board" ? <BlankStudyBoard
                   strokes={classroom?.strokes || []}
                   drawingVersion={classroom?.drawingVersion || 0}
@@ -1157,11 +1189,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     /> : <div className="grid h-full place-items-center p-4 text-center text-slate-300"><div><GraduationCap className="mx-auto mb-2 h-8 w-8 text-cyan-300"/><b className="block text-xs">اختر مدرسًا من الشريط لعرض الفيديو</b><small className="text-[9px] text-slate-500">لن يبدأ أي فيديو تلقائيًا</small></div></div>}
                   </div>
                 </div>}
-                <button onClick={() => void openStudyFullscreen()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
-              </div>}
+                <button onClick={openStudyFullscreen} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label={workspaceExpanded ? "تصغير منطقة العرض" : "تكبير منطقة العرض"} title={workspaceExpanded ? "العودة إلى الغرفة" : "تكبير إلى ملء الشاشة"}>{workspaceExpanded ? <Minimize2 className="h-4 w-4"/> : <Maximize2 className="h-4 w-4"/>}</button>
+              </div>;
+                return workspaceExpanded ? createPortal(workspace, document.body) : workspace;
+              })()}
             </main>
 
-            {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
+            {bookletPanelVisible && <aside className="grid min-h-[65dvh] grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label="مشاركة السؤال مع الأعضاء"><Share2 className="h-4 w-4 text-cyan-600"/>مشاركة</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
@@ -1366,7 +1400,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </section>
               <aside className="order-3 hidden flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:flex">
                 <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
-                <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(treeStage).padStart(2, "0")}.png`} alt="شجرة تقدم المجموعة" className="my-3 max-h-48 w-full object-contain drop-shadow-[0_12px_18px_rgba(16,185,129,.25)]"/>
+                <div className="my-3 flex min-h-32 w-full items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound /></div>
                 <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
               </aside>
             </>
@@ -1401,25 +1435,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <button onClick={() => { setMissionText(self?.mission?.text || ""); setMissionTarget(self?.mission?.target || 4); setMissionOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950"><Target className="h-4 w-4"/>{self?.mission ? "تعديل مهمتي" : "اختر مهمتك"}</button>
             {self?.mission && <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1"><button onClick={() => updateMissionProgress(self.mission!.progress - 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">−</button><span className="min-w-12 text-center text-xs font-black text-white">{self.mission.progress}/{self.mission.target}</span><button onClick={() => updateMissionProgress(self.mission!.progress + 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500 text-slate-950">+</button>{self.mission.completed && <CheckCircle2 className="mx-1 h-5 w-5 text-emerald-300"/>}</div>}
           </>}
-          {canDraw && classroom?.contentMode === "booklet" && (
-            <>
-              <PenLine className="h-4 w-4 text-cyan-300" />
-              <input
-                type="color"
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-                className="h-9 w-10"
-              />
-              <input
-                type="range"
-                min="2"
-                max="16"
-                value={size}
-                onChange={(event) => setSize(Number(event.target.value))}
-                className="w-20"
-              />
-            </>
-          )}
           {!isTeacher && (
             <button
               onClick={() =>

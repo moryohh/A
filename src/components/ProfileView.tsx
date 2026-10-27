@@ -150,7 +150,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
   const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
 
   return (
-    <div className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
+    <div className="relative isolate flex h-32 w-32 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
       <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white/75 p-2">
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
       <style>{`
@@ -264,7 +264,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
       </svg>
       </div>
       </div>
-      <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
+      <span className="absolute -bottom-1 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full border border-sky-100 bg-white/95 px-3 py-1 text-xs font-black text-sky-700 shadow-md"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
     </div>
   );
 };
