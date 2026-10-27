@@ -879,7 +879,8 @@ export class ChallengeRoom {
       this.sockets().forEach(function (peer) {
         var peerAttachment = peer.deserializeAttachment();
         var peerPlayer = liveGame && liveGame.players.find(function (player) { return player.id === (peerAttachment && peerAttachment.userId); });
-        if (peer !== socket && (!liveGame || liveGame.gameType !== 'millionaire_team' || (signalSender && peerPlayer && signalSender.team === peerPlayer.team))) this.send(peer, { type: 'audio_signal', from: sender.userId, signal: payload.signal });
+        var targeted = !payload.targetId || (peerAttachment && peerAttachment.userId === payload.targetId);
+        if (peer !== socket && targeted && (!liveGame || liveGame.gameType !== 'millionaire_team' || (signalSender && peerPlayer && signalSender.team === peerPlayer.team))) this.send(peer, { type: 'audio_signal', from: sender.userId, targetId: payload.targetId || null, signal: payload.signal });
       }, this);
       return;
     }

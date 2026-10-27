@@ -44,6 +44,10 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [teamRecommendation, setTeamRecommendation] = useState<{ from: string; option: number } | null>(null);
   const [gibhaPowerResult, setGibhaPowerResult] = useState<{ kind: 'fifty' | 'freeze' | 'reveal'; keep?: number[]; seconds?: number; option?: number | null } | null>(null);
   useEffect(() => { void preloadOnlineTrueFalseCharacters(); }, []);
+  useEffect(() => {
+    gameAudio.setOnlineVoiceActive(remoteTalking);
+    return () => gameAudio.setOnlineVoiceActive(false);
+  }, [remoteTalking]);
   const [usedGibhaPowers, setUsedGibhaPowers] = useState<Array<'fifty' | 'freeze' | 'reveal'>>([]);
   const [musicMuted, setMusicMuted] = useState(() => gameAudio.getMuted());
   const [reactionUsed, setReactionUsed] = useState(false);
@@ -55,10 +59,12 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
   const socketRef = useRef<WebSocket | null>(null);
-  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteAudiosRef = useRef(new Map<string, HTMLAudioElement>());
+  const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const talkingPeersRef = useRef(new Set<string>());
+  const remoteAudioEnabledRef = useRef(true);
   const roundRef = useRef<number | null>(null);
   const roomGameTypeRef = useRef<OnlineChallengeGameType>(gameType);
   const resultUntilRef = useRef(0);
@@ -71,29 +77,72 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
   }
 
-  function closePeer() {
-    peerRef.current?.close();
-    peerRef.current = null;
+  function closePeers() {
+    peersRef.current.forEach(peer => peer.close());
+    peersRef.current.clear();
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-    pendingCandidatesRef.current = [];
+    remoteAudiosRef.current.forEach(audio => { audio.pause(); audio.srcObject = null; });
+    remoteAudiosRef.current.clear();
+    pendingCandidatesRef.current.clear();
+    talkingPeersRef.current.clear();
   }
 
-  async function ensurePeer() {
-    if (peerRef.current) return peerRef.current;
+  function sendAudioSignal(targetId: string, signal: unknown) {
+    sendSocket({ type: 'audio_signal', targetId, signal });
+  }
+
+  function ensurePeer(peerId: string) {
+    const existing = peersRef.current.get(peerId);
+    if (existing) return existing;
     const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    peerRef.current = peer;
+    peersRef.current.set(peerId, peer);
     localStreamRef.current?.getTracks().forEach(track => peer.addTrack(track, localStreamRef.current as MediaStream));
-    peer.onicecandidate = event => { if (event.candidate) sendSocket({ type: 'audio_signal', signal: { candidate: event.candidate.toJSON() } }); };
+    peer.onicecandidate = event => { if (event.candidate) sendAudioSignal(peerId, { candidate: event.candidate.toJSON() }); };
     peer.ontrack = event => {
-      if (remoteAudioRef.current && event.streams[0]) {
-        remoteAudioRef.current.srcObject = event.streams[0];
-        remoteAudioRef.current.muted = !remoteAudioEnabled;
-        void remoteAudioRef.current.play().catch(() => undefined);
+      let audio = remoteAudiosRef.current.get(peerId);
+      if (!audio) {
+        audio = new Audio();
+        audio.autoplay = true;
+        audio.playsInline = true;
+        audio.volume = 1;
+        remoteAudiosRef.current.set(peerId, audio);
       }
+      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      audio.muted = !remoteAudioEnabledRef.current;
+      void audio.play().catch(() => undefined);
+    };
+    peer.onconnectionstatechange = () => {
+      if (!['failed', 'closed'].includes(peer.connectionState)) return;
+      peer.close();
+      peersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) { audio.pause(); audio.srcObject = null; }
+      remoteAudiosRef.current.delete(peerId);
+      pendingCandidatesRef.current.delete(peerId);
     };
     return peer;
+  }
+
+  function attachLocalAudio(peer: RTCPeerConnection) {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const trackIds = new Set(peer.getSenders().map(sender => sender.track?.id));
+    stream.getAudioTracks().forEach(track => { if (!trackIds.has(track.id)) peer.addTrack(track, stream); });
+  }
+
+  async function negotiatePeer(peerId: string) {
+    const peer = ensurePeer(peerId);
+    if (peer.signalingState !== 'stable') return;
+    attachLocalAudio(peer);
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    sendAudioSignal(peerId, { description: peer.localDescription });
+  }
+
+  function eligibleHumanPeers(current = stateRef.current) {
+    const self = current?.players.find(player => player.id === meRef.current);
+    return (current?.players || []).filter(player => player.id !== meRef.current && player.connected && !player.bot && (current?.gameType !== 'millionaire_team' || player.team === self?.team));
   }
 
   async function toggleMicrophone() {
@@ -101,11 +150,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       setAudioBusy(true);
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح لا يدعم الميكروفون.');
-        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
         localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = true; });
         setAudioEnabled(true);
         sendSocket({ type: 'audio_state', enabled: true });
-        await ensurePeer();
+        await Promise.all(eligibleHumanPeers().map(player => negotiatePeer(player.id).catch(() => undefined)));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'تعذر تشغيل الميكروفون.');
       } finally { setAudioBusy(false); }
@@ -119,7 +168,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   function toggleRemoteAudio() {
     setRemoteAudioEnabled(value => {
       const next = !value;
-      if (remoteAudioRef.current) remoteAudioRef.current.muted = !next;
+      remoteAudioEnabledRef.current = next;
+      remoteAudiosRef.current.forEach(audio => { audio.muted = !next; if (next) void audio.play().catch(() => undefined); });
       return next;
     });
   }
@@ -127,17 +177,28 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   useEffect(() => {
     if (!audioEnabled || !connected) return;
     void (async () => {
-      const peer = await ensurePeer();
-      if (peer.signalingState !== 'stable') return;
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      sendSocket({ type: 'audio_signal', signal: { description: peer.localDescription } });
+      await Promise.all(eligibleHumanPeers().map(player => negotiatePeer(player.id).catch(() => undefined)));
     })();
   }, [audioEnabled, connected, state?.players.length]);
 
+  useEffect(() => {
+    const activeIds = new Set((state?.players || []).filter(player => player.connected && !player.bot).map(player => player.id));
+    peersRef.current.forEach((peer, peerId) => {
+      if (activeIds.has(peerId)) return;
+      peer.close();
+      peersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) { audio.pause(); audio.srcObject = null; }
+      remoteAudiosRef.current.delete(peerId);
+      pendingCandidatesRef.current.delete(peerId);
+      talkingPeersRef.current.delete(peerId);
+    });
+    setRemoteTalking(talkingPeersRef.current.size > 0);
+  }, [state?.players]);
+
   useEffect(() => () => {
     socketRef.current?.close();
-    closePeer();
+    closePeers();
     gameAudio.stopExternal('millionaire-thinking');
     gameAudio.stopExternal('millionaire-prize');
     gameAudio.stopExternal('millionaire-correct');
@@ -198,30 +259,39 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
       if (payload.type === 'welcome') { meRef.current = payload.userId; setMe(payload.userId); }
-      if (payload.type === 'audio_state') setRemoteTalking(Boolean(payload.enabled));
+      if (payload.type === 'audio_state' && payload.from) {
+        if (payload.enabled) talkingPeersRef.current.add(payload.from);
+        else talkingPeersRef.current.delete(payload.from);
+        setRemoteTalking(talkingPeersRef.current.size > 0);
+      }
       if (payload.type === 'audio_signal') {
         void (async () => {
-          const peer = await ensurePeer();
+          const peerId = String(payload.from || '');
+          if (!peerId || peerId === meRef.current || (payload.targetId && payload.targetId !== meRef.current)) return;
+          const peer = ensurePeer(peerId);
           try {
             if (payload.signal?.description) {
+              if (payload.signal.description.type === 'offer' && peer.signalingState !== 'stable')
+                await peer.setLocalDescription({ type: 'rollback' }).catch(() => undefined);
               await peer.setRemoteDescription(payload.signal.description);
-              for (const candidate of pendingCandidatesRef.current) await peer.addIceCandidate(candidate);
-              pendingCandidatesRef.current = [];
+              for (const candidate of pendingCandidatesRef.current.get(peerId) || []) await peer.addIceCandidate(candidate).catch(() => undefined);
+              pendingCandidatesRef.current.delete(peerId);
               if (payload.signal.description.type === 'offer') {
+                attachLocalAudio(peer);
                 const answer = await peer.createAnswer();
                 await peer.setLocalDescription(answer);
-                sendSocket({ type: 'audio_signal', signal: { description: peer.localDescription } });
+                sendAudioSignal(peerId, { description: peer.localDescription });
               }
             }
             if (payload.signal?.candidate) {
-              if (peer.remoteDescription) await peer.addIceCandidate(payload.signal.candidate);
-              else pendingCandidatesRef.current.push(payload.signal.candidate);
+              if (peer.remoteDescription) await peer.addIceCandidate(payload.signal.candidate).catch(() => undefined);
+              else pendingCandidatesRef.current.set(peerId, [...(pendingCandidatesRef.current.get(peerId) || []), payload.signal.candidate]);
             }
           } catch (_) { setError('تعذر الاتصال الصوتي، حاول إيقاف الميكروفون وتشغيله مرة أخرى.'); }
         })();
       }
       if (payload.type === 'room_closed') {
-        closePeer();
+        closePeers();
         setAudioEnabled(false);
         setRemoteTalking(false);
         setConnected(false);
@@ -232,7 +302,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         ws.close();
       }
       if (payload.type === 'challenge_ended') {
-        closePeer();
+        closePeers();
         setAudioEnabled(false);
         setRemoteTalking(false);
         setConnected(false);
@@ -331,7 +401,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     ws.onerror = () => setError('تعذر الاتصال بالغرفة. اضغط إعادة الاتصال.');
     ws.onclose = () => {
       if (socketRef.current === ws) {
-        closePeer();
+        closePeers();
         setAudioEnabled(false);
         setRemoteTalking(false);
         socketRef.current = null;
@@ -574,7 +644,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   if (room && state && isTrueFalse) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/90 p-2 text-white sm:p-5" dir="rtl">
     <ClappingCelebration show={didIWin} label="مبروك — فزت بالتحدي!" />
-    <audio ref={remoteAudioRef} autoPlay playsInline />
     <div className="relative mx-auto min-h-full w-full max-w-lg overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] shadow-[0_0_40px_rgba(34,211,238,.25)]">
       <header className="flex items-center gap-2 border-b border-white/10 p-3"><div className="flex min-w-0 flex-1 items-center gap-2"><div className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-emerald-400 via-cyan-300 to-rose-400 p-1"><div className="flex h-full w-full items-center justify-center rounded-xl bg-[#08152e]"><TrueFalseAuthenticIcon className="h-10 w-10" /></div></div><div className="min-w-0"><h2 className="truncate text-sm font-black">صح أم خطأ — أونلاين</h2><p className="truncate text-[10px] text-slate-300">{lessonTitle}</p></div></div>{trueFalseControls}<button onClick={() => void closeModal()} aria-label="إغلاق" className="rounded-xl border-2 border-rose-400/70 bg-rose-500/20 p-2.5 text-rose-200 shadow-[0_0_14px_rgba(244,63,94,.35)]"><X className="h-7 w-7" /></button></header>
       <main className="space-y-2 p-3">
@@ -597,7 +666,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   if (room && state && isGibhaSah) return <div className="fixed inset-0 z-[90] overflow-hidden bg-[#020818] text-white" dir="rtl">
     <ClappingCelebration show={didIWin} label="مبروك — فزت بالتحدي!" />
-    <audio ref={remoteAudioRef} autoPlay playsInline />
     <div ref={gibhaBoardRef} className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border-x-2 border-cyan-500/40 bg-[radial-gradient(circle_at_center,rgba(15,67,113,.42),rgba(2,8,24,.98)_70%),linear-gradient(90deg,rgba(34,211,238,.07)_1px,transparent_1px),linear-gradient(rgba(34,211,238,.07)_1px,transparent_1px)] bg-[size:auto,32px_32px,32px_32px] shadow-[0_0_45px_rgba(6,182,212,.28)]">
       <header className="flex h-11 shrink-0 items-center justify-between border-b border-cyan-400/20 px-3"><div className="min-w-0"><b className="block truncate text-sm text-cyan-200">جبتها صح — تحدّي 4 لاعبين</b><p className="truncate text-[10px] text-slate-400">{lessonTitle}</p></div><button onClick={() => void closeModal()} className="rounded-full bg-white/5 p-1.5"><X className="h-5 w-5" /></button></header>
       <main className="flex min-h-0 flex-1 flex-col gap-2 p-2">{waitingOrReconnect}
@@ -629,7 +697,6 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   if (room && state && isMillionaire) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/95 p-2 text-white sm:p-5" dir="rtl">
     <ClappingCelebration show={didIWin} label={isMillionaireTeam ? 'مبروك — فاز فريقكم!' : 'مبروك — فزت بالتحدي!'} />
-    <audio ref={remoteAudioRef} autoPlay playsInline />
     <div className="mx-auto min-h-full w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-[#2049a4] bg-[radial-gradient(circle_at_center,#0b1b51,#03091e_72%)] shadow-[0_0_40px_rgba(32,73,164,.6)]">
       <header className="flex items-center justify-between border-b border-blue-500/30 bg-[#03091e] p-4">
         <div className="flex items-center gap-3"><div className="rounded-full border-2 border-amber-400 p-2 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,.4)]"><Trophy className="h-6 w-6" /></div><div>{isMillionaireTeam ? <p className="text-xs text-slate-300">{lessonTitle}</p> : <><h2 className="font-black text-amber-300">من سيربح المليون؟</h2><p className="text-xs text-slate-300">{lessonTitle}</p></>}</div></div>
@@ -688,7 +755,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         <button disabled={busy || !questions.length} onClick={create} className="w-full rounded-xl bg-sky-500 p-3 font-bold disabled:opacity-50">أنشئ غرفة وادعُ صديقك</button>
         <div className="flex gap-2"><input inputMode="numeric" maxLength={4} className="min-w-0 flex-1 rounded-xl bg-white/10 p-3" value={entry} onChange={e => setEntry(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="رمز من 4 أرقام"/><button disabled={busy} onClick={join} className="rounded-xl bg-emerald-600 px-5 font-bold">انضم</button></div>
       </div>}
-      {room && <div className="space-y-4"><audio ref={remoteAudioRef} autoPlay playsInline /><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
+      {room && <div className="space-y-4"><div className="rounded-xl bg-white/5 p-3 text-sm">رمز الغرفة: <code className="break-all select-all">{room}</code><button className="mr-2 rounded bg-sky-700 px-2 py-1" onClick={() => navigator.clipboard.writeText(room)}>نسخ</button></div>
         {!connected && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-2 font-bold disabled:opacity-50">{busy ? 'جارٍ الاتصال…' : 'إعادة الاتصال بالغرفة'}</button>}
         <div className="grid grid-cols-2 gap-2">{state?.players.map((p, i) => <div key={p.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3"><span className="flex items-center gap-2 text-sm">{p.bot && p.avatar ? <img src={p.avatar} alt={p.name || 'الخصم'} className="h-9 w-9 rounded-full object-cover" /> : <UserRound className="h-5 w-5 text-sky-300" />}<span><strong className="block">{p.id === me ? 'أنت' : p.bot ? p.name || 'الخصم' : `اللاعب ${i + 1}`}</strong>{p.bot && <small className="block text-[10px] text-violet-200">{p.badge} · المستوى {p.level}</small>}<small className={p.connected ? 'text-emerald-300' : 'text-slate-400'}>{p.bot ? (p.answered ? 'أجاب' : 'يفكر…') : p.connected ? 'متصل' : 'غير متصل'}</small></span></span>{p.id === me ? <button type="button" disabled={audioBusy} onClick={() => void toggleMicrophone()} aria-label={audioEnabled ? 'إغلاق الميكروفون' : 'فتح الميكروفون'} className={`rounded-lg p-2 ${audioEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'} disabled:opacity-50`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button> : p.bot ? <span className="rounded-lg bg-violet-500/20 px-2 py-1 text-xs text-violet-200">متصل</span> : <button type="button" onClick={toggleRemoteAudio} aria-label={remoteAudioEnabled ? 'كتم صوت اللاعب المقابل' : 'فتح صوت اللاعب المقابل'} className={`rounded-lg p-2 ${remoteAudioEnabled && remoteTalking ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}</div>)}</div>
         {state?.status === 'playing' && state.reconnectDeadline && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-sm text-amber-100">انقطع اتصال اللاعب الآخر. ننتظر عودته لمدة 30 ثانية…</p>}

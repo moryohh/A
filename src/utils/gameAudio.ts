@@ -20,6 +20,7 @@ class GameAudioEngine {
   private isMuted: boolean = false;
   private externalPlayers = new Map<string, HTMLAudioElement>();
   private gameSessionThemeRequested = false;
+  private onlineVoiceActive = false;
   private trueFalseCorrectIndex = 0;
   private trueFalseWrongIndex = 0;
 
@@ -119,11 +120,18 @@ class GameAudioEngine {
   }
 
   public playOnlineGameSessionTheme() {
-    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.5, true);
+    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, this.onlineVoiceActive ? 0.12 : 0.5, true);
   }
 
   public stopOnlineGameSessionTheme() {
     this.stopExternal('online-game-session-theme');
+  }
+
+  /** Keep player voices clearly above the online game soundtrack. */
+  public setOnlineVoiceActive(active: boolean) {
+    this.onlineVoiceActive = active;
+    const player = this.externalPlayers.get('online-game-session-theme');
+    if (player) player.volume = active ? 0.12 : 0.5;
   }
 
   public playExamSessionTheme() {
