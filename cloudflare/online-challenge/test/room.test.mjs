@@ -108,6 +108,85 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });
 
+test('live classroom schedules the requested two bot waves', async () => {
+  const data = new Map();
+  const alarms = [];
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async value => alarms.push(value),
+    },
+    getWebSockets: () => [],
+  });
+  const startedAt = Date.now();
+  const response = await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({
+      hostId: 'teacher', gameType: 'live_classroom', roomCode: '6060',
+      contentMode: 'booklet', questions: [{ question: 'درس مباشر', options: ['شرح', 'متابعة'], correctAnswer: 0 }],
+    }),
+  }));
+  const finishedAt = Date.now();
+  assert.equal(response.status, 200);
+  const schedule = data.get('game').classroomBotSchedule;
+  assert.equal(schedule.length, 3);
+  assert.ok(schedule[0].joinAt >= startedAt + 10000 && schedule[0].joinAt <= finishedAt + 30000);
+  assert.equal(schedule[0].stayMs, 120000);
+  assert.ok(schedule[1].joinAt >= startedAt + 70000 && schedule[1].joinAt <= finishedAt + 79000);
+  assert.ok(schedule[2].joinAt >= startedAt + 80000 && schedule[2].joinAt <= finishedAt + 90000);
+  assert.ok(schedule.slice(1).every(event => event.stayMs >= 240000 && event.stayMs <= 480000));
+  assert.equal(new Set(schedule.map(event => event.id)).size, 3);
+  assert.equal(new Set(schedule.map(event => event.profileIndex)).size, 3);
+  assert.equal(new Set(schedule.map(event => event.score)).size, 3);
+  assert.ok(alarms[0] >= schedule[0].joinAt);
+});
+
+test('live classroom bots join and leave independently without occupying human seats', async () => {
+  const data = new Map();
+  const received = [];
+  const teacherSocket = { deserializeAttachment: () => ({ userId: 'teacher' }), send: message => received.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async () => {},
+    },
+    getWebSockets: () => [teacherSocket],
+  });
+  await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({
+      hostId: 'teacher', gameType: 'live_classroom', roomCode: '6161', capacity: 2,
+      contentMode: 'booklet', questions: [{ question: 'درس مباشر', options: ['شرح', 'متابعة'], correctAnswer: 0 }],
+    }),
+  }));
+  let game = data.get('game');
+  game.classroomBotSchedule[0].joinAt = Date.now() - 1;
+  game.classroomBotSchedule[1].joinAt = Date.now() + 60000;
+  game.classroomBotSchedule[2].joinAt = Date.now() + 70000;
+  data.set('game', game);
+  await room.alarm();
+  game = data.get('game');
+  assert.equal(game.players.length, 2);
+  assert.equal(game.players[1].id, game.classroomBotSchedule[0].id);
+  assert.equal(game.players[1].micAllowed, false);
+  assert.equal(game.players[1].activity, 'انضم إلى الدرس');
+
+  const availableTicket = await room.fetch(new Request('https://room/internal/ticket', {
+    method: 'POST', body: JSON.stringify({ userId: 'student' }),
+  }));
+  assert.equal(availableTicket.status, 200);
+
+  game.classroomBotSchedule[0].leaveAt = Date.now() - 1;
+  game.classroomBotSchedule[1].joinAt = Date.now() - 1;
+  data.set('game', game);
+  await room.alarm();
+  game = data.get('game');
+  assert.equal(game.players.length, 2);
+  assert.equal(game.classroomBotSchedule[0].left, true);
+  assert.equal(game.players[1].id, game.classroomBotSchedule[1].id);
+  assert.ok(received.some(message => message.type === 'state' && message.players.some(player => player.bot)));
+});
+
 test('two players finish a match; duplicate answers and third player are rejected', async () => {
   const data = new Map();
   const messages = new Map([['host', []], ['guest', []]]);

@@ -61,6 +61,7 @@ function registryBinding(env) {
 
 var BOT_ID = 'bot:duha-challenge';
 var TEAM_BOT_PREFIX = 'bot:team:';
+var CLASSROOM_BOT_PREFIX = 'bot:classroom:';
 var BOT_ANSWER_DELAY_MS = 2000;
 var TRUE_FALSE_TURN_MS = 20000;
 var CHARACTER_VARIANTS = ['anime', 'student', 'student2'];
@@ -239,14 +240,16 @@ export class ChallengeRoom {
   send(socket, payload) { try { socket.send(JSON.stringify(payload)); } catch (_) {} }
   broadcast(payload) { this.sockets().forEach(function (socket) { this.send(socket, payload); }, this); }
   connected(userId, excludedSocket) {
-    if (userId === BOT_ID || (typeof userId === 'string' && userId.startsWith(TEAM_BOT_PREFIX))) return true;
+    if (userId === BOT_ID || (typeof userId === 'string' && (userId.startsWith(TEAM_BOT_PREFIX) || userId.startsWith(CLASSROOM_BOT_PREFIX)))) return true;
     return this.sockets().some(function (socket) {
       if (socket === excludedSocket) return false;
       var attachment = socket.deserializeAttachment();
       return attachment && attachment.userId === userId;
     });
   }
-  isBot(player) { return Boolean(player && typeof player.id === 'string' && (player.id === BOT_ID || player.id.startsWith(TEAM_BOT_PREFIX))); }
+  isBot(player) { return Boolean(player && typeof player.id === 'string' && (player.id === BOT_ID || player.id.startsWith(TEAM_BOT_PREFIX) || player.id.startsWith(CLASSROOM_BOT_PREFIX))); }
+  humanPlayers(game) { return game.players.filter(function (player) { return !this.isBot(player); }, this); }
+  hasConnectedHuman(game) { return this.humanPlayers(game).some(function (player) { return this.connected(player.id); }, this); }
   assignCharacter(game, player) {
     if (!player || player.character) return player && player.character;
     var used = game.players.map(function (item) { return item.character; }).filter(Boolean);
@@ -272,7 +275,11 @@ export class ChallengeRoom {
     }, this);
   }
   async scheduleNextAlarm(game) {
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].filter(function (value) {
+    var classroomBotDeadlines = Array.isArray(game.classroomBotSchedule) ? game.classroomBotSchedule.flatMap(function (event) {
+      if (event.left) return [];
+      return event.joined ? [event.leaveAt] : [event.joinAt];
+    }) : [];
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].concat(classroomBotDeadlines).filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -533,7 +540,14 @@ export class ChallengeRoom {
       var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
       var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
       var classroomMode = init.gameType === 'live_classroom';
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: Date.now(), mission: null, activity: classroomMode ? 'أنشأ الغرفة' : undefined, activityAt: classroomMode ? Date.now() : undefined }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, bookletIndex: classroomMode ? 0 : undefined, bookletAnswerVisible: classroomMode ? false : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? Date.now() + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var createdAt = Date.now();
+      var availableProfileIndexes = BOT_PROFILES.map(function (_, index) { return index; }).sort(function () { return Math.random() - 0.5; });
+      var classroomBotSchedule = classroomMode ? [
+        { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[0] ?? 0, score: randomDelay(20, 44), joinAt: createdAt + randomDelay(10000, 30000), stayMs: 120000, joined: false, left: false },
+        { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[1] ?? 1, score: randomDelay(50, 69), joinAt: createdAt + randomDelay(70000, 79000), stayMs: randomDelay(240000, 480000), joined: false, left: false },
+        { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[2] ?? 2, score: randomDelay(75, 96), joinAt: createdAt + randomDelay(80000, 90000), stayMs: randomDelay(240000, 480000), joined: false, left: false },
+      ] : undefined;
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: createdAt, mission: null, activity: classroomMode ? 'أنشأ الغرفة' : undefined, activityAt: classroomMode ? createdAt : undefined }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, bookletIndex: classroomMode ? 0 : undefined, bookletAnswerVisible: classroomMode ? false : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? createdAt + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, classroomBotSchedule: classroomBotSchedule, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : createdAt + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -543,7 +557,8 @@ export class ChallengeRoom {
       var ticketBody = await request.json();
       if (!ticketBody || typeof ticketBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       var maxPlayers = game.gameType === 'live_classroom' ? classroomCapacity(game.capacity) + 1 : game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' ? 4 : 2;
-      if (game.players.length >= maxPlayers && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
+      var occupiedSeats = game.gameType === 'live_classroom' ? this.humanPlayers(game).length : game.players.length;
+      if (occupiedSeats >= maxPlayers && !game.players.some(function (p) { return p.id === ticketBody.userId; })) return json({ error: 'room_full' }, 409, '');
       var ticket = crypto.randomUUID();
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
         name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
@@ -557,15 +572,16 @@ export class ChallengeRoom {
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       if (game.gameType === 'live_classroom') {
         game.players = game.players.filter(function (player) { return player.id !== leaveBody.userId; });
-        if (game.players.length && leaveBody.userId === game.hostId) {
-          game.hostId = game.players[0].id;
+        var remainingHumans = this.humanPlayers(game);
+        if (remainingHumans.length && leaveBody.userId === game.hostId) {
+          game.hostId = remainingHumans[0].id;
           game.presenterId = game.hostId;
-          game.players[0].micAllowed = true;
-          game.players[0].drawAllowed = true;
-          game.players[0].activity = 'أصبح مضيف الغرفة';
-          game.players[0].activityAt = Date.now();
+          remainingHumans[0].micAllowed = true;
+          remainingHumans[0].drawAllowed = true;
+          remainingHumans[0].activity = 'أصبح مضيف الغرفة';
+          remainingHumans[0].activityAt = Date.now();
         }
-        if (!game.players.length) game.emptyDeadline = Date.now() + 60000;
+        if (!remainingHumans.length) { game.players = []; game.emptyDeadline = Date.now() + 60000; }
         await this.ctx.storage.put('game', game);
         this.broadcast(this.view(game));
         await this.updateRegistry('playing', game);
@@ -595,7 +611,7 @@ export class ChallengeRoom {
       await this.ctx.storage.delete('ticket:' + ticketId);
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
-        var canJoinClassroom = game.gameType === 'live_classroom' && game.players.length < classroomCapacity(game.capacity) + 1 && game.status === 'playing';
+        var canJoinClassroom = game.gameType === 'live_classroom' && this.humanPlayers(game).length < classroomCapacity(game.capacity) + 1 && game.status === 'playing';
         var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 4 && game.status === 'waiting';
         var canJoinGibha = game.gameType === 'gibha_sah' && game.players.length < 4 && game.status === 'waiting';
         if (!canJoinClassroom && !canJoinTeam && !canJoinGibha && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
@@ -1010,15 +1026,16 @@ export class ChallengeRoom {
     if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId, socket)) return;
     if (game.gameType === 'live_classroom') {
       game.players = game.players.filter(function (player) { return player.id !== userId; });
-      if (game.players.length && userId === game.hostId) {
-        game.hostId = game.players[0].id;
+      var remainingClassroomHumans = this.humanPlayers(game);
+      if (remainingClassroomHumans.length && userId === game.hostId) {
+        game.hostId = remainingClassroomHumans[0].id;
         game.presenterId = game.hostId;
-        game.players[0].micAllowed = true;
-        game.players[0].drawAllowed = true;
-        game.players[0].activity = 'أصبح مضيف الغرفة';
-        game.players[0].activityAt = Date.now();
+        remainingClassroomHumans[0].micAllowed = true;
+        remainingClassroomHumans[0].drawAllowed = true;
+        remainingClassroomHumans[0].activity = 'أصبح مضيف الغرفة';
+        remainingClassroomHumans[0].activityAt = Date.now();
       }
-      if (!game.players.length) game.emptyDeadline = Date.now() + 60000;
+      if (!remainingClassroomHumans.length) { game.players = []; game.emptyDeadline = Date.now() + 60000; }
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));
       await this.updateRegistry('playing', game);
@@ -1046,6 +1063,29 @@ export class ChallengeRoom {
         return;
       }
       delete game.emptyDeadline;
+    }
+    if (game.gameType === 'live_classroom' && Array.isArray(game.classroomBotSchedule)) {
+      var classroomBotsChanged = false;
+      var classroomHasHuman = this.hasConnectedHuman(game);
+      game.classroomBotSchedule.forEach(function (event) {
+        if (event.left) return;
+        if (!event.joined && now >= event.joinAt) {
+          if (!classroomHasHuman) { event.joinAt = now + 30000; return; }
+          var botProfile = BOT_PROFILES[event.profileIndex % BOT_PROFILES.length] || BOT_PROFILES[0];
+          game.players.push({ id: event.id, score: event.score, streak: 0, answer: null, profile: botProfile, micAllowed: false, drawAllowed: false, answerFrozen: false, handRaised: false, joinedAt: now, mission: null, activity: 'انضم إلى الدرس', activityAt: now });
+          event.joined = true;
+          event.leaveAt = now + event.stayMs;
+          classroomBotsChanged = true;
+        } else if (event.joined && now >= event.leaveAt) {
+          game.players = game.players.filter(function (player) { return player.id !== event.id; });
+          event.left = true;
+          classroomBotsChanged = true;
+        }
+      });
+      if (classroomBotsChanged) {
+        await this.updateRegistry('playing', game);
+        this.broadcast(this.view(game));
+      }
     }
     if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' || game.players.length === 1) && this.connected(game.players[0].id)) {
       if (game.gameType === 'millionaire_team') {
