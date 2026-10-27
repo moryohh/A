@@ -455,6 +455,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
 
   useEffect(() => {
+    if (studyWorkspace === "board") setStudyWorkspace("plants");
+  }, [studyWorkspace]);
+
+  useEffect(() => {
     setClassroomExercises([]);
     setExerciseMenu(false);
     setBookletItemIndex(0);
@@ -1102,7 +1106,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>}
           </div>
           <div className="z-20 flex items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
-            <button onClick={() => { setStudyWorkspace((current) => current === "board" ? "plants" : "board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
             <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
           </div>
           </div>
@@ -1434,25 +1437,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <button onClick={() => { setMissionText(self?.mission?.text || ""); setMissionTarget(self?.mission?.target || 4); setMissionOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950"><Target className="h-4 w-4"/>{self?.mission ? "تعديل مهمتي" : "اختر مهمتك"}</button>
             {self?.mission && <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1"><button onClick={() => updateMissionProgress(self.mission!.progress - 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">−</button><span className="min-w-12 text-center text-xs font-black text-white">{self.mission.progress}/{self.mission.target}</span><button onClick={() => updateMissionProgress(self.mission!.progress + 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500 text-slate-950">+</button>{self.mission.completed && <CheckCircle2 className="mx-1 h-5 w-5 text-emerald-300"/>}</div>}
           </>}
-          {canDraw && classroom?.contentMode === "booklet" && (
-            <>
-              <PenLine className="h-4 w-4 text-cyan-300" />
-              <input
-                type="color"
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-                className="h-9 w-10"
-              />
-              <input
-                type="range"
-                min="2"
-                max="16"
-                value={size}
-                onChange={(event) => setSize(Number(event.target.value))}
-                className="w-20"
-              />
-            </>
-          )}
           {!isTeacher && (
             <button
               onClick={() =>
