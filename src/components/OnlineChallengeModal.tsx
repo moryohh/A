@@ -1,3 +1,4 @@
+import { playVoice, unlockVoices, captureVoice } from '../utils/voiceAudio';
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Crosshair, MessageCircle, Mic, MicOff, Music, Music2, Send, Sparkles, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabase';
@@ -62,6 +63,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const peersRef = useRef(new Map<string, RTCPeerConnection>());
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudiosRef = useRef(new Map<string, HTMLAudioElement>());
+  useEffect(() => unlockVoices(remoteAudiosRef.current), []);
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const talkingPeersRef = useRef(new Set<string>());
   const remoteAudioEnabledRef = useRef(true);
@@ -104,13 +106,13 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       if (!audio) {
         audio = new Audio();
         audio.autoplay = true;
-        audio.playsInline = true;
+        audio.setAttribute('playsinline', '');
         audio.volume = 1;
         remoteAudiosRef.current.set(peerId, audio);
       }
       audio.srcObject = event.streams[0] || new MediaStream([event.track]);
       audio.muted = !remoteAudioEnabledRef.current;
-      void audio.play().catch(() => undefined);
+      playVoice(audio);
     };
     peer.onconnectionstatechange = () => {
       if (!['failed', 'closed'].includes(peer.connectionState)) return;
@@ -150,7 +152,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       setAudioBusy(true);
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح لا يدعم الميكروفون.');
-        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+        if (!localStreamRef.current?.getAudioTracks().some(track => track.readyState === 'live')) localStreamRef.current = await captureVoice();
         localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = true; });
         setAudioEnabled(true);
         sendSocket({ type: 'audio_state', enabled: true });
@@ -169,7 +171,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     setRemoteAudioEnabled(value => {
       const next = !value;
       remoteAudioEnabledRef.current = next;
-      remoteAudiosRef.current.forEach(audio => { audio.muted = !next; if (next) void audio.play().catch(() => undefined); });
+      remoteAudiosRef.current.forEach(audio => { audio.muted = !next; if (next) playVoice(audio); });
       return next;
     });
   }
@@ -271,6 +273,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           const peer = ensurePeer(peerId);
           try {
             if (payload.signal?.description) {
+              if (payload.signal.description.type === 'offer' && peer.signalingState !== 'stable' && meRef.current < peerId) return;
               if (payload.signal.description.type === 'offer' && peer.signalingState !== 'stable')
                 await peer.setLocalDescription({ type: 'rollback' }).catch(() => undefined);
               await peer.setRemoteDescription(payload.signal.description);

@@ -1,3 +1,4 @@
+import { playVoice, unlockVoices, captureVoice } from '../utils/voiceAudio';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -444,6 +445,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const roomSoundRef = useRef(true);
   const audioPeersRef = useRef(new Map<string, RTCPeerConnection>());
   const remoteAudiosRef = useRef(new Map<string, HTMLAudioElement>());
+  useEffect(() => unlockVoices(remoteAudiosRef.current), []);
   const pendingIceRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
   const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
@@ -635,12 +637,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
       if (!audio) {
         audio = new Audio();
         audio.autoplay = true;
-        audio.playsInline = true;
+        audio.setAttribute('playsinline', '');
         remoteAudiosRef.current.set(peerId, audio);
       }
+      audio.volume = 1;
       audio.muted = !roomSoundRef.current;
       audio.srcObject = event.streams[0] || new MediaStream([event.track]);
-      void audio.play().catch(() => undefined);
+      playVoice(audio);
     };
     peer.onconnectionstatechange = () => {
       if (!["failed", "closed"].includes(peer.connectionState)) return;
@@ -684,6 +687,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     const peer = ensureAudioPeer(peerId);
     const description = payload.signal?.description;
     if (description) {
+      if (description.type === "offer" && peer.signalingState !== "stable" && meRef.current < peerId) return;
       if (description.type === "offer" && peer.signalingState !== "stable")
         await peer.setLocalDescription({ type: "rollback" }).catch(() => undefined);
       await peer.setRemoteDescription(description);
@@ -1049,7 +1053,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     }
     try {
       if (!streamRef.current?.getAudioTracks().some((track) => track.readyState === "live"))
-        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = await captureVoice();
       streamRef.current.getAudioTracks().forEach((track) => { track.enabled = true; });
       setMicOn(true);
       send({ type: "audio_state", enabled: true });
