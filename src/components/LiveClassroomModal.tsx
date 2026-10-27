@@ -441,6 +441,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const workspaceFullscreenRef = useRef(false);
   const historyEntryRef = useRef(false);
   const previousOrientationRef = useRef<"portrait" | "landscape">("portrait");
+  const preserveDisplayOnUnmountRef = useRef(false);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -578,7 +579,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       closingRef.current = true;
       socketRef.current?.close();
       streamRef.current?.getTracks().forEach((track) => track.stop());
-      void restoreClassroomDisplay();
+      if (!preserveDisplayOnUnmountRef.current) void restoreClassroomDisplay();
     },
     [],
   );
@@ -856,9 +857,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     if (!room) return;
     const handleClassroomBack = (event: Event) => {
-      if (!workspaceFullscreenRef.current) return;
-      event.preventDefault();
-      closeStudyFullscreen();
+      if (workspaceFullscreenRef.current) {
+        event.preventDefault();
+        closeStudyFullscreen();
+        return;
+      }
+      preserveDisplayOnUnmountRef.current = true;
     };
     window.addEventListener("duha-live-classroom-back", handleClassroomBack);
     return () => window.removeEventListener("duha-live-classroom-back", handleClassroomBack);

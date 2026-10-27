@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Gamepad2,
@@ -125,9 +125,15 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   );
   const [isLoadingBundle, setIsLoadingBundle] = useState(false);
   const [bundleLoadError, setBundleLoadError] = useState(false);
+  const preserveOrientationOnBackRef = useRef(false);
 
   useEffect(() => {
     if (activeGameMode !== "menu") return;
+    if (preserveOrientationOnBackRef.current) {
+      preserveOrientationOnBackRef.current = false;
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
+      return;
+    }
     const restoreDisplay = async () => {
       try {
         if (document.fullscreenElement) await document.exitFullscreen();
@@ -156,6 +162,7 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
         }
       }
       event.preventDefault();
+      preserveOrientationOnBackRef.current = true;
       setActiveGameMode("menu");
     };
     window.addEventListener("duha-games-back", handleHardwareBack);
