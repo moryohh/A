@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Apple,
   ArrowLeftRight,
@@ -1157,7 +1158,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
                   </div>;
                 })}
-              </div> : <div ref={studyWorkspaceRef} className={`${workspaceExpanded ? "fixed inset-0 z-[130] min-h-0 rounded-none border-0" : "relative min-h-44 flex-1 rounded-2xl border border-emerald-200"} overflow-hidden bg-white shadow-inner`}>
+              </div> : (() => {
+                const workspace = <div ref={studyWorkspaceRef} className={`${workspaceExpanded ? "fixed inset-0 z-[130] min-h-0 rounded-none border-0" : "relative min-h-44 flex-1 rounded-2xl border border-emerald-200"} overflow-hidden bg-white shadow-inner`}>
                 {studyWorkspace === "board" ? <BlankStudyBoard
                   strokes={classroom?.strokes || []}
                   drawingVersion={classroom?.drawingVersion || 0}
@@ -1187,7 +1189,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   </div>
                 </div>}
                 <button onClick={openStudyFullscreen} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label={workspaceExpanded ? "تصغير منطقة العرض" : "تكبير منطقة العرض"} title={workspaceExpanded ? "العودة إلى الغرفة" : "تكبير إلى ملء الشاشة"}>{workspaceExpanded ? <Minimize2 className="h-4 w-4"/> : <Maximize2 className="h-4 w-4"/>}</button>
-              </div>}
+              </div>;
+                return workspaceExpanded ? createPortal(workspace, document.body) : workspace;
+              })()}
             </main>
 
             {bookletPanelVisible && <aside className="grid min-h-[65dvh] grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
