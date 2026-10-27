@@ -346,7 +346,8 @@ test('true false assigns different random characters to two players', () => {
   assert.notEqual(game.players[0].character, game.players[1].character);
 });
 
-test('a bot joins only after the three-to-five-minute waiting deadline', async () => {
+test('two-player games schedule one development bot after five-to-ten seconds', async () => {
+  for (const gameType of ['millionaire', 'true_false']) {
   const data = new Map();
   let alarmAt = null;
   const messages = [];
@@ -359,22 +360,24 @@ test('a bot joins only after the three-to-five-minute waiting deadline', async (
       deleteAlarm: async () => { alarmAt = null; },
     },
     getWebSockets: () => [hostSocket],
-  });
+  }, { MATCHMAKING_BOT_MIN_MS: '5000', MATCHMAKING_BOT_MAX_MS: '10000' });
   const questions = [{ question: 'Question?', options: ['a', 'b'], correctAnswer: 0 }];
   const startedAt = Date.now();
   await room.fetch(new Request('https://room/internal/init', {
-    method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'true_false', roomCode: '4321', questions }),
+    method: 'POST', body: JSON.stringify({ hostId: 'host', gameType, roomCode: '4321', questions }),
   }));
-  assert.ok(alarmAt >= startedAt + 180000);
-  assert.ok(alarmAt <= Date.now() + 300000);
+  assert.ok(alarmAt >= startedAt + 5000);
+  assert.ok(alarmAt <= Date.now() + 10000);
   const waiting = data.get('game');
-  waiting.botJoinAt = Date.now() - 1;
+  assert.equal(waiting.matchmakingBotSchedule.length, 1);
+  waiting.matchmakingBotSchedule[0].joinAt = Date.now() - 1;
   data.set('game', waiting);
   await room.alarm();
   assert.equal(data.get('game').status, 'playing');
-  assert.equal(data.get('game').players[1].id, 'bot:duha-challenge');
-  assert.ok(data.get('game').questionDeadline > Date.now());
+  assert.equal(data.get('game').players[1].id.startsWith('bot:team:match:'), true);
+  if (gameType === 'true_false') assert.ok(data.get('game').questionDeadline > Date.now());
   assert.equal(messages.some(message => message.type === 'bot_joined'), true);
+  }
 });
 
 test('bot answers after its delay and completes every supported game type', async () => {
@@ -421,16 +424,22 @@ test('millionaire team fills four seats after five seconds and alternates 2v2 te
   const room = new ChallengeRoom({
     storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => {} },
     getWebSockets: () => [hostSocket, mateSocket],
-  });
+  }, { MATCHMAKING_BOT_MIN_MS: '5000', MATCHMAKING_BOT_MAX_MS: '10000' });
   const questions = Array.from({ length: 20 }, (_, index) => ({ question: `Team ${index}?`, options: ['a', 'b', 'c', 'd'], correctAnswer: 0 }));
   const startedAt = Date.now();
   const response = await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'millionaire_team', questions }) }));
   assert.equal(response.status, 200);
-  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 5000);
+  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 10000);
   const waiting = data.get('game');
   waiting.players.push({ id: 'mate', team: 'A', score: 0, answer: null });
-  waiting.botJoinAt = Date.now() - 1;
+  waiting.matchmakingBotSchedule[0].joinAt = Date.now() - 1;
   data.set('game', waiting);
+  await room.alarm();
+  assert.equal(data.get('game').players.length, 3);
+  assert.equal(data.get('game').status, 'waiting');
+  const oneBotWaiting = data.get('game');
+  oneBotWaiting.matchmakingBotSchedule.find(event => !event.joined && !event.cancelled).joinAt = Date.now() - 1;
+  data.set('game', oneBotWaiting);
   await room.alarm();
   assert.equal(data.get('game').players.length, 4);
   assert.deepEqual(data.get('game').players.map(player => player.team), ['A', 'A', 'B', 'B']);
@@ -440,7 +449,7 @@ test('millionaire team fills four seats after five seconds and alternates 2v2 te
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 0 }));
   assert.equal(data.get('game').round, 1);
   assert.equal(data.get('game').activeTeam, 'B');
-  assert.equal(data.get('game').turn.startsWith('bot:team:B:'), true);
+  assert.equal(room.isBot(data.get('game').players.find(player => player.id === data.get('game').turn)), true);
   assert.equal(messages.some(message => message.type === 'round_result' && message.answeredTeam === 'A'), true);
 });
 
@@ -452,16 +461,20 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   const room = new ChallengeRoom({
     storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async value => { alarmAt = value; }, deleteAlarm: async () => {} },
     getWebSockets: () => [hostSocket],
-  });
+  }, { MATCHMAKING_BOT_MIN_MS: '5000', MATCHMAKING_BOT_MAX_MS: '10000' });
   const questions = Array.from({ length: 24 }, (_, index) => ({ question: `Card ${index}?`, options: [`answer-${index}`, `wrong-${index}-1`, `wrong-${index}-2`, `wrong-${index}-3`, `wrong-${index}-4`, `wrong-${index}-5`], correctAnswer: 0 }));
   const startedAt = Date.now();
   const response = await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
   assert.equal(response.status, 200);
-  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 5000);
-  const waiting = data.get('game');
-  waiting.botJoinAt = Date.now() - 1;
-  data.set('game', waiting);
-  await room.alarm();
+  assert.ok(alarmAt >= startedAt + 5000 && alarmAt <= Date.now() + 10000);
+  for (let botNumber = 1; botNumber <= 3; botNumber += 1) {
+    const waiting = data.get('game');
+    waiting.matchmakingBotSchedule.find(event => !event.joined && !event.cancelled).joinAt = Date.now() - 1;
+    data.set('game', waiting);
+    await room.alarm();
+    assert.equal(data.get('game').players.length, botNumber + 1);
+    if (botNumber < 3) assert.equal(data.get('game').status, 'waiting');
+  }
   assert.equal(data.get('game').status, 'playing');
   assert.equal(data.get('game').players.length, 4);
   assert.equal(data.get('game').turn, 'host');

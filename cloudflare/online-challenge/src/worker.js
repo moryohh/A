@@ -279,7 +279,8 @@ export class ChallengeRoom {
       if (event.left) return [];
       return event.joined ? [event.leaveAt] : [event.joinAt];
     }) : [];
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].concat(classroomBotDeadlines).filter(function (value) {
+    var matchmakingBotDeadlines = game.status === 'waiting' && Array.isArray(game.matchmakingBotSchedule) ? game.matchmakingBotSchedule.filter(function (event) { return !event.joined && !event.cancelled; }).map(function (event) { return event.joinAt; }) : [];
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].concat(classroomBotDeadlines, matchmakingBotDeadlines).filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -537,17 +538,25 @@ export class ChallengeRoom {
       if (!init || typeof init.hostId !== 'string' || !validGameType(init.gameType) || !validQuestions(init.questions)) return json({ error: 'invalid_init' }, 400, '');
       var teamMode = init.gameType === 'millionaire_team';
       var fourPlayerMode = teamMode || init.gameType === 'gibha_sah';
-      var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
-      var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
       var classroomMode = init.gameType === 'live_classroom';
       var createdAt = Date.now();
       var availableProfileIndexes = BOT_PROFILES.map(function (_, index) { return index; }).sort(function () { return Math.random() - 0.5; });
+      var configuredMatchmakingMinimum = Number(this.env && this.env.MATCHMAKING_BOT_MIN_MS);
+      var configuredMatchmakingMaximum = Number(this.env && this.env.MATCHMAKING_BOT_MAX_MS);
+      var matchmakingMinimum = Number.isFinite(configuredMatchmakingMinimum) && configuredMatchmakingMinimum >= 5000 ? configuredMatchmakingMinimum : 60000;
+      var matchmakingMaximum = Number.isFinite(configuredMatchmakingMaximum) && configuredMatchmakingMaximum >= matchmakingMinimum ? configuredMatchmakingMaximum : 180000;
+      var matchmakingCursor = createdAt;
+      var matchmakingSeats = classroomMode ? 0 : (fourPlayerMode ? 3 : 1);
+      var matchmakingBotSchedule = classroomMode ? undefined : Array.from({ length: matchmakingSeats }, function (_, index) {
+        matchmakingCursor += randomDelay(matchmakingMinimum, matchmakingMaximum);
+        return { id: TEAM_BOT_PREFIX + 'match:' + crypto.randomUUID(), profileIndex: availableProfileIndexes[index % availableProfileIndexes.length] ?? 0, joinAt: matchmakingCursor, joined: false, cancelled: false };
+      });
       var classroomBotSchedule = classroomMode ? [
         { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[0] ?? 0, score: randomDelay(20, 44), joinAt: createdAt + randomDelay(10000, 30000), stayMs: 120000, joined: false, left: false },
         { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[1] ?? 1, score: randomDelay(50, 69), joinAt: createdAt + randomDelay(70000, 79000), stayMs: randomDelay(240000, 480000), joined: false, left: false },
         { id: CLASSROOM_BOT_PREFIX + crypto.randomUUID(), profileIndex: availableProfileIndexes[2] ?? 2, score: randomDelay(75, 96), joinAt: createdAt + randomDelay(80000, 90000), stayMs: randomDelay(240000, 480000), joined: false, left: false },
       ] : undefined;
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: createdAt, mission: null, activity: classroomMode ? 'أنشأ الغرفة' : undefined, activityAt: classroomMode ? createdAt : undefined }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, bookletIndex: classroomMode ? 0 : undefined, bookletAnswerVisible: classroomMode ? false : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? createdAt + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, classroomBotSchedule: classroomBotSchedule, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: classroomMode ? undefined : createdAt + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: classroomMode ? 'playing' : 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null, micAllowed: classroomMode, drawAllowed: classroomMode, answerFrozen: false, handRaised: false, joinedAt: createdAt, mission: null, activity: classroomMode ? 'أنشأ الغرفة' : undefined, activityAt: classroomMode ? createdAt : undefined }], capacity: classroomMode ? classroomCapacity(init.capacity) : undefined, answersLocked: classroomMode ? true : undefined, presenterId: classroomMode ? init.hostId : undefined, presenterState: classroomMode ? null : undefined, bookletIndex: classroomMode ? 0 : undefined, bookletAnswerVisible: classroomMode ? false : undefined, studyMode: classroomMode && init.studyMode === 'together' ? 'together' : 'teacher', sharedMission: classroomMode ? String(init.sharedMission || '').trim().slice(0, 120) : undefined, durationMinutes: classroomMode ? Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) : undefined, endsAt: classroomMode ? createdAt + Math.max(5, Math.min(180, Number(init.durationMinutes) || 45)) * 60000 : undefined, contentMode: classroomMode ? (init.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, content: classroomMode ? init.content || null : undefined, strokes: classroomMode ? [] : undefined, drawingVersion: classroomMode ? 0 : undefined, classroomBotSchedule: classroomBotSchedule, matchmakingBotSchedule: matchmakingBotSchedule, matchmakingBotMinimum: classroomMode ? undefined : matchmakingMinimum, matchmakingBotMaximum: classroomMode ? undefined : matchmakingMaximum, botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: undefined, activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -612,7 +621,7 @@ export class ChallengeRoom {
       var userId = ticketRecord.userId;
       if (!game.players.some(function (p) { return p.id === userId; })) {
         var canJoinClassroom = game.gameType === 'live_classroom' && this.humanPlayers(game).length < classroomCapacity(game.capacity) + 1 && game.status === 'playing';
-        var canJoinTeam = game.gameType === 'millionaire_team' && this.teamHumans(game).length < 4 && game.status === 'waiting';
+        var canJoinTeam = game.gameType === 'millionaire_team' && game.players.length < 4 && game.status === 'waiting';
         var canJoinGibha = game.gameType === 'gibha_sah' && game.players.length < 4 && game.status === 'waiting';
         if (!canJoinClassroom && !canJoinTeam && !canJoinGibha && (game.players.length !== 1 || game.status !== 'waiting')) return json({ error: 'room_full' }, 409, '');
         var team = null;
@@ -634,16 +643,20 @@ export class ChallengeRoom {
         this.assignCharacter(game, joinedPlayer);
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') game.status = 'playing';
         if (game.gameType === 'gibha_sah' && game.players.length === 4) game.status = 'playing';
+        if (game.gameType === 'millionaire_team' && game.players.length === 4) game.status = 'playing';
         game.questionIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : 0;
         if (game.gameType !== 'millionaire_team' && game.gameType !== 'gibha_sah') {
           game.turn = game.players[0].id;
           delete game.botJoinAt;
+          if (Array.isArray(game.matchmakingBotSchedule)) game.matchmakingBotSchedule.forEach(function (event) { if (!event.joined) event.cancelled = true; });
           this.beginSoloTurn(game);
         }
         if (game.gameType === 'gibha_sah' && game.status === 'playing') {
           game.turn = game.players[0].id;
           delete game.botJoinAt;
         }
+        if (game.gameType === 'millionaire_team' && game.status === 'playing') this.beginTeamTurn(game, 'A');
+        if (game.status === 'playing' && Array.isArray(game.matchmakingBotSchedule)) game.matchmakingBotSchedule.forEach(function (event) { if (!event.joined) event.cancelled = true; });
       }
       var currentPlayer = game.players.find(function (player) { return player.id === userId; });
       if (currentPlayer && ticketRecord.profile) {
@@ -1092,7 +1105,40 @@ export class ChallengeRoom {
         this.broadcast(this.view(game));
       }
     }
-    if (game.status === 'waiting' && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' || game.players.length === 1) && this.connected(game.players[0].id)) {
+    if (game.status === 'waiting' && Array.isArray(game.matchmakingBotSchedule) && this.hasConnectedHuman(game)) {
+      var matchmakingTarget = game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' ? 4 : 2;
+      var dueMatchmakingBot = game.matchmakingBotSchedule.find(function (event) { return !event.joined && !event.cancelled && now >= event.joinAt; });
+      if (dueMatchmakingBot && game.players.length < matchmakingTarget) {
+        var matchmakingProfile = BOT_PROFILES[dueMatchmakingBot.profileIndex % BOT_PROFILES.length] || BOT_PROFILES[0];
+        var matchmakingTeam = null;
+        if (game.gameType === 'millionaire_team') {
+          var matchmakingTeamASeats = this.teamPlayers(game, 'A').length;
+          var matchmakingTeamBSeats = this.teamPlayers(game, 'B').length;
+          matchmakingTeam = matchmakingTeamASeats < 2 && matchmakingTeamASeats <= matchmakingTeamBSeats ? 'A' : 'B';
+        }
+        var matchmakingBot = { id: dueMatchmakingBot.id, team: matchmakingTeam, score: 0, streak: 0, answer: null, profile: matchmakingProfile };
+        game.players.push(matchmakingBot);
+        this.assignCharacter(game, matchmakingBot);
+        dueMatchmakingBot.joined = true;
+        var nextMatchmakingBot = game.matchmakingBotSchedule.find(function (event) { return !event.joined && !event.cancelled; });
+        if (nextMatchmakingBot && nextMatchmakingBot.joinAt <= now) nextMatchmakingBot.joinAt = now + randomDelay(game.matchmakingBotMinimum || 60000, game.matchmakingBotMaximum || 180000);
+        if (game.players.length >= matchmakingTarget) {
+          game.status = 'playing';
+          game.matchmakingBotSchedule.forEach(function (event) { if (!event.joined) event.cancelled = true; });
+          if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
+          else {
+            game.turn = game.players[0].id;
+            if (game.gameType !== 'gibha_sah') this.beginSoloTurn(game);
+          }
+        }
+        await this.updateRegistry(game.status === 'waiting' ? 'waiting' : 'playing', game);
+        this.broadcast({ type: 'bot_joined', replacedUserId: null, botId: matchmakingBot.id });
+        this.broadcast(this.view(game));
+      } else if (game.players.length >= matchmakingTarget) {
+        game.matchmakingBotSchedule.forEach(function (event) { if (!event.joined) event.cancelled = true; });
+      }
+    }
+    if (game.status === 'waiting' && !Array.isArray(game.matchmakingBotSchedule) && game.botJoinAt && now >= game.botJoinAt && (game.gameType === 'millionaire_team' || game.gameType === 'gibha_sah' || game.players.length === 1) && this.connected(game.players[0].id)) {
       if (game.gameType === 'millionaire_team') {
         while (game.players.length < 4) {
           var teamASeats = this.teamPlayers(game, 'A').length;
