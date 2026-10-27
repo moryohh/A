@@ -13,9 +13,6 @@ import {
   VideoOff,
   BookOpen,
   Presentation,
-  Eraser,
-  PenLine,
-  Trash2,
 } from 'lucide-react';
 import { LessonBookletView } from './LessonBookletView';
 import { LessonBookletData } from '../data/lessonBooklet';
@@ -32,132 +29,6 @@ interface VideoPlayerCardProps {
   onBackToMap?: () => void;
   onOpenGames?: () => void;
 }
-
-type BoardPoint = { x: number; y: number };
-type BoardLine = { color: string; width: number; erase: boolean; points: BoardPoint[] };
-
-const LessonBlankBoard: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const linesRef = useRef<BoardLine[]>([]);
-  const activeLineRef = useRef<BoardLine | null>(null);
-  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
-  const [color, setColor] = useState('#173f5f');
-  const [width, setWidth] = useState(4);
-  const [revision, setRevision] = useState(0);
-
-  const drawBoard = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, rect.width, rect.height);
-    context.fillStyle = '#fffef9';
-    context.fillRect(0, 0, rect.width, rect.height);
-    [...linesRef.current, ...(activeLineRef.current ? [activeLineRef.current] : [])].forEach((line) => {
-      if (line.points.length < 2) return;
-      context.strokeStyle = line.erase ? '#fffef9' : line.color;
-      context.lineWidth = line.erase ? line.width * 4 : line.width;
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      context.beginPath();
-      line.points.forEach((point, index) => index
-        ? context.lineTo(point.x * rect.width, point.y * rect.height)
-        : context.moveTo(point.x * rect.width, point.y * rect.height));
-      context.stroke();
-    });
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    let frame = 0;
-    const resize = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const rect = canvas.getBoundingClientRect();
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        const nextWidth = Math.max(1, Math.round(rect.width * ratio));
-        const nextHeight = Math.max(1, Math.round(rect.height * ratio));
-        if (canvas.width === nextWidth && canvas.height === nextHeight) return;
-        canvas.width = nextWidth;
-        canvas.height = nextHeight;
-        setRevision((value) => value + 1);
-      });
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, []);
-
-  useEffect(drawBoard, [revision]);
-
-  const pointFromEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return {
-      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
-      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
-    };
-  };
-
-  return <div
-    className="relative isolate h-[min(620px,68dvh)] min-h-[360px] overflow-hidden overscroll-contain rounded-2xl border border-emerald-500/30 bg-[#fffef9] shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
-    onClick={(event) => event.stopPropagation()}
-    onContextMenu={(event) => event.preventDefault()}
-  >
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 block h-full w-full touch-none select-none bg-[#fffef9]"
-      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-      aria-label="سبورة بيضاء فارغة للرسم"
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
-        activeLineRef.current = { color, width, erase: tool === 'eraser', points: [pointFromEvent(event)] };
-      }}
-      onPointerMove={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!activeLineRef.current) return;
-        activeLineRef.current.points.push(pointFromEvent(event));
-        drawBoard();
-      }}
-      onPointerUp={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!activeLineRef.current) return;
-        activeLineRef.current.points.push(pointFromEvent(event));
-        linesRef.current.push(activeLineRef.current);
-        activeLineRef.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-        drawBoard();
-      }}
-      onPointerCancel={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        activeLineRef.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-        drawBoard();
-      }}
-      onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
-    />
-    <div className="absolute inset-x-2 top-2 z-10 flex items-center justify-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md" dir="rtl">
-      <button type="button" onClick={() => setTool('pen')} aria-label="قلم" className={`rounded-lg p-2 ${tool === 'pen' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}><PenLine className="h-5 w-5" /></button>
-      <button type="button" onClick={() => setTool('eraser')} aria-label="ممحاة" className={`rounded-lg p-2 ${tool === 'eraser' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}><Eraser className="h-5 w-5" /></button>
-      {['#173f5f', '#dc2626', '#059669', '#2563eb'].map((value) => <button key={value} type="button" onClick={() => { setColor(value); setTool('pen'); }} aria-label={`لون ${value}`} className="h-8 w-8 shrink-0 rounded-full border-2 border-white shadow" style={{ backgroundColor: value }} />)}
-      <input aria-label="حجم القلم" type="range" min="2" max="14" value={width} onChange={(event) => setWidth(Number(event.target.value))} className="w-24 accent-emerald-600" />
-      <button type="button" onClick={() => { linesRef.current = []; activeLineRef.current = null; drawBoard(); }} aria-label="مسح السبورة" className="rounded-lg bg-rose-50 p-2 text-rose-600"><Trash2 className="h-5 w-5" /></button>
-    </div>
-  </div>;
-};
 
 export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   lesson,
@@ -541,7 +412,15 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         </button>
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
-      {studyView === 'board' && <LessonBlankBoard />}
+      {studyView === 'board' && <iframe
+        key={`${lesson.id}-board`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
+        title="صبورة حل معي: السؤال والشرح وخطوات الحل"
+        className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
+        style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
+        allow="fullscreen; clipboard-write; web-share"
+        allowFullScreen
+      />}
       <div hidden={studyView !== 'booklet'}>
       {/* Educational Booklet / Real Curriculum View */}
       <LessonBookletView
