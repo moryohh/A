@@ -34,7 +34,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { OpenLessonContext, TeacherStory } from "../types";
+import { OpenLessonContext, SubjectChapter, TeacherStory } from "../types";
 import { getSupabaseClient } from "../lib/supabase";
 import { loadGuestSession } from "../services/guestPreviewService";
 import { fetchLessonCurriculum } from "../services/curriculumService";
@@ -42,6 +42,7 @@ import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/l
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
 import { PlantStageVideo } from "./PlantStageVideo";
+import { ScienceLaboratoryModal } from "./ScienceLaboratoryModal";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
 
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
@@ -411,8 +412,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
-  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers" | "biology">("plants");
-  const [biologyChapter, setBiologyChapter] = useState<number | null>(null);
+  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers">("plants");
+  const [biologyLabOpen, setBiologyLabOpen] = useState(false);
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
@@ -467,6 +468,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
   const isBiologyClassroom = currentSubjectKey.includes("biology") || currentSubjectKey.includes("bio-") || currentSubjectKey.includes("أحياء") || currentSubjectKey.includes("احياء");
+  const biologyLabChapters = useMemo<SubjectChapter[]>(() => [1, 2, 3].map((number) => ({
+    id: `biology-chapter-${number}`,
+    number,
+    title: `الفصل ${["الأول", "الثاني", "الثالث"][number - 1]}`,
+    lessonsCount: 0,
+    completedLessonsCount: 0,
+    lessons: [],
+  })), []);
 
   useEffect(() => { meRef.current = me; }, [me]);
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -1242,7 +1251,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>}
           </div>
           <div className="z-20 flex items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
-            {isBiologyClassroom && <button onClick={() => { setStudyWorkspace((current) => current === "biology" ? "plants" : "biology"); setBiologyChapter(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "biology" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="رسومات الأحياء" title="رسومات الأحياء"><Presentation className="h-4 w-4"/></button>}
+            {isBiologyClassroom && <button onClick={() => setBiologyLabOpen(true)} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:border-cyan-200 hover:bg-cyan-500 hover:text-white hover:shadow-[0_0_12px_rgba(34,211,238,.35)]" aria-label="الانتقال إلى رسومات الأحياء" title="رسومات الأحياء"><Presentation className="h-4 w-4"/></button>}
             <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
           </div>
           </div>
@@ -1304,24 +1313,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   drawingVersion={classroom?.drawingVersion || 0}
                   canDraw={canDraw}
                   onShare={(strokes) => send({ type: "classroom_board_share", strokes })}
-                /> : studyWorkspace === "biology" ? <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-cyan-50 to-emerald-50">
-                  {biologyChapter === null ? <div className="grid h-full place-items-center overflow-y-auto p-4">
-                    <div className="w-full max-w-lg text-center">
-                      <Presentation className="mx-auto mb-2 h-9 w-9 text-emerald-700"/>
-                      <b className="block text-sm text-emerald-950">اختر فصل رسومات الأحياء</b>
-                      <p className="mt-1 text-[10px] text-slate-500">اختر الفصل لفتح الرسومات التفاعلية الخاصة به</p>
-                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        {[1, 2, 3].map((chapter) => <button key={chapter} onClick={() => setBiologyChapter(chapter)} className="rounded-2xl border border-emerald-300 bg-white px-4 py-4 text-xs font-black text-emerald-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">الفصل {chapter}</button>)}
-                      </div>
-                    </div>
-                  </div> : <>
-                    <div className="flex shrink-0 items-center justify-between border-b border-emerald-200 bg-white/90 px-3 py-2">
-                      <b className="text-[10px] text-emerald-900">رسومات الأحياء · الفصل {biologyChapter}</b>
-                      <button onClick={() => setBiologyChapter(null)} className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 text-[9px] font-black text-emerald-800">اختيار فصل آخر</button>
-                    </div>
-                    <iframe className="min-h-0 flex-1 border-0 bg-white" src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${biologyChapter}/index.html?embedded=1`} title={`رسومات الأحياء للفصل ${biologyChapter}`}/>
-                  </>}
-                </div> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
+                /> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
                   <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white/95 p-2" dir="rtl">
                     <div className="flex min-w-max items-start gap-3">
                       {teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center">
@@ -1374,6 +1366,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
         {openSharedBy && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setOpenSharedBy(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[72vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-200 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><b className="text-sm">الأسئلة المشاركة</b><button onClick={() => setOpenSharedBy(null)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="space-y-3">{openShares.slice().reverse().map((share) => <article key={share.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3"><small className="font-black text-emerald-700">السؤال {share.index + 1}</small><p className="mt-1 text-sm font-black leading-7">{share.question}</p><div className="mt-2 rounded-xl bg-white p-3 text-xs font-bold leading-6">{share.answer || "لا توجد إجابة مسجلة."}</div></article>)}</div></section></div>}
+        {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
       </div>
     );
 

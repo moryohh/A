@@ -5,6 +5,7 @@ import biome1Img from '../assets/images/biome1_snow_mountain_1786898662715.webp'
 import biome2Img from '../assets/images/biome2_green_farm_1786898677268.webp';
 import biome3Img from '../assets/images/biome3_harbor_refinery_1786898690005.webp';
 import biome4Img from '../assets/images/biome4_night_realm_1786898703967.webp';
+import biologyChapterCardsImg from '../assets/images/biology-chapter-cards-v1.webp';
 import { SubjectChapter, SubjectChapterLesson } from '../types';
 import { useAppTheme } from '../services/themeService';
 import { formatArabicLessonTitle } from '../services/lessonsService';
@@ -328,14 +329,6 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
             {/* Chapters Dropdown Menu */}
             {isChapterDropdownOpen && !isLoadingChapters && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[64vh] space-y-2 overflow-y-auto rounded-[24px] border border-cyan-300/60 bg-gradient-to-b from-slate-900/98 via-[#0b1735]/98 to-[#14133a]/98 p-2.5 shadow-[0_24px_65px_rgba(2,8,23,.75),0_0_28px_rgba(56,189,248,.24)] backdrop-blur-2xl custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.05] px-3 py-2 text-xs font-black text-cyan-200">
-                    <span className="flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5" />
-                      فصول المادة ({chapters.length} فصول متاحة)
-                    </span>
-                    <span className="text-[9px] font-bold text-white/45">اضغط خارج القائمة للإغلاق</span>
-                  </div>
-
                   {chapters.map((chapter, idx) => {
                     const isSelected = idx === selectedChapterIndex;
                     const chapterCompletedCount = chapter.lessons.filter((l) =>
@@ -349,40 +342,46 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                       <button
                         key={chapter.id || `ch-${idx}`}
                         onClick={() => scrollToChapter(chapter, idx)}
-                        className={`group/chapter relative flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-2xl border p-3 text-right transition-all duration-300 hover:-translate-y-0.5 ${
+                        className={`group/chapter relative flex min-h-[86px] w-full cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-[22px] border p-3.5 text-right transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] ${
                           isSelected
-                            ? 'border-white/45 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 text-white shadow-[0_10px_26px_rgba(37,99,235,.34)]'
+                            ? 'border-cyan-100/80 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 text-white shadow-[0_12px_30px_rgba(37,99,235,.48)] ring-2 ring-cyan-300/35'
                             : idx % 3 === 0
                             ? 'border-cyan-300/15 bg-gradient-to-r from-slate-800/95 to-cyan-950/80 text-gray-100 hover:border-cyan-300/45'
                             : idx % 3 === 1
                             ? 'border-blue-300/15 bg-gradient-to-r from-slate-800/95 to-blue-950/80 text-gray-100 hover:border-blue-300/45'
                             : 'border-violet-300/15 bg-gradient-to-r from-slate-800/95 to-violet-950/80 text-gray-100 hover:border-violet-300/45'
                         }`}
+                        style={subjectId === 'biology' ? {
+                          backgroundImage: `linear-gradient(90deg, rgba(4,20,39,.92), rgba(7,47,64,.78), rgba(51,22,101,.72)), url(${biologyChapterCardsImg})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: `${Math.min(100, idx * 24)}% center`,
+                        } : undefined}
                       >
+                        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(103,232,249,.22),transparent_38%)]" />
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                            className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border text-lg font-black shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_8px_18px_rgba(0,0,0,.25)] ${
                               isFullyCompleted
-                                ? 'bg-emerald-500 text-black font-black'
+                                ? 'border-emerald-200 bg-emerald-400 text-emerald-950'
                                 : isSelected
-                                ? 'bg-white text-blue-900 font-black'
-                                : 'border border-white/10 bg-white/10 text-gray-200 group-hover/chapter:bg-white/15'
+                                ? 'border-white/80 bg-white text-blue-900'
+                                : 'border-white/20 bg-white/10 text-white backdrop-blur group-hover/chapter:bg-white/20'
                             }`}
                           >
                             {isFullyCompleted ? '✓' : idx + 1}
                           </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-black truncate">
+                          <div className="relative min-w-0">
+                            <div className="truncate text-sm font-black drop-shadow">
                               {chapter.title}
                             </div>
-                            <div className="text-[10px] text-sky-200/80 font-medium">
+                            <div className="mt-1 text-[10px] font-bold text-cyan-100/80">
                               {chapter.lessons.length || chapter.lessonsCount || 0} دروس ({chapterCompletedCount} مكتمل)
                             </div>
                           </div>
                         </div>
 
                         {isSelected && (
-                          <div className="shrink-0 rounded-full border border-amber-100/60 bg-gradient-to-r from-amber-300 to-yellow-400 px-2 py-0.5 text-[9px] font-black text-slate-950 shadow">
+                          <div className="relative shrink-0 rounded-full border border-amber-100/70 bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[9px] font-black text-slate-950 shadow-lg">
                             الفصل الحالي
                           </div>
                         )}
