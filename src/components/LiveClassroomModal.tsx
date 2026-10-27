@@ -64,6 +64,7 @@ type Stroke = {
 };
 type Participant = {
   id: string;
+  bot?: boolean;
   name?: string;
   avatar?: string;
   connected: boolean;
@@ -410,7 +411,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletItemIndex, setBookletItemIndex] = useState(0);
   const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
-  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers">("plants");
+  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers" | "biology">("plants");
+  const [biologyChapter, setBiologyChapter] = useState<number | null>(null);
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
@@ -436,6 +438,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const meRef = useRef("");
+  const stateRef = useRef<ClassroomState | null>(null);
+  const roomSoundRef = useRef(true);
+  const audioPeersRef = useRef(new Map<string, RTCPeerConnection>());
+  const remoteAudiosRef = useRef(new Map<string, HTMLAudioElement>());
+  const pendingIceRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
   const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
@@ -458,10 +466,33 @@ export const LiveClassroomModal: React.FC<Props> = ({
   };
   const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
   const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
+  const isBiologyClassroom = currentSubjectKey.includes("biology") || currentSubjectKey.includes("bio-") || currentSubjectKey.includes("أحياء") || currentSubjectKey.includes("احياء");
 
+  useEffect(() => { meRef.current = me; }, [me]);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => {
+    roomSoundRef.current = roomSoundOn;
+    remoteAudiosRef.current.forEach((audio) => { audio.muted = !roomSoundOn; });
+  }, [roomSoundOn]);
   useEffect(() => {
     if (studyWorkspace === "board") setStudyWorkspace("plants");
   }, [studyWorkspace]);
+  useEffect(() => {
+    const activeIds = new Set((state?.players || []).filter((player) => player.connected && !player.bot).map((player) => player.id));
+    audioPeersRef.current.forEach((peer, peerId) => {
+      if (activeIds.has(peerId)) return;
+      peer.close();
+      audioPeersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) audio.srcObject = null;
+      remoteAudiosRef.current.delete(peerId);
+      pendingIceRef.current.delete(peerId);
+    });
+    if (!micOn || !me) return;
+    (state?.players || [])
+      .filter((player) => player.id !== me && player.connected && !player.bot && !audioPeersRef.current.has(player.id))
+      .forEach((player) => { void negotiateAudio(player.id).catch(() => undefined); });
+  }, [state?.players, micOn, me]);
 
   useEffect(() => {
     setClassroomExercises([]);
@@ -576,11 +607,102 @@ export const LiveClassroomModal: React.FC<Props> = ({
       socketRef.current.send(JSON.stringify(payload));
   };
 
+  const sendAudioSignal = (targetId: string, signal: unknown) => {
+    if (!targetId || socketRef.current?.readyState !== WebSocket.OPEN) return;
+    socketRef.current.send(JSON.stringify({ type: "audio_signal", targetId, signal }));
+  };
+
+  const ensureAudioPeer = (peerId: string) => {
+    const existing = audioPeersRef.current.get(peerId);
+    if (existing) return existing;
+    const peer = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    audioPeersRef.current.set(peerId, peer);
+    streamRef.current?.getAudioTracks().forEach((track) => peer.addTrack(track, streamRef.current!));
+    peer.onicecandidate = (event) => {
+      if (event.candidate) sendAudioSignal(peerId, { candidate: event.candidate.toJSON() });
+    };
+    peer.ontrack = (event) => {
+      let audio = remoteAudiosRef.current.get(peerId);
+      if (!audio) {
+        audio = new Audio();
+        audio.autoplay = true;
+        audio.playsInline = true;
+        remoteAudiosRef.current.set(peerId, audio);
+      }
+      audio.muted = !roomSoundRef.current;
+      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      void audio.play().catch(() => undefined);
+    };
+    peer.onconnectionstatechange = () => {
+      if (!["failed", "closed"].includes(peer.connectionState)) return;
+      peer.close();
+      audioPeersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) audio.srcObject = null;
+      remoteAudiosRef.current.delete(peerId);
+      pendingIceRef.current.delete(peerId);
+    };
+    return peer;
+  };
+
+  const attachLocalAudio = (peer: RTCPeerConnection) => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    const sentTrackIds = new Set(peer.getSenders().map((sender) => sender.track?.id));
+    stream.getAudioTracks().forEach((track) => {
+      if (!sentTrackIds.has(track.id)) peer.addTrack(track, stream);
+    });
+  };
+
+  const negotiateAudio = async (peerId: string) => {
+    const peer = ensureAudioPeer(peerId);
+    if (peer.signalingState !== "stable") return;
+    attachLocalAudio(peer);
+    const description = await peer.createOffer();
+    await peer.setLocalDescription(description);
+    sendAudioSignal(peerId, { description: peer.localDescription });
+  };
+
+  const flushPendingIce = async (peerId: string, peer: RTCPeerConnection) => {
+    const candidates = pendingIceRef.current.get(peerId) || [];
+    pendingIceRef.current.delete(peerId);
+    for (const candidate of candidates) await peer.addIceCandidate(candidate).catch(() => undefined);
+  };
+
+  const handleAudioSignal = async (payload: { from?: string; targetId?: string; signal?: { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit } }) => {
+    const peerId = String(payload.from || "");
+    if (!peerId || peerId === meRef.current || (payload.targetId && payload.targetId !== meRef.current)) return;
+    const peer = ensureAudioPeer(peerId);
+    const description = payload.signal?.description;
+    if (description) {
+      if (description.type === "offer" && peer.signalingState !== "stable")
+        await peer.setLocalDescription({ type: "rollback" }).catch(() => undefined);
+      await peer.setRemoteDescription(description);
+      await flushPendingIce(peerId, peer);
+      if (description.type === "offer") {
+        attachLocalAudio(peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        sendAudioSignal(peerId, { description: peer.localDescription });
+      }
+      return;
+    }
+    const candidate = payload.signal?.candidate;
+    if (!candidate) return;
+    if (peer.remoteDescription) await peer.addIceCandidate(candidate).catch(() => undefined);
+    else pendingIceRef.current.set(peerId, [...(pendingIceRef.current.get(peerId) || []), candidate]);
+  };
+
   useEffect(
     () => () => {
       closingRef.current = true;
       socketRef.current?.close();
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+      remoteAudiosRef.current.forEach((audio) => { audio.srcObject = null; });
+      remoteAudiosRef.current.clear();
+      pendingIceRef.current.clear();
       if (!preserveDisplayOnUnmountRef.current) void restoreClassroomDisplay();
     },
     [],
@@ -744,14 +866,22 @@ export const LiveClassroomModal: React.FC<Props> = ({
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.type === "welcome") setMe(payload.userId);
+        if (payload.type === "welcome") {
+          meRef.current = payload.userId;
+          setMe(payload.userId);
+        }
         if (payload.type === "state" && payload.gameType === "live_classroom")
           setState(payload);
+        if (payload.type === "audio_signal") void handleAudioSignal(payload);
       } catch {
         /* ignore malformed messages */
       }
     };
-    ws.onclose = () => setMicOn(false);
+    ws.onclose = () => {
+      setMicOn(false);
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+    };
     setRoom(code);
   }
 
@@ -896,23 +1026,26 @@ export const LiveClassroomModal: React.FC<Props> = ({
     closingRef.current = true;
     socketRef.current?.close();
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    audioPeersRef.current.forEach((peer) => peer.close());
+    audioPeersRef.current.clear();
     void restoreClassroomDisplay().finally(onClose);
   };
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
     if (micOn) {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+      streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
       setMicOn(false);
       send({ type: "audio_state", enabled: false });
       return;
     }
     try {
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
+      if (!streamRef.current?.getAudioTracks().some((track) => track.readyState === "live"))
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current.getAudioTracks().forEach((track) => { track.enabled = true; });
       setMicOn(true);
       send({ type: "audio_state", enabled: true });
+      const peers = (stateRef.current?.players || []).filter((player) => player.id !== meRef.current && player.connected && !player.bot);
+      await Promise.all(peers.map((player) => negotiateAudio(player.id).catch(() => undefined)));
     } catch {
       setError("تعذر تشغيل الميكروفون. تحقق من الإذن.");
     }
@@ -1109,6 +1242,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </div>}
           </div>
           <div className="z-20 flex items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
+            {isBiologyClassroom && <button onClick={() => { setStudyWorkspace((current) => current === "biology" ? "plants" : "biology"); setBiologyChapter(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "biology" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="رسومات الأحياء" title="رسومات الأحياء"><Presentation className="h-4 w-4"/></button>}
             <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
           </div>
           </div>
@@ -1170,7 +1304,24 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   drawingVersion={classroom?.drawingVersion || 0}
                   canDraw={canDraw}
                   onShare={(strokes) => send({ type: "classroom_board_share", strokes })}
-                /> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
+                /> : studyWorkspace === "biology" ? <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-cyan-50 to-emerald-50">
+                  {biologyChapter === null ? <div className="grid h-full place-items-center overflow-y-auto p-4">
+                    <div className="w-full max-w-lg text-center">
+                      <Presentation className="mx-auto mb-2 h-9 w-9 text-emerald-700"/>
+                      <b className="block text-sm text-emerald-950">اختر فصل رسومات الأحياء</b>
+                      <p className="mt-1 text-[10px] text-slate-500">اختر الفصل لفتح الرسومات التفاعلية الخاصة به</p>
+                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {[1, 2, 3].map((chapter) => <button key={chapter} onClick={() => setBiologyChapter(chapter)} className="rounded-2xl border border-emerald-300 bg-white px-4 py-4 text-xs font-black text-emerald-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">الفصل {chapter}</button>)}
+                      </div>
+                    </div>
+                  </div> : <>
+                    <div className="flex shrink-0 items-center justify-between border-b border-emerald-200 bg-white/90 px-3 py-2">
+                      <b className="text-[10px] text-emerald-900">رسومات الأحياء · الفصل {biologyChapter}</b>
+                      <button onClick={() => setBiologyChapter(null)} className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 text-[9px] font-black text-emerald-800">اختيار فصل آخر</button>
+                    </div>
+                    <iframe className="min-h-0 flex-1 border-0 bg-white" src={`${import.meta.env.BASE_URL}laboratory/biology/chapter-${biologyChapter}/index.html?embedded=1`} title={`رسومات الأحياء للفصل ${biologyChapter}`}/>
+                  </>}
+                </div> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
                   <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white/95 p-2" dir="rtl">
                     <div className="flex min-w-max items-start gap-3">
                       {teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center">
