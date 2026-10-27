@@ -459,7 +459,12 @@ function AppContent() {
       if (state.activeCommunityPostForComments) { setActiveCommunityPostForComments(null); return true; }
       if (state.isCreatePostOpen) { setIsCreatePostOpen(false); return true; }
       if (state.isDailyExamOpen) { setIsDailyExamOpen(false); return true; }
-      if (state.isGamesOpen) { setIsGamesOpen(false); return true; }
+      if (state.isGamesOpen) {
+        const gamesBack = new Event('duha-games-back', { cancelable: true });
+        window.dispatchEvent(gamesBack);
+        if (!gamesBack.defaultPrevented) setIsGamesOpen(false);
+        return true;
+      }
       if (state.isAttachmentOpen) { setIsAttachmentOpen(false); setActiveAttachment(null); return true; }
       if (state.isCommentsOpen) { setIsCommentsOpen(false); return true; }
       if (state.selectedStory) { setSelectedStory(null); return true; }

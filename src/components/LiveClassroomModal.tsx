@@ -853,6 +853,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       if (workspaceFullscreenRef.current) {
         workspaceFullscreenRef.current = false;
         setWorkspaceExpanded(false);
+        try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
         window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
         return;
       }
@@ -1402,7 +1403,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </section>
               <aside className="order-3 hidden flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:flex">
                 <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
-                <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(treeStage).padStart(2, "0")}.png`} alt="شجرة تقدم المجموعة" className="my-3 max-h-48 w-full object-contain drop-shadow-[0_12px_18px_rgba(16,185,129,.25)]"/>
+                <div className="my-3 flex min-h-32 w-full items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound /></div>
                 <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
               </aside>
             </>

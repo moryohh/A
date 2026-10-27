@@ -11,7 +11,15 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(!sound);
   const safeStage = Math.min(12, Math.max(1, Math.round(stage)));
-  const progressiveSize = compact ? 54 + (safeStage - 1) * 4 : undefined;
+  const regularSize = 54 + (Math.min(safeStage, 9) - 1) * 4;
+  const progressiveSize = compact
+    ? safeStage === 10
+      ? Math.round(regularSize * 1.1)
+      : safeStage >= 11
+        ? Math.round(regularSize * 1.1 * 1.15)
+        : regularSize
+    : undefined;
+  const visualScale = safeStage === 10 ? 1.1 : safeStage >= 11 ? 1.265 : 1;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -44,9 +52,9 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
         key={safeStage}
         ref={videoRef}
         src={`${import.meta.env.BASE_URL}assets/plant-growth/stage-${String(safeStage).padStart(2, '0')}.mp4`}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover transition-transform duration-700"
+        style={{ transform: `scale(${visualScale})` }}
         autoPlay
-        loop
         playsInline
         preload="metadata"
         muted={muted}

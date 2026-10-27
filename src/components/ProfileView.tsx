@@ -26,6 +26,7 @@ import { UserProfile, CommunityPost, CompetitionSnapshot } from '../types';
 import { DEFAULT_CARTOON_AVATARS, CartoonAvatarOption } from '../data/cartoonAvatars';
 import { updateUserProfileData } from '../services/communityService';
 import { getLevelSnapshot } from '../services/pointsService';
+import { PlantStageVideo } from './PlantStageVideo';
 
 interface ProfileViewProps {
   user?: UserProfile | null;
@@ -152,6 +153,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
   return (
     <div className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
       <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white/75 p-2">
+      <PlantStageVideo stage={Math.min(12, stageIndex + 1)} sound className="absolute inset-2 z-20 rounded-full" />
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
       <style>{`
         @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }

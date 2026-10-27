@@ -143,6 +143,16 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
     };
     void restoreDisplay();
   }, [activeGameMode]);
+
+  useEffect(() => {
+    const handleHardwareBack = (event: Event) => {
+      if (activeGameMode === "menu") return;
+      event.preventDefault();
+      setActiveGameMode("menu");
+    };
+    window.addEventListener("duha-games-back", handleHardwareBack);
+    return () => window.removeEventListener("duha-games-back", handleHardwareBack);
+  }, [activeGameMode]);
   const hasMillionaireQuestions = Boolean(
     gamesBundle?.mcqConfig.questions.length,
   );
