@@ -6,7 +6,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
-import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
+import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, preloadOnlineTrueFalseCharacters, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
 import { ClappingCelebration, ClappingHandsAnimation } from './ClappingCelebration';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
@@ -43,6 +43,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [lifelineResult, setLifelineResult] = useState<{ kind: 'fifty' | 'audience' | 'phone'; keep?: number[]; percentages?: number[]; suggested?: number } | null>(null);
   const [teamRecommendation, setTeamRecommendation] = useState<{ from: string; option: number } | null>(null);
   const [gibhaPowerResult, setGibhaPowerResult] = useState<{ kind: 'fifty' | 'freeze' | 'reveal'; keep?: number[]; seconds?: number; option?: number | null } | null>(null);
+  useEffect(() => { void preloadOnlineTrueFalseCharacters(); }, []);
   const [usedGibhaPowers, setUsedGibhaPowers] = useState<Array<'fifty' | 'freeze' | 'reveal'>>([]);
   const [musicMuted, setMusicMuted] = useState(() => gameAudio.getMuted());
   const [reactionUsed, setReactionUsed] = useState(false);

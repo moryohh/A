@@ -104,6 +104,9 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   assert.equal(data.get('game').players[1].mission.completed, true);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_control', action: 'shared_mission', value: 'نقرأ الفصل الأول معًا' }));
   assert.equal(room.view(data.get('game')).classroom.sharedMission, 'نقرأ الفصل الأول معًا');
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'classroom_booklet_share', index: 2, question: 'سؤال واحد', answer: 'إجابة واحدة' }));
+  await room.webSocketMessage(studentSocket, JSON.stringify({ type: 'classroom_booklet_share', index: 2, question: 'سؤال واحد', answer: 'إجابة واحدة' }));
+  assert.equal(data.get('game').bookletShares.length, 1);
   assert.equal(room.view(data.get('game')).classroom.capacity, 50);
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });

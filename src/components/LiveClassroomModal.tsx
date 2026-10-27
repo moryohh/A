@@ -416,6 +416,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [openSharedBy, setOpenSharedBy] = useState<string | null>(null);
   const [seenShareCounts, setSeenShareCounts] = useState<Record<string, number>>({});
+  const pendingQuestionSharesRef = useRef(new Set<number>());
+  useEffect(() => { pendingQuestionSharesRef.current.clear(); }, [room]);
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
@@ -957,9 +959,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (classroom?.studyMode === "teacher" && isTeacher) send({ type: "classroom_booklet_navigation", index: nextIndex, answerVisible });
   };
   const shareCurrentQuestion = () => {
-    if (!bookletQuestion) return;
+    if (!bookletQuestion || (!offlineBooklet && pendingQuestionSharesRef.current.has(bookletItemIndex))) return;
+    if (!offlineBooklet) pendingQuestionSharesRef.current.add(bookletItemIndex);
     send({ type: "classroom_booklet_share", index: bookletItemIndex, question: bookletQuestion.question, answer: bookletQuestion.answer });
   };
+  const currentQuestionShared = Boolean(!offlineBooklet && (pendingQuestionSharesRef.current.has(bookletItemIndex) || (classroom?.bookletShares || []).some((share) => share.from === me && share.index === bookletItemIndex)));
   const saveMission = (progress = 0) => {
     const text = missionText.trim();
     if (!text) return;
@@ -1197,7 +1201,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
             {bookletPanelVisible && <aside className="grid min-h-[65dvh] grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
-                {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label="مشاركة السؤال مع الأعضاء"><Share2 className="h-4 w-4 text-cyan-600"/>مشاركة</button> : <span className="flex-1" aria-hidden="true" />}
+                {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4 text-cyan-600"/>{currentQuestionShared ? "تمت المشاركة" : "مشاركة"}</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
                 <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
               </div>

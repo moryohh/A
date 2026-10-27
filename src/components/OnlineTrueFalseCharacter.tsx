@@ -33,8 +33,48 @@ export function onlineTrueFalseResultDuration(variant: OnlineTrueFalseCharacterV
   return clipDurationsMs[variant][state];
 }
 
+const clipPreloads = new Map<string, Promise<boolean>>();
+
+function preloadClip(src: string) {
+  if (typeof document === 'undefined') return Promise.resolve(false);
+  const existing = clipPreloads.get(src);
+  if (existing) return existing;
+  const loading = new Promise<boolean>((resolve) => {
+    const video = document.createElement('video');
+    let settled = false;
+    const finish = (ready: boolean) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute('src');
+      video.load();
+      resolve(ready);
+    };
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener('canplaythrough', () => finish(true), { once: true });
+    video.addEventListener('loadeddata', () => finish(true), { once: true });
+    video.addEventListener('error', () => finish(false), { once: true });
+    window.setTimeout(() => finish(video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA), 12000);
+    video.src = src;
+    video.load();
+  });
+  clipPreloads.set(src, loading);
+  return loading;
+}
+
+let preloadQueue: Promise<void> | null = null;
+export function preloadOnlineTrueFalseCharacters() {
+  if (preloadQueue) return preloadQueue;
+  const clips: OnlineTrueFalseCharacterState[] = ['idle', 'correct', 'wrong'];
+  const orderedSources = clips.flatMap(state => ONLINE_TRUE_FALSE_CHARACTERS.map(({ value }) => onlineTrueFalseCharacterVideo(value, state)));
+  preloadQueue = orderedSources.reduce<Promise<void>>((queue, src) => queue.then(() => preloadClip(src).then(() => undefined)), Promise.resolve());
+  return preloadQueue;
+}
+
 export function OnlineTrueFalseCharacter({ state, variant, compact = false }: { state: OnlineTrueFalseCharacterState; variant: OnlineTrueFalseCharacterVariant; compact?: boolean }) {
   const [playbackState, setPlaybackState] = useState<OnlineTrueFalseCharacterState>(state);
+  const [displayedSrc, setDisplayedSrc] = useState(() => onlineTrueFalseCharacterVideo(variant, 'idle'));
   const [videoFailed, setVideoFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const src = onlineTrueFalseCharacterVideo(variant, playbackState);
@@ -54,6 +94,17 @@ export function OnlineTrueFalseCharacter({ state, variant, compact = false }: { 
       if (playbackState !== 'idle') setPlaybackState('idle');
       else setVideoFailed(true);
     });
+  }, [displayedSrc, playbackState]);
+
+  useEffect(() => {
+    let active = true;
+    void preloadClip(src).then((ready) => {
+      if (!active) return;
+      if (ready) setDisplayedSrc(src);
+      else if (playbackState !== 'idle') setPlaybackState('idle');
+      else setVideoFailed(true);
+    });
+    return () => { active = false; };
   }, [src, playbackState]);
 
   const recoverToIdle = () => {
@@ -65,6 +116,6 @@ export function OnlineTrueFalseCharacter({ state, variant, compact = false }: { 
     {state === 'correct' && <div className="pointer-events-none absolute inset-x-0 top-3 z-10 text-center text-4xl text-emerald-500" aria-hidden="true">✓ ✦ ✧ ✦</div>}
     <div className="absolute inset-2 rounded-2xl bg-gradient-to-b from-cyan-50 to-sky-100" aria-hidden="true" />
     {videoFailed && <div className="absolute inset-0 z-[1] grid place-items-center text-5xl" aria-hidden="true">👤</div>}
-    <video ref={videoRef} key={src} src={src} autoPlay muted playsInline loop={playbackState === 'idle'} preload="auto" onEnded={recoverToIdle} onError={recoverToIdle} className={`relative z-[2] h-full w-full select-none object-contain object-bottom drop-shadow-[0_12px_9px_rgba(23,50,77,.18)] ${videoFailed ? 'opacity-0' : 'opacity-100'}`} aria-label={`${labels[variant]} المتحرك`} />
+    <video ref={videoRef} key={displayedSrc} src={displayedSrc} autoPlay muted playsInline loop={playbackState === 'idle'} preload="auto" onEnded={recoverToIdle} onError={recoverToIdle} className={`relative z-[2] h-full w-full select-none object-contain object-bottom drop-shadow-[0_12px_9px_rgba(23,50,77,.18)] ${videoFailed ? 'opacity-0' : 'opacity-100'}`} aria-label={`${labels[variant]} المتحرك`} />
   </div>;
 }
