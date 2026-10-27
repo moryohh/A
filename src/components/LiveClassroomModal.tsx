@@ -186,6 +186,20 @@ async function enterClassroomLandscape() {
   }
 }
 
+async function restoreClassroomDisplay() {
+  try {
+    (screen.orientation as LockableScreenOrientation).unlock?.();
+  } catch {
+    // Orientation locking is not available in every mobile browser.
+  }
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+  } catch {
+    // Fullscreen cleanup is best effort.
+  }
+  window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+}
+
 function BlankStudyBoard({ strokes, drawingVersion, canDraw, onShare }: {
   strokes: Stroke[];
   drawingVersion: number;
@@ -421,6 +435,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
   const closingRef = useRef(false);
   const workspaceFullscreenRef = useRef(false);
+  const historyEntryRef = useRef(false);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -554,8 +569,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       closingRef.current = true;
       socketRef.current?.close();
       streamRef.current?.getTracks().forEach((track) => track.stop());
-      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      void restoreClassroomDisplay();
     },
     [],
   );
@@ -818,17 +832,29 @@ export const LiveClassroomModal: React.FC<Props> = ({
       if (document.fullscreenElement || closingRef.current) return;
       if (workspaceFullscreenRef.current) {
         workspaceFullscreenRef.current = false;
-        return;
       }
-      closingRef.current = true;
       try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
-      socketRef.current?.close();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      onClose();
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
     };
     document.addEventListener("fullscreenchange", handleFullscreenExit);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
-  }, [room, onClose]);
+  }, [room]);
+
+  useEffect(() => {
+    if (!room || offlineBooklet || historyEntryRef.current) return;
+    window.history.pushState({ ...window.history.state, liveClassroom: true }, "", window.location.href);
+    historyEntryRef.current = true;
+    const handleBack = () => {
+      if (!historyEntryRef.current || closingRef.current) return;
+      historyEntryRef.current = false;
+      closingRef.current = true;
+      socketRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      void restoreClassroomDisplay().finally(onClose);
+    };
+    window.addEventListener("popstate", handleBack);
+    return () => window.removeEventListener("popstate", handleBack);
+  }, [room, offlineBooklet, onClose]);
 
   const openStudyFullscreen = async () => {
     if (!studyWorkspaceRef.current?.requestFullscreen) return;
@@ -851,17 +877,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const closeClassroom = () => {
     if (closingRef.current) return;
+    if (historyEntryRef.current) {
+      window.history.back();
+      return;
+    }
     closingRef.current = true;
     socketRef.current?.close();
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    try {
-      (screen.orientation as LockableScreenOrientation).unlock?.();
-    } catch {
-      /* orientation unlocking is optional */
-    }
-    if (document.fullscreenElement)
-      void document.exitFullscreen().catch(() => undefined);
-    onClose();
+    void restoreClassroomDisplay().finally(onClose);
   };
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
@@ -1085,9 +1108,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
-          <div className={`relative grid h-full min-h-[360px] min-w-0 gap-1.5 p-1.5 sm:gap-2 sm:p-2 ${bookletPanelVisible ? "grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
+          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
-            <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
+            <aside className="max-h-36 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
               <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
               <div className="space-y-2">
                 {state?.players.filter((player) => player.connected || offlineBooklet).map((player, index) => {
@@ -1108,7 +1131,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
             </aside>
 
-            <main className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner" dir="rtl">
+            <main className="flex min-h-[55dvh] flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner min-[600px]:min-h-0" dir="rtl">
               {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-xl grid-cols-2 gap-2 overflow-y-auto content-start">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
@@ -1161,7 +1184,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>}
             </main>
 
-            {bookletPanelVisible && <aside className="grid min-h-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl" dir="rtl">
+            {bookletPanelVisible && <aside className="grid min-h-[65dvh] grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label="مشاركة السؤال مع الأعضاء"><Share2 className="h-4 w-4 text-cyan-600"/>مشاركة</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
