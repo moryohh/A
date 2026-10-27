@@ -15,6 +15,7 @@ import {
   GraduationCap,
   LockKeyhole,
   Maximize2,
+  Minimize2,
   Mic,
   MicOff,
   Radio,
@@ -427,6 +428,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [missionOpen, setMissionOpen] = useState(false);
   const [missionText, setMissionText] = useState("");
   const [missionTarget, setMissionTarget] = useState(4);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -830,10 +832,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (!room) return;
     const handleFullscreenExit = () => {
       if (document.fullscreenElement || closingRef.current) return;
-      if (workspaceFullscreenRef.current) {
-        workspaceFullscreenRef.current = false;
-      }
-      try { (screen.orientation as LockableScreenOrientation).unlock?.(); } catch { /* optional */ }
       window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
     };
     document.addEventListener("fullscreenchange", handleFullscreenExit);
@@ -846,6 +844,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
     historyEntryRef.current = true;
     const handleBack = () => {
       if (!historyEntryRef.current || closingRef.current) return;
+      if (workspaceFullscreenRef.current) {
+        workspaceFullscreenRef.current = false;
+        setWorkspaceExpanded(false);
+        window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+        return;
+      }
       historyEntryRef.current = false;
       closingRef.current = true;
       socketRef.current?.close();
@@ -856,14 +860,16 @@ export const LiveClassroomModal: React.FC<Props> = ({
     return () => window.removeEventListener("popstate", handleBack);
   }, [room, offlineBooklet, onClose]);
 
-  const openStudyFullscreen = async () => {
-    if (!studyWorkspaceRef.current?.requestFullscreen) return;
-    workspaceFullscreenRef.current = true;
-    try {
-      await studyWorkspaceRef.current.requestFullscreen();
-    } catch {
-      workspaceFullscreenRef.current = false;
+  const openStudyFullscreen = () => {
+    if (workspaceFullscreenRef.current) {
+      window.history.back();
+      return;
     }
+    workspaceFullscreenRef.current = true;
+    setWorkspaceExpanded(true);
+    window.history.pushState({ ...window.history.state, classroomWorkspace: true }, "", window.location.href);
+    void (screen.orientation as LockableScreenOrientation).lock?.("landscape").catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
   };
 
   useEffect(() => {
@@ -1151,7 +1157,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
                   </div>;
                 })}
-              </div> : <div ref={studyWorkspaceRef} className="relative min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
+              </div> : <div ref={studyWorkspaceRef} className={`${workspaceExpanded ? "fixed inset-0 z-[130] min-h-0 rounded-none border-0" : "relative min-h-44 flex-1 rounded-2xl border border-emerald-200"} overflow-hidden bg-white shadow-inner`}>
                 {studyWorkspace === "board" ? <BlankStudyBoard
                   strokes={classroom?.strokes || []}
                   drawingVersion={classroom?.drawingVersion || 0}
@@ -1180,7 +1186,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                     /> : <div className="grid h-full place-items-center p-4 text-center text-slate-300"><div><GraduationCap className="mx-auto mb-2 h-8 w-8 text-cyan-300"/><b className="block text-xs">اختر مدرسًا من الشريط لعرض الفيديو</b><small className="text-[9px] text-slate-500">لن يبدأ أي فيديو تلقائيًا</small></div></div>}
                   </div>
                 </div>}
-                <button onClick={() => void openStudyFullscreen()} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label="تكبير منطقة العرض" title="تكبير إلى ملء الشاشة"><Maximize2 className="h-4 w-4"/></button>
+                <button onClick={openStudyFullscreen} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label={workspaceExpanded ? "تصغير منطقة العرض" : "تكبير منطقة العرض"} title={workspaceExpanded ? "العودة إلى الغرفة" : "تكبير إلى ملء الشاشة"}>{workspaceExpanded ? <Minimize2 className="h-4 w-4"/> : <Maximize2 className="h-4 w-4"/>}</button>
               </div>}
             </main>
 
