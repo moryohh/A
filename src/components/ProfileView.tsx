@@ -26,7 +26,6 @@ import { UserProfile, CommunityPost, CompetitionSnapshot } from '../types';
 import { DEFAULT_CARTOON_AVATARS, CartoonAvatarOption } from '../data/cartoonAvatars';
 import { updateUserProfileData } from '../services/communityService';
 import { getLevelSnapshot } from '../services/pointsService';
-import { PlantStageVideo } from './PlantStageVideo';
 
 interface ProfileViewProps {
   user?: UserProfile | null;
@@ -151,11 +150,8 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
   const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
 
   return (
-    <div className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
+    <div className="relative isolate flex h-32 w-32 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
       <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white/75 p-2">
-      <div className="absolute inset-2 z-20 overflow-hidden rounded-full">
-        <PlantStageVideo stage={Math.min(12, stageIndex + 1)} sound className="!h-full !w-full !rounded-full shadow-none" />
-      </div>
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
       <style>{`
         @keyframes treeGrowPop { 0% { transform: translateY(8px) scale(.86); opacity:.72; } 58% { transform: translateY(-4px) scale(1.08); opacity:1; } 100% { transform: translateY(0) scale(1); opacity:1; } }
@@ -268,7 +264,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
       </svg>
       </div>
       </div>
-      <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
+      <span className="absolute -bottom-1 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full border border-sky-100 bg-white/95 px-3 py-1 text-xs font-black text-sky-700 shadow-md"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
     </div>
   );
 };

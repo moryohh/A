@@ -396,6 +396,8 @@ function AppContent() {
     isNotificationsOpen,
     isTeacherInfoOpen,
     isGamesOpen,
+    isChallengeHubOpen,
+    challengeGameType: challengeConfig?.gameType,
     isDailyExamOpen,
     isCreatePostOpen,
     activeCommunityPostForComments,
@@ -413,6 +415,8 @@ function AppContent() {
     isNotificationsOpen,
     isTeacherInfoOpen,
     isGamesOpen,
+    isChallengeHubOpen,
+    challengeGameType: challengeConfig?.gameType,
     isDailyExamOpen,
     isCreatePostOpen,
     activeCommunityPostForComments,
@@ -459,6 +463,15 @@ function AppContent() {
       if (state.activeCommunityPostForComments) { setActiveCommunityPostForComments(null); return true; }
       if (state.isCreatePostOpen) { setIsCreatePostOpen(false); return true; }
       if (state.isDailyExamOpen) { setIsDailyExamOpen(false); return true; }
+      if (state.isChallengeHubOpen) {
+        if (state.challengeGameType === 'live_classroom') {
+          const classroomBack = new Event('duha-live-classroom-back', { cancelable: true });
+          window.dispatchEvent(classroomBack);
+          if (classroomBack.defaultPrevented) return true;
+        }
+        setIsChallengeHubOpen(false);
+        return true;
+      }
       if (state.isGamesOpen) {
         const gamesBack = new Event('duha-games-back', { cancelable: true });
         window.dispatchEvent(gamesBack);
