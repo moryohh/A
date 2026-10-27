@@ -723,6 +723,26 @@ export class ChallengeRoom {
         var serializedPresenterState = JSON.stringify(payload.state || {});
         if (serializedPresenterState.length > 220000) return;
         liveGame.presenterState = payload.state && typeof payload.state === 'object' ? payload.state : null;
+      } else if (payload.type === 'classroom_board_share' && senderPlayer && (isTeacher || senderPlayer.drawAllowed)) {
+        var sharedStrokes = Array.isArray(payload.strokes) ? payload.strokes.slice(-120) : [];
+        var normalizedSharedStrokes = sharedStrokes.map(function (stroke) {
+          if (!stroke || !Array.isArray(stroke.points) || stroke.points.length < 2 || stroke.points.length > 1200) return null;
+          return {
+            id: String(stroke.id || crypto.randomUUID()).slice(0, 80),
+            owner: sender.userId,
+            color: typeof stroke.color === 'string' ? stroke.color.slice(0, 20) : '#173f5f',
+            size: Math.max(1, Math.min(24, Number(stroke.size) || 4)),
+            tool: ['pen', 'eraser', 'text'].includes(stroke.tool) ? stroke.tool : 'pen',
+            text: stroke.tool === 'text' ? String(stroke.text || '').trim().slice(0, 120) : undefined,
+            fontSize: stroke.tool === 'text' ? Math.max(12, Math.min(72, Number(stroke.fontSize) || 24)) : undefined,
+            points: stroke.points.map(function (point) { return { x: Math.max(0, Math.min(1, Number(point.x) || 0)), y: Math.max(0, Math.min(1, Number(point.y) || 0)) }; }),
+          };
+        }).filter(Boolean);
+        if (!normalizedSharedStrokes.length) return;
+        liveGame.strokes = (liveGame.strokes || []).concat(normalizedSharedStrokes).slice(-300);
+        liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1;
+        senderPlayer.activity = 'شارك سبورته';
+        senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_stroke' && senderPlayer && (isTeacher || senderPlayer.drawAllowed)) {
         var stroke = payload.stroke;
         if (!stroke || !Array.isArray(stroke.points) || stroke.points.length < 2 || stroke.points.length > 1200) return;

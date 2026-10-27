@@ -186,12 +186,11 @@ async function enterClassroomLandscape() {
   }
 }
 
-function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }: {
+function BlankStudyBoard({ strokes, drawingVersion, canDraw, onShare }: {
   strokes: Stroke[];
   drawingVersion: number;
   canDraw: boolean;
-  onStroke: (stroke: Stroke) => void;
-  onClear: () => void;
+  onShare: (strokes: Stroke[]) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tool, setTool] = useState<"pen" | "eraser" | "text">("pen");
@@ -199,6 +198,7 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
   const [size, setSize] = useState(4);
   const [textValue, setTextValue] = useState("");
   const [draft, setDraft] = useState<Point[]>([]);
+  const [privateStrokes, setPrivateStrokes] = useState<Stroke[]>([]);
   const [canvasVersion, setCanvasVersion] = useState(0);
 
   const normalizedPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -247,7 +247,7 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
     context.clearRect(0, 0, rect.width, rect.height);
     context.fillStyle = "#fffef9";
     context.fillRect(0, 0, rect.width, rect.height);
-    [...strokes, ...(draft.length > 1 ? [{ id: "draft", owner: "draft", color, size, points: draft, tool }] as Stroke[] : [])].forEach((stroke) => {
+    [...strokes, ...privateStrokes, ...(draft.length > 1 ? [{ id: "draft", owner: "draft", color, size, points: draft, tool }] as Stroke[] : [])].forEach((stroke) => {
       const first = stroke.points[0];
       if (!first) return;
       if (stroke.tool === "text" && stroke.text) {
@@ -267,7 +267,7 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
       stroke.points.forEach((point, index) => index ? context.lineTo(point.x * rect.width, point.y * rect.height) : context.moveTo(point.x * rect.width, point.y * rect.height));
       context.stroke();
     });
-  }, [strokes, drawingVersion, draft, color, size, tool, canvasVersion]);
+  }, [strokes, privateStrokes, drawingVersion, draft, color, size, tool, canvasVersion]);
 
   return <div
     className="relative isolate h-full min-h-44 overflow-hidden overscroll-contain bg-[#fffef9]"
@@ -281,7 +281,8 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
       {tool === "text" && <input value={textValue} onChange={(event) => setTextValue(event.target.value)} placeholder="اكتب ثم المس السبورة" className="h-8 min-w-28 flex-1 rounded-lg border border-slate-200 px-2 text-[10px] text-slate-800 outline-none"/>}
       <input type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-8 w-8 shrink-0 rounded-lg" title="لون القلم"/>
       <input type="range" min="2" max="18" value={size} onChange={(event) => setSize(Number(event.target.value))} className="w-20 shrink-0 accent-cyan-500" title={tool === "text" ? "حجم الخط" : "سمك القلم"}/>
-      {canDraw && <button onClick={onClear} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600" title="مسح السبورة"><Trash2 className="h-4 w-4"/></button>}
+      {canDraw && <button onClick={() => setPrivateStrokes([])} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600" title="مسح رسمك المحلي"><Trash2 className="h-4 w-4"/></button>}
+      {canDraw && <button disabled={!privateStrokes.length} onClick={() => { onShare(privateStrokes); setPrivateStrokes([]); }} className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-cyan-600 px-2 text-[9px] font-black text-white disabled:opacity-40" title="مشاركة السبورة مع الأعضاء"><Share2 className="h-4 w-4"/>مشاركة</button>}
     </div>
     <canvas ref={canvasRef} className={`block h-full w-full touch-none select-none ${canDraw ? "cursor-crosshair" : "cursor-not-allowed"}`}
       style={{ touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}
@@ -294,7 +295,7 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
         if (tool === "text") {
           const value = textValue.trim();
           if (!value) return;
-          onStroke({ id: crypto.randomUUID(), owner: "", color, size, points: [point, point], tool: "text", text: value.slice(0, 120), fontSize: Math.max(14, size * 2.2) });
+          setPrivateStrokes((current) => current.concat({ id: crypto.randomUUID(), owner: "", color, size, points: [point, point], tool: "text", text: value.slice(0, 120), fontSize: Math.max(14, size * 2.2) }));
           setTextValue("");
           return;
         }
@@ -311,7 +312,7 @@ function BlankStudyBoard({ strokes, drawingVersion, canDraw, onStroke, onClear }
         event.stopPropagation();
         if (draft.length) {
           const points = [...draft, normalizedPoint(event)];
-          if (points.length > 1) onStroke({ id: crypto.randomUUID(), owner: "", color, size, points, tool });
+          if (points.length > 1) setPrivateStrokes((current) => current.concat({ id: crypto.randomUUID(), owner: "", color, size, points, tool }));
         }
         setDraft([]);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -397,6 +398,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [openSharedBy, setOpenSharedBy] = useState<string | null>(null);
+  const [seenShareCounts, setSeenShareCounts] = useState<Record<string, number>>({});
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
@@ -493,7 +495,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   const send = (payload: unknown) => {
     if (offlineBooklet) {
-      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; index?: number; answerVisible?: boolean; question?: string; answer?: string };
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; strokes?: Stroke[]; index?: number; answerVisible?: boolean; question?: string; answer?: string };
       setState((previous) => {
         if (!previous) return previous;
         const next: ClassroomState = {
@@ -519,6 +521,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
         if (message.type === "classroom_stroke" && message.stroke) {
           next.classroom.strokes = next.classroom.strokes.slice(-299).concat(message.stroke);
           next.classroom.drawingVersion += 1;
+        }
+        if (message.type === "classroom_board_share" && selfPlayer && Array.isArray(message.strokes)) {
+          next.classroom.strokes = next.classroom.strokes.concat(message.strokes.map((stroke) => ({ ...stroke, owner: selfPlayer.id }))).slice(-300);
+          next.classroom.drawingVersion += 1;
+          selfPlayer.activity = "شارك سبورته";
+          selfPlayer.activityAt = Date.now();
         }
         if (message.type === "classroom_control") {
           const targetPlayer = next.players.find((player) => player.id === message.targetId);
@@ -899,6 +907,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
   const openShares = openSharedBy ? (classroom?.bookletShares || []).filter((share) => share.from === openSharedBy) : [];
+  const openPlayerShares = (playerId: string) => {
+    const total = (classroom?.bookletShares || []).filter((share) => share.from === playerId).length;
+    setSeenShareCounts((current) => ({ ...current, [playerId]: total }));
+    setOpenSharedBy(playerId);
+  };
   useEffect(() => {
     if (classroom?.studyMode !== "teacher") return;
     setBookletItemIndex(Math.max(0, Math.min(bookletQuestions.length - 1, Number(classroom?.bookletIndex) || 0)));
@@ -1034,13 +1047,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
   if (classroom?.contentMode === "booklet")
     return (
       <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#0b1d24] font-cairo text-white" dir="rtl">
-        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-[#102832] px-3 shadow-lg">
+        <header className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-1 border-b border-white/10 bg-[#102832] px-2 py-1 shadow-lg sm:flex-nowrap sm:px-3">
           <div className="flex min-w-0 items-center gap-2">
             <button onClick={closeClassroom} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-500" aria-label="إغلاق الغرفة"><X className="h-5 w-5"/></button>
           <div className="min-w-0"><b className="block truncate text-xs">{currentContent.lessonTitle || lessonTitle}</b><small className="text-[9px] text-emerald-200">{offlineBooklet ? "معاينة أوفلاين" : "غرفة دراسة أونلاين"} · {state?.players.length || 0} طلاب</small></div>
           </div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"><span className="block text-[8px] font-black text-slate-400">مدة الدراسة</span><strong className="block font-mono text-lg tracking-[.18em] text-white">{elapsedTimerText}</strong></div>
-          <div className="absolute left-[31%] top-1/2 z-30 -translate-y-1/2">
+          <div className="order-3 flex w-full items-center justify-center gap-1 sm:order-none sm:w-auto">
+          <div className="text-center"><span className="block text-[7px] font-black text-slate-400">مدة الدراسة</span><strong className="block font-mono text-base tracking-[.12em] text-white">{elapsedTimerText}</strong></div>
+          <div className="relative z-30">
             <button onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-cyan-200/45 bg-gradient-to-br from-cyan-400/25 via-blue-500/20 to-violet-500/30 text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,.18)]" aria-label="تبديل الدرس" title="تبديل الدرس"><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-300"/></button>
             {lessonMenuOpen && <div className="absolute left-0 top-11 max-h-[70dvh] w-52 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 shadow-2xl backdrop-blur" dir="rtl">
               <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
@@ -1057,9 +1071,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
             </div>}
           </div>
-          <div className="absolute left-[40%] top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
+          <div className="z-20 flex items-center gap-1 rounded-xl border border-white/10 bg-black/15 p-1">
             <button onClick={() => { setStudyWorkspace((current) => current === "board" ? "plants" : "board"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "board" ? "border-cyan-200 bg-cyan-500 text-white shadow-[0_0_12px_rgba(34,211,238,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="عرض السبورة التفاعلية" title="السبورة التفاعلية"><Presentation className="h-4 w-4"/></button>
             <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white shadow-[0_0_12px_rgba(139,92,246,.35)]" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
+          </div>
           </div>
           <div className="flex items-center gap-1">
             {!offlineBooklet && <span className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
@@ -1069,8 +1084,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden" dir="ltr">
-          <div className={`relative grid h-full min-w-[680px] gap-2 p-2 ${bookletPanelVisible ? "grid-cols-[145px_minmax(260px,1fr)_290px]" : "grid-cols-[145px_minmax(420px,1fr)]"}`}>
+        <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
+          <div className={`relative grid h-full min-h-[360px] min-w-0 gap-1.5 p-1.5 sm:gap-2 sm:p-2 ${bookletPanelVisible ? "grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
             <aside className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2" dir="rtl">
               <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
@@ -1103,13 +1118,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
                   const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
+                  const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
                   return <div key={player.id} className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
                     <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-10 w-10 object-contain drop-shadow-md ${personalAnimation}`}/>
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
-                    {shareCount > 0 && <button onClick={() => setOpenSharedBy(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${shareCount} أسئلة مشاركة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/><b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{shareCount}</b></button>}
+                    {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
                   </div>;
                 })}
               </div> : <div ref={studyWorkspaceRef} className="relative min-h-44 flex-1 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-inner">
@@ -1117,8 +1133,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   strokes={classroom?.strokes || []}
                   drawingVersion={classroom?.drawingVersion || 0}
                   canDraw={canDraw}
-                  onStroke={(stroke) => send({ type: "classroom_stroke", stroke })}
-                  onClear={() => send({ type: "classroom_control", action: "clear_drawing" })}
+                  onShare={(strokes) => send({ type: "classroom_board_share", strokes })}
                 /> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
                   <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white/95 p-2" dir="rtl">
                     <div className="flex min-w-max items-start gap-3">
@@ -1131,10 +1146,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   </div>
                   <div className="min-h-0 flex-1 bg-slate-950">
                     {selectedTeacherVideo?.youtubeId ? <iframe
-                      key={selectedTeacherVideo.youtubeId}
+                      key={`${me || "local"}-${selectedTeacherVideo.youtubeId}`}
                       className="h-full w-full border-0 bg-black"
-                      src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=1&rel=0&playsinline=1`}
+                      src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=0&rel=0&playsinline=1`}
                       title={`شرح ${selectedTeacherVideo.teacherName}`}
+                      loading="lazy"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       referrerPolicy="strict-origin-when-cross-origin"
                       allowFullScreen

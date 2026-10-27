@@ -125,6 +125,24 @@ export const LessonGamesModal: React.FC<LessonGamesModalProps> = ({
   );
   const [isLoadingBundle, setIsLoadingBundle] = useState(false);
   const [bundleLoadError, setBundleLoadError] = useState(false);
+
+  useEffect(() => {
+    if (activeGameMode !== "menu") return;
+    const restoreDisplay = async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+      } catch {
+        /* fullscreen cleanup is best effort */
+      }
+      try {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+      } catch {
+        /* unsupported browsers follow the device orientation automatically */
+      }
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
+    };
+    void restoreDisplay();
+  }, [activeGameMode]);
   const hasMillionaireQuestions = Boolean(
     gamesBundle?.mcqConfig.questions.length,
   );
