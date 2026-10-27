@@ -1,6 +1,7 @@
 import React, { useId, useMemo, useState } from 'react';
 import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
+import { PlantStageVideo } from './PlantStageVideo';
 
 const growthStages = [
   { points: 0, label: 'بذرة', color: '#9a5b22' },
@@ -360,7 +361,9 @@ export const PlantGrowthPreview: React.FC = () => {
               </div>
             </section>
 
-            <FantasyTree cyclePoints={cyclePoints} burst={burst} />
+            <div className="h-[19rem] overflow-hidden rounded-[2rem]">
+              <PlantStageVideo stage={Math.min(12, stageIndex + 1)} sound />
+            </div>
 
             <div className="mt-4 rounded-3xl border border-emerald-100 bg-white/80 p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
@@ -422,7 +425,9 @@ export const PlantGrowthPreview: React.FC = () => {
                       ['--tw-ring-color' as string]: item.color,
                     }}
                   >
-                    <FantasyTree cyclePoints={item.points} burst={false} compact />
+                    <div className="flex h-24 items-end justify-center overflow-hidden rounded-2xl bg-sky-50">
+                      <PlantStageVideo stage={Math.min(12, getStageIndex(item.points) + 1)} compact />
+                    </div>
                     <div className="mt-1 flex items-center justify-between gap-1 px-1">
                       <span className="text-[10px] font-black text-slate-900">{item.points}</span>
                       <span className="truncate text-[9px] font-bold" style={{ color: item.color }}>{item.label}</span>

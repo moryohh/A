@@ -41,6 +41,7 @@ import { fetchLessonCurriculum } from "../services/curriculumService";
 import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/lessonsService";
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
+import { PlantStageVideo } from "./PlantStageVideo";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
 
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
@@ -1148,13 +1149,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const target = Math.max(1, player.mission?.target || 1);
                   const points = Math.round((progress / target) * 100);
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
-                  const personalStage = Math.min(12, ageStage + Math.floor((progress / target) * 3));
-                  const personalAnimation = classroom?.presenterId === player.id ? "animate-bounce" : player.micAllowed ? "animate-pulse" : player.handRaised ? "motion-safe:animate-[bounce_1.5s_ease-in-out_infinite]" : player.mission?.completed ? "motion-safe:animate-[spin_6s_linear_infinite]" : "motion-safe:animate-[pulse_2.5s_ease-in-out_infinite]";
+                  const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
                   const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
                   return <div key={player.id} className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <img src={`${import.meta.env.BASE_URL}assets/tree-stages/stage-${String(personalStage).padStart(2, "0")}.png`} alt={`نبتة ${player.name || "طالب"}`} className={`h-10 w-10 object-contain drop-shadow-md ${personalAnimation}`}/>
+                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="drop-shadow-md" />
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
