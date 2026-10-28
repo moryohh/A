@@ -64,6 +64,7 @@ var TEAM_BOT_PREFIX = 'bot:team:';
 var CLASSROOM_BOT_PREFIX = 'bot:classroom:';
 var BOT_ANSWER_DELAY_MS = 2000;
 var TRUE_FALSE_TURN_MS = 20000;
+var GIBHA_SAH_TURN_MS = 25000;
 var CHARACTER_VARIANTS = ['anime', 'student', 'student2'];
 var BOT_PROFILES = [
   { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
@@ -264,7 +265,7 @@ export class ChallengeRoom {
     var active = game.players.find(function (player) { return player.id === game.turn; });
     if (!active || game.status !== 'playing') return;
     if (this.isBot(active)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
-    else if (game.gameType === 'true_false') game.questionDeadline = Date.now() + TRUE_FALSE_TURN_MS;
+    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah') game.questionDeadline = Date.now() + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : GIBHA_SAH_TURN_MS);
   }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
@@ -1004,7 +1005,7 @@ export class ChallengeRoom {
           // When only two cards existed before this correct answer and there is
           // nothing left to refill, finish immediately instead of forcing the
           // players to answer the final orphan card.
-          finishAfterThisAnswer = remainingCards <= 1 && pendingCards === 0;
+          finishAfterThisAnswer = remainingCards === 0 && pendingCards === 0;
           if (!finishAfterThisAnswer && remainingCards <= 3) this.refillGibhaBoard(game);
         }
         nextQuestionIndex = finishAfterThisAnswer ? game.questions.length : this.advanceGibhaQuestion(game, currentIndex, isCorrect);
@@ -1186,21 +1187,21 @@ export class ChallengeRoom {
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
     }
-    if (game.gameType === 'true_false' && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
+    if ((game.gameType === 'true_false' || game.gameType === 'gibha_sah') && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
       var timedOutPlayer = game.players.find(function (player) { return player.id === game.turn; });
       var timedOutIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
       var timedOutQuestion = game.questions[timedOutIndex];
       if (timedOutPlayer && timedOutQuestion && !this.isBot(timedOutPlayer)) {
         var timedOutId = timedOutPlayer.id;
-        game.round = timedOutIndex + 1;
+        game.round = game.gameType === 'gibha_sah' ? this.advanceGibhaQuestion(game, timedOutIndex, false) : timedOutIndex + 1;
         game.questionIndex = game.round;
-        game.turn = game.players.find(function (player) { return player.id !== timedOutId; })?.id || null;
+        game.turn = game.gameType === 'gibha_sah' ? game.players[(game.players.findIndex(function (player) { return player.id === timedOutId; }) + 1) % game.players.length]?.id || null : game.players.find(function (player) { return player.id !== timedOutId; })?.id || null;
         game.players.forEach(function (player) { player.answer = null; });
         if (game.questionIndex >= game.questions.length) {
           game.status = 'finished';
           delete game.questionDeadline;
         } else this.beginSoloTurn(game);
-        this.broadcast({ type: 'round_result', question: { question: timedOutQuestion.question, options: timedOutQuestion.options }, answer: timedOutQuestion.correctAnswer, selected: -1, correct: false, timedOut: true, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }), answeredBy: timedOutId });
+        this.broadcast({ type: 'round_result', question: { question: timedOutQuestion.question, options: game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.slice() : timedOutQuestion.options }, selected: -1, correct: false, timedOut: true, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }), answeredBy: timedOutId, ...(game.gameType === 'true_false' ? { answer: timedOutQuestion.correctAnswer } : {}) });
         this.broadcast(this.view(game));
         if (game.status === 'finished') await this.updateRegistry('ended', game);
       }

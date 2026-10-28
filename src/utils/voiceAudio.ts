@@ -35,7 +35,7 @@ export async function captureVoice(): Promise<MediaStream> {
     if (context.state !== 'running') throw new Error('Audio processing unavailable');
     const input = context.createMediaStreamSource(raw);
     const gain = context.createGain();
-    gain.gain.value = 1.8;
+    gain.gain.value = 1.2;
     const limiter = context.createDynamicsCompressor();
     limiter.threshold.value = -12;
     limiter.knee.value = 12;

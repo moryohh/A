@@ -642,8 +642,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
       }
       audio.volume = 1;
       audio.muted = !roomSoundRef.current;
-      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
-      playVoice(audio);
+      if (event.track.kind !== 'audio') return;
+      const incoming = event.streams[0] || new MediaStream([event.track]);
+      if (audio.srcObject !== incoming) audio.srcObject = incoming;
+      if (audio.paused) playVoice(audio);
     };
     peer.onconnectionstatechange = () => {
       if (!["failed", "closed"].includes(peer.connectionState)) return;

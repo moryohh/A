@@ -336,6 +336,33 @@ test('true false timeout gives no point and advances the turn', async () => {
   assert.ok(alarmAt > Date.now());
 });
 
+test('gibha sah timeout keeps the card, awards no point, and passes to the next player', async () => {
+  const data = new Map();
+  const messages = [];
+  const sockets = ['host', 'guest', 'third', 'fourth'].map(id => ({ deserializeAttachment: () => ({ userId: id }), send: message => messages.push(JSON.parse(message)) }));
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} },
+    getWebSockets: () => sockets,
+  });
+  const questions = Array.from({ length: 4 }, (_, index) => ({ question: `Q${index}?`, options: [`right-${index}`, `wrong-${index}`], correctAnswer: 0 }));
+  await room.fetch(new Request('https://room/internal/init', { method: 'POST', body: JSON.stringify({ hostId: 'host', gameType: 'gibha_sah', questions }) }));
+  const game = data.get('game');
+  game.status = 'playing';
+  game.players = sockets.map((socket, index) => ({ id: ['host', 'guest', 'third', 'fourth'][index], score: 0, answer: null }));
+  game.turn = 'host';
+  room.prepareGibhaBoard(game);
+  game.questionDeadline = Date.now() - 1;
+  data.set('game', game);
+  await room.alarm();
+  const next = data.get('game');
+  assert.equal(next.turn, 'guest');
+  assert.equal(next.status, 'playing');
+  assert.deepEqual(next.players.map(player => player.score), [0, 0, 0, 0]);
+  assert.equal(next.gibhaBoardOptions.includes('right-0'), true);
+  assert.equal(next.questionDeadline > Date.now(), true);
+  assert.equal(messages.some(message => message.type === 'round_result' && message.timedOut), true);
+});
+
 test('true false assigns different random characters to two players', () => {
   const room = new ChallengeRoom({ storage: {}, getWebSockets: () => [] });
   const game = { players: [{ id: 'host' }, { id: 'guest' }] };

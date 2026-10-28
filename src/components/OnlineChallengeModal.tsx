@@ -110,9 +110,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         audio.volume = 1;
         remoteAudiosRef.current.set(peerId, audio);
       }
-      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      if (event.track.kind !== 'audio') return;
+      const incoming = event.streams[0] || new MediaStream([event.track]);
+      if (audio.srcObject !== incoming) audio.srcObject = incoming;
       audio.muted = !remoteAudioEnabledRef.current;
-      playVoice(audio);
+      if (audio.paused) playVoice(audio);
     };
     peer.onconnectionstatechange = () => {
       if (!['failed', 'closed'].includes(peer.connectionState)) return;
@@ -559,9 +561,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, [isTrueFalse, isGibhaSah, room, state?.status]);
 
   useEffect(() => {
-    setTurnSeconds(isMillionaireTeam ? Math.max(0, Math.ceil(((state?.questionDeadline || Date.now() + 60000) - Date.now()) / 1000)) : isTrueFalse ? 20 : 25);
+    setTurnSeconds(Math.max(0, Math.ceil(((state?.questionDeadline || Date.now() + (isMillionaireTeam ? 60000 : isTrueFalse ? 20000 : 25000)) - Date.now()) / 1000)));
     if (!connected || state?.status !== 'playing' || roundResult) return;
-    const timer = window.setInterval(() => setTurnSeconds(value => Math.max(0, value - 1)), 1000);
+    const timer = window.setInterval(() => setTurnSeconds(value => Math.max(0, Math.ceil(((state?.questionDeadline || Date.now()) - Date.now()) / 1000))), 250);
     return () => window.clearInterval(timer);
   }, [isTrueFalse, isMillionaireTeam, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
 
