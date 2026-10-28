@@ -5,7 +5,7 @@
 
 
 const GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/game-session-theme.mp3`;
-const ONLINE_GAME_SESSION_AUDIO = GAME_SESSION_AUDIO;
+const ONLINE_GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/online-game-session-loop-38s.m4a`;
 const GAME_LOSS_AUDIO = `${import.meta.env.BASE_URL}audio/game-loss.mp3`;
 const TRUE_FALSE_CORRECT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct.mp3`;
 const TRUE_FALSE_CORRECT_ALT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct-alt.mp3`;

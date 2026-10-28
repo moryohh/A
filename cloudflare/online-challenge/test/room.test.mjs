@@ -695,3 +695,35 @@ test('gibha sah allows one synchronized reaction per player and turn', async () 
   assert.equal(messages.filter(message => message.type === 'reaction').length, 2);
   assert.equal(messages.at(-1).targetId, 'guest');
 });
+
+test('true false preserves the complete result before starting the next human or bot clock', async () => {
+  const originalNow = Date.now;
+  let now = 100000;
+  Date.now = () => now;
+  try {
+    for (const nextIsBot of [false, true]) {
+      for (const correct of [false, true]) {
+        const data = new Map();
+        const received = [];
+        const guestId = nextIsBot ? 'bot:duha-challenge' : 'guest';
+        const sockets = ['host', guestId].map(userId => ({ deserializeAttachment: () => ({ userId }), send: message => received.push(JSON.parse(message)) }));
+        const room = new ChallengeRoom({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} }, getWebSockets: () => sockets });
+        room.botAnswerDelay = () => 5000;
+        data.set('game', { gameType: 'true_false', status: 'playing', round: 0, questionIndex: 0, turn: 'host', hostId: 'host', questions: Array.from({ length: 3 }, (_, i) => ({ question: `Q${i}`, options: ['صح', 'خطأ'], correctAnswer: 0 })), players: [{ id: 'host', character: 'anime', score: 0, answer: null }, { id: guestId, bot: nextIsBot, character: 'student', score: 0, answer: null }] });
+        await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: correct ? 0 : 1, round: 0 }));
+        const game = data.get('game');
+        const duration = correct ? 6500 : 9500;
+        assert.equal(received.find(message => message.type === 'round_result').resultDurationMs, duration);
+        assert.equal(game.resultUntil, now + duration);
+        assert.equal((nextIsBot ? game.botAnswerAt : game.questionDeadline) - game.resultUntil, nextIsBot ? 5000 : 20000);
+        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 1 }));
+        assert.equal(data.get('game').round, 1, 'answers cannot skip the result');
+        now += duration;
+        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 0 }));
+        assert.equal(data.get('game').round, 1, 'a stale answer cannot affect the new question');
+        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 1 }));
+        assert.equal(data.get('game').round, 2);
+      }
+    }
+  } finally { Date.now = originalNow; }
+});

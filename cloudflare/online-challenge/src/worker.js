@@ -259,13 +259,19 @@ export class ChallengeRoom {
     player.character = pool[Math.floor(Math.random() * pool.length)];
     return player.character;
   }
-  beginSoloTurn(game) {
+  resultDuration(game, player, correct) {
+    if (game.gameType !== 'true_false') return 0;
+    var durations = { anime: [5000, 8000], student: [4000, 4100], student2: [4000, 3350] };
+    return (durations[player?.character] || durations.anime)[correct ? 0 : 1] + 1500;
+  }
+  beginSoloTurn(game, resultDurationMs = 0) {
+    game.resultUntil = Date.now() + resultDurationMs;
     delete game.questionDeadline;
     delete game.botAnswerAt;
     var active = game.players.find(function (player) { return player.id === game.turn; });
     if (!active || game.status !== 'playing') return;
-    if (this.isBot(active)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
-    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah' || game.gameType === 'millionaire') game.questionDeadline = Date.now() + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : game.gameType === 'gibha_sah' ? GIBHA_SAH_TURN_MS : 60000);
+    if (this.isBot(active)) game.botAnswerAt = Math.max(Date.now(), game.resultUntil || 0) + this.botAnswerDelay(game);
+    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah' || game.gameType === 'millionaire') game.questionDeadline = Math.max(Date.now(), game.resultUntil || 0) + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : game.gameType === 'gibha_sah' ? GIBHA_SAH_TURN_MS : 60000);
   }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
@@ -426,7 +432,7 @@ export class ChallengeRoom {
   async scheduleBotAnswer(game) {
     var bot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
     if (game.status === 'playing' && bot && bot.answer === null && !game.botAnswerAt) {
-      game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
+      game.botAnswerAt = Math.max(Date.now(), game.resultUntil || 0) + this.botAnswerDelay(game);
     }
     await this.scheduleNextAlarm(game);
   }
@@ -955,6 +961,8 @@ export class ChallengeRoom {
     if (!payload || payload.type !== 'answer' || !Number.isInteger(payload.option)) return;
     var game = await this.read();
     if (!game || game.status !== 'playing') return;
+    if (Date.now() < (game.resultUntil || 0)) return;
+    if (payload.round !== undefined && payload.round !== game.round) return;
     var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     var currentQuestion = game.questions[currentIndex];
     if (game.gameType === 'gibha_sah') this.prepareGibhaBoard(game);
@@ -1020,8 +1028,9 @@ export class ChallengeRoom {
       game.players.forEach(function (item) { item.answer = null; });
       game.reactionTurn = Number(game.reactionTurn || 0) + 1;
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else this.beginSoloTurn(game);
+      else this.beginSoloTurn(game, this.resultDuration(game, player, isCorrect));
       var roundPayload = { type: 'round_result', question: { question: currentQuestion.question, options: resultOptions }, selected: chosen, correct: isCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId };
+      if (game.gameType === 'true_false') roundPayload.resultDurationMs = this.resultDuration(game, player, isCorrect);
       // Never disclose Gibha Sah's correct card after a mistake.
       if (game.gameType !== 'gibha_sah' || isCorrect) roundPayload.answer = correctAnswer;
       this.broadcast(roundPayload);
@@ -1275,8 +1284,9 @@ export class ChallengeRoom {
         game.players.forEach(function (item) { item.answer = null; });
         game.reactionTurn = Number(game.reactionTurn || 0) + 1;
         if (game.questionIndex >= game.questions.length) game.status = 'finished';
-        else this.beginSoloTurn(game);
+        else this.beginSoloTurn(game, this.resultDuration(game, bot, botWasCorrect));
         var botRoundPayload = { type: 'round_result', question: { question: botQuestion.question, options: botResultOptions }, selected: botSelected, correct: botWasCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: bot.id };
+        if (game.gameType === 'true_false') botRoundPayload.resultDurationMs = this.resultDuration(game, bot, botWasCorrect);
         if (game.gameType !== 'gibha_sah' || botWasCorrect) botRoundPayload.answer = botCorrect;
         this.broadcast(botRoundPayload);
       }

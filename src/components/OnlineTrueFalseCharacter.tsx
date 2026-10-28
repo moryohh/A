@@ -73,49 +73,24 @@ export function preloadOnlineTrueFalseCharacters() {
 }
 
 export function OnlineTrueFalseCharacter({ state, variant, compact = false }: { state: OnlineTrueFalseCharacterState; variant: OnlineTrueFalseCharacterVariant; compact?: boolean }) {
-  const [playbackState, setPlaybackState] = useState<OnlineTrueFalseCharacterState>(state);
-  const [displayedSrc, setDisplayedSrc] = useState(() => onlineTrueFalseCharacterVideo(variant, 'idle'));
   const [videoFailed, setVideoFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const src = onlineTrueFalseCharacterVideo(variant, playbackState);
+  const src = onlineTrueFalseCharacterVideo(variant, state);
   const stateLabel = state === 'correct' ? 'فرح بالإجابة الصحيحة' : state === 'wrong' ? 'تفاعل مع الإجابة الخاطئة' : 'بانتظار الإجابة';
 
   useEffect(() => {
-    setPlaybackState(state);
     setVideoFailed(false);
-  }, [state, variant]);
-
-  useEffect(() => {
+    // A keyed video owns one clip. Do not play the previous idle element while
+    // React is replacing it, or let an aborted play promise cancel the result.
     const video = videoRef.current;
     if (!video) return;
-    setVideoFailed(false);
-    video.currentTime = 0;
-    void video.play().catch(() => {
-      if (playbackState !== 'idle') setPlaybackState('idle');
-      else setVideoFailed(true);
-    });
-  }, [displayedSrc, playbackState]);
-
-  useEffect(() => {
-    let active = true;
-    void preloadClip(src).then((ready) => {
-      if (!active) return;
-      if (ready) setDisplayedSrc(src);
-      else if (playbackState !== 'idle') setPlaybackState('idle');
-      else setVideoFailed(true);
-    });
-    return () => { active = false; };
-  }, [src, playbackState]);
-
-  const recoverToIdle = () => {
-    if (playbackState !== 'idle') setPlaybackState('idle');
-    else setVideoFailed(true);
-  };
+    void video.play().catch(() => { /* autoPlay/onCanPlay retries after loading */ });
+  }, [src]);
 
   return <div className={`relative mx-auto grid w-full max-w-xs place-items-end overflow-hidden ${compact ? 'h-32 sm:h-36' : 'h-52 sm:h-60'}`} aria-label={`${labels[variant]}: ${stateLabel}`}>
     {state === 'correct' && <div className="pointer-events-none absolute inset-x-0 top-3 z-10 text-center text-4xl text-emerald-500" aria-hidden="true">✓ ✦ ✧ ✦</div>}
     <div className="absolute inset-2 rounded-2xl bg-gradient-to-b from-cyan-50 to-sky-100" aria-hidden="true" />
     {videoFailed && <div className="absolute inset-0 z-[1] grid place-items-center text-5xl" aria-hidden="true">👤</div>}
-    <video ref={videoRef} key={displayedSrc} src={displayedSrc} autoPlay muted playsInline loop={playbackState === 'idle'} preload="auto" onEnded={recoverToIdle} onError={recoverToIdle} className={`relative z-[2] h-full w-full select-none object-contain object-bottom drop-shadow-[0_12px_9px_rgba(23,50,77,.18)] ${videoFailed ? 'opacity-0' : 'opacity-100'}`} aria-label={`${labels[variant]} المتحرك`} />
+    <video ref={videoRef} key={src} src={src} autoPlay muted playsInline loop={state === 'idle'} preload="auto" onCanPlay={event => { void event.currentTarget.play().catch(() => {}); }} onError={() => setVideoFailed(true)} className={`relative z-[2] h-full w-full select-none object-contain object-bottom drop-shadow-[0_12px_9px_rgba(23,50,77,.18)] ${videoFailed ? 'opacity-0' : 'opacity-100'}`} aria-label={`${labels[variant]} المتحرك`} />
   </div>;
 }

@@ -373,6 +373,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'round_result') {
+        if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
         if (payload.timedOut) {
           resultUntilRef.current = 0;
           if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
@@ -382,9 +383,9 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
         const isCorrect = payload.correct ?? payload.selected === payload.answer;
         const answeringCharacter = stateRef.current?.players.find(player => player.id === payload.answeredBy)?.character || 'anime';
-        const resultDuration = roomGameTypeRef.current === 'true_false'
+        const resultDuration = payload.resultDurationMs ?? (roomGameTypeRef.current === 'true_false'
           ? Math.max(isCorrect ? 4000 : 0, onlineTrueFalseResultDuration(answeringCharacter, isCorrect ? 'correct' : 'wrong') + 1500)
-          : roomGameTypeRef.current === 'millionaire' || roomGameTypeRef.current === 'millionaire_team' ? 5000 : 3000;
+          : roomGameTypeRef.current === 'millionaire' || roomGameTypeRef.current === 'millionaire_team' ? 5000 : 3000);
         resultUntilRef.current = Date.now() + resultDuration;
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
         setResultRevealed(false);
@@ -437,7 +438,7 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     if (!connected || (state?.turn && state.turn !== me) || pendingAnswer || self?.answered || socketRef.current?.readyState !== WebSocket.OPEN) return;
     setPendingAnswer(true);
     if ((state?.gameType || gameType) === 'gibha_sah') gameAudio.playCardSelect();
-    socketRef.current.send(JSON.stringify({ type: 'answer', option }));
+    socketRef.current.send(JSON.stringify({ type: 'answer', option, round: state?.round }));
   }
 
   function sendChat() {
