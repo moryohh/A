@@ -216,15 +216,23 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
         setChallengeMessage('');
         return;
       }
-      const bundle = await fetchLessonGamesData(context);
-      const config: any = challengeGame === 'millionaire' ? bundle.mcqConfig : challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
-      const questions: ChallengeQuestion[] = challengeGame === 'millionaire'
-        ? config.questions.map((item: any) => ({ question: item.question, options: item.options, correctAnswer: item.correctAnswer }))
-        : challengeGame === 'true_false'
-          ? config.questions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
-          : config.questions.map((item: any) => ({ question: item.question, options: config.cards.map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
-      if (questions.length < 1) throw new Error('لا توجد أسئلة لهذا الدرس. اختر مادة أو فصلاً آخر.');
-      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: selectedLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'live_classroom' ? 'الفصل التعليمي المباشر' : challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number });
+      const shuffledLessons = [selectedLesson, ...challengeLessons.filter(lesson => lesson.id !== selectedLesson.id).sort(() => Math.random() - 0.5)];
+      let playableLesson = selectedLesson;
+      let questions: ChallengeQuestion[] = [];
+      for (const candidate of shuffledLessons) {
+        const candidateContext = { ...context, lessonNumber: candidate.number, lessonId: candidate.id, lessonTitle: candidate.title };
+        const bundle = await fetchLessonGamesData(candidateContext);
+        const config: any = challengeGame === 'millionaire' ? bundle.mcqConfig : challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
+        const sourceQuestions = Array.isArray(config?.questions) ? config.questions : [];
+        questions = challengeGame === 'millionaire'
+          ? sourceQuestions.map((item: any) => ({ question: item.question, options: item.options, correctAnswer: item.correctAnswer }))
+          : challengeGame === 'true_false'
+            ? sourceQuestions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
+            : sourceQuestions.map((item: any) => ({ question: item.question, options: (config?.cards || []).map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
+        if (questions.length > 0) { playableLesson = candidate; break; }
+      }
+      if (questions.length < 1) throw new Error('لا توجد أسئلة لهذه اللعبة في دروس الفصل المحدد.');
+      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: playableLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: playableLesson.number });
       setChallengeMessage('');
     } catch (error) { setChallengeMessage(error instanceof Error ? error.message : 'تعذر تجهيز الغرفة.'); }
     finally { setChallengeBusy(false); }

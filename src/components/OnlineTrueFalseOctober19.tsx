@@ -6,6 +6,7 @@ import { gameAudio } from '../utils/trueFalseOctober19Audio';
 import { millionaireAudio } from '../utils/millionaireAudio';
 import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
+import { captureVoice } from '../utils/voiceAudio';
 import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacterOctober19';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
@@ -56,6 +57,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const voiceMeterRef = useRef<{ context: AudioContext; timer: number } | null>(null);
   const roundRef = useRef<number | null>(null);
   const roomGameTypeRef = useRef<OnlineChallengeGameType>(gameType);
   const resultUntilRef = useRef(0);
@@ -75,11 +77,50 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
     localStreamRef.current = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     pendingCandidatesRef.current = [];
+    if (voiceMeterRef.current) {
+      window.clearInterval(voiceMeterRef.current.timer);
+      void voiceMeterRef.current.context.close();
+      voiceMeterRef.current = null;
+    }
+    setRemoteTalking(false);
+  }
+
+  function iceServers(): RTCIceServer[] {
+    const servers: RTCIceServer[] = [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    ];
+    const turnUrl = String(import.meta.env.VITE_TURN_URL || '').trim();
+    if (turnUrl) servers.push({
+      urls: turnUrl,
+      username: String(import.meta.env.VITE_TURN_USERNAME || ''),
+      credential: String(import.meta.env.VITE_TURN_CREDENTIAL || ''),
+    });
+    return servers;
+  }
+
+  function monitorRemoteVoice(stream: MediaStream) {
+    if (voiceMeterRef.current) {
+      window.clearInterval(voiceMeterRef.current.timer);
+      void voiceMeterRef.current.context.close();
+    }
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const context = new AudioCtx();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    context.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    const timer = window.setInterval(() => {
+      analyser.getByteTimeDomainData(samples);
+      let energy = 0;
+      for (const sample of samples) energy += Math.abs(sample - 128);
+      setRemoteTalking(energy / samples.length > 2.5);
+    }, 150);
+    voiceMeterRef.current = { context, timer };
   }
 
   async function ensurePeer() {
     if (peerRef.current) return peerRef.current;
-    const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const peer = new RTCPeerConnection({ iceServers: iceServers(), iceCandidatePoolSize: 4 });
     peerRef.current = peer;
     localStreamRef.current?.getTracks().forEach(track => peer.addTrack(track, localStreamRef.current as MediaStream));
     peer.onicecandidate = event => { if (event.candidate) sendSocket({ type: 'audio_signal', signal: { candidate: event.candidate.toJSON() } }); };
@@ -88,6 +129,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
         remoteAudioRef.current.srcObject = event.streams[0];
         remoteAudioRef.current.muted = !remoteAudioEnabled;
         void remoteAudioRef.current.play().catch(() => undefined);
+        monitorRemoteVoice(event.streams[0]);
       }
     };
     return peer;
@@ -98,7 +140,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
       setAudioBusy(true);
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح لا يدعم الميكروفون.');
-        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = await captureVoice();
         localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = true; });
         setAudioEnabled(true);
         sendSocket({ type: 'audio_state', enabled: true });
@@ -195,7 +237,8 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
       let payload;
       try { payload = JSON.parse(event.data); } catch { return; }
       if (payload.type === 'welcome') { meRef.current = payload.userId; setMe(payload.userId); }
-      if (payload.type === 'audio_state') setRemoteTalking(Boolean(payload.enabled));
+      // `audio_state` only reports whether the other microphone is enabled.
+      // The speaking indicator is driven by the received audio level instead.
       if (payload.type === 'audio_signal') {
         void (async () => {
           const peer = await ensurePeer();
@@ -384,7 +427,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
     const next = !musicMuted;
     setMusicMuted(next);
     gameAudio.setMuted(next);
-    if (!next && isGibhaSah && state?.status === 'playing') gameAudio.playGameSessionTheme();
+    if (!next && (isTrueFalse || isGibhaSah) && state?.status !== 'finished') gameAudio.playGameSessionTheme();
   }
 
   async function create() {

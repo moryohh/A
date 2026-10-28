@@ -51,6 +51,7 @@ var BOT_ID = 'bot:duha-challenge';
 var TEAM_BOT_PREFIX = 'bot:team:';
 var BOT_ANSWER_DELAY_MS = 2000;
 var TRUE_FALSE_TURN_MS = 20000;
+var TRUE_FALSE_RESULT_DELAY_MS = 10000;
 var CHARACTER_VARIANTS = ['anime', 'student', 'student2'];
 var BOT_PROFILES = [
   { id: 'opp-1', name: 'سجاد مهدي', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', city: 'بغداد - الكرخ', school: 'إعدادية المتميزين', badge: 'نجم التحدي ⚡', level: 12 },
@@ -99,13 +100,14 @@ export class ChallengeRoom {
     player.character = pool[Math.floor(Math.random() * pool.length)];
     return player.character;
   }
-  beginSoloTurn(game) {
+  beginSoloTurn(game, resultDelayMs = 0) {
     delete game.questionDeadline;
     delete game.botAnswerAt;
     var active = game.players.find(function (player) { return player.id === game.turn; });
     if (!active || game.status !== 'playing') return;
-    if (this.isBot(active)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
-    else if (game.gameType === 'true_false') game.questionDeadline = Date.now() + TRUE_FALSE_TURN_MS;
+    var turnStartsAt = Date.now() + Math.max(0, Number(resultDelayMs) || 0);
+    if (this.isBot(active)) game.botAnswerAt = turnStartsAt + this.botAnswerDelay(game);
+    else if (game.gameType === 'true_false') game.questionDeadline = turnStartsAt + TRUE_FALSE_TURN_MS;
   }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
@@ -138,7 +140,7 @@ export class ChallengeRoom {
   botAnswerDelay(game) {
     if (game.gameType === 'gibha_sah') return randomDelay(5000, 20000);
     if (game.gameType === 'millionaire') return randomDelay(10000, 30000);
-    return BOT_ANSWER_DELAY_MS;
+    return game.gameType === 'true_false' ? randomDelay(4000, 6500) : BOT_ANSWER_DELAY_MS;
   }
   syncGibhaQuestionQueue(game) {
     var available = game.gibhaBoardSlots.filter(Boolean).map(function (slot) { return slot.questionIndex; });
@@ -355,7 +357,7 @@ export class ChallengeRoom {
       var fourPlayerMode = teamMode || init.gameType === 'gibha_sah';
       var configuredTeamWait = Number(this.env && this.env.TEAM_MATCHMAKING_WAIT_MS);
       var teamWait = Number.isFinite(configuredTeamWait) && configuredTeamWait >= 5000 ? configuredTeamWait : 5000;
-      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (fourPlayerMode ? teamWait : randomDelay(180000, 300000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
+      var initialGame = { gameType: init.gameType, roomCode: init.roomCode, hostId: init.hostId, status: 'waiting', round: 0, questionIndex: 0, turn: init.hostId, questions: init.questions, players: [{ id: init.hostId, team: teamMode ? 'A' : null, score: 0, streak: 0, answer: null }], botProfile: BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)], botJoinAt: Date.now() + (fourPlayerMode ? teamWait : randomDelay(5000, 10000)), activeTeam: teamMode ? 'A' : undefined, teamLives: teamMode ? { A: 3, B: 3 } : undefined, teamScores: teamMode ? { A: 0, B: 0 } : undefined, captainCursor: teamMode ? { A: 0, B: 0 } : undefined, recommendations: teamMode ? {} : undefined, lifelines: teamMode ? { fifty: false, audience: false, phone: false } : undefined };
       await this.ctx.storage.put('game', initialGame);
       await this.scheduleNextAlarm(initialGame);
       return json({ ok: true }, 200, '');
@@ -625,7 +627,7 @@ export class ChallengeRoom {
       game.players.forEach(function (item) { item.answer = null; });
       game.reactionTurn = Number(game.reactionTurn || 0) + 1;
       if (game.questionIndex >= game.questions.length) game.status = 'finished';
-      else this.beginSoloTurn(game);
+      else this.beginSoloTurn(game, game.gameType === 'true_false' ? TRUE_FALSE_RESULT_DELAY_MS : 0);
       var roundPayload = { type: 'round_result', question: { question: currentQuestion.question, options: resultOptions }, selected: chosen, correct: isCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: attachment.userId };
       // Never disclose Gibha Sah's correct card after a mistake.
       if (game.gameType !== 'gibha_sah' || isCorrect) roundPayload.answer = correctAnswer;
@@ -721,7 +723,7 @@ export class ChallengeRoom {
         if (game.questionIndex >= game.questions.length) {
           game.status = 'finished';
           delete game.questionDeadline;
-        } else this.beginSoloTurn(game);
+        } else this.beginSoloTurn(game, TRUE_FALSE_RESULT_DELAY_MS);
         this.broadcast({ type: 'round_result', question: { question: timedOutQuestion.question, options: timedOutQuestion.options }, answer: timedOutQuestion.correctAnswer, selected: -1, correct: false, timedOut: true, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }), answeredBy: timedOutId });
         this.broadcast(this.view(game));
         if (game.status === 'finished') await this.updateRegistry('ended', game);
@@ -794,7 +796,7 @@ export class ChallengeRoom {
         game.players.forEach(function (item) { item.answer = null; });
         game.reactionTurn = Number(game.reactionTurn || 0) + 1;
         if (game.questionIndex >= game.questions.length) game.status = 'finished';
-        else this.beginSoloTurn(game);
+        else this.beginSoloTurn(game, game.gameType === 'true_false' ? TRUE_FALSE_RESULT_DELAY_MS : 0);
         var botRoundPayload = { type: 'round_result', question: { question: botQuestion.question, options: botResultOptions }, selected: botSelected, correct: botWasCorrect, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: bot.id };
         if (game.gameType !== 'gibha_sah' || botWasCorrect) botRoundPayload.answer = botCorrect;
         this.broadcast(botRoundPayload);
