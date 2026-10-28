@@ -265,7 +265,7 @@ export class ChallengeRoom {
     var active = game.players.find(function (player) { return player.id === game.turn; });
     if (!active || game.status !== 'playing') return;
     if (this.isBot(active)) game.botAnswerAt = Date.now() + this.botAnswerDelay(game);
-    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah') game.questionDeadline = Date.now() + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : GIBHA_SAH_TURN_MS);
+    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah' || game.gameType === 'millionaire') game.questionDeadline = Date.now() + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : game.gameType === 'gibha_sah' ? GIBHA_SAH_TURN_MS : 60000);
   }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
@@ -655,6 +655,7 @@ export class ChallengeRoom {
         if (game.gameType === 'gibha_sah' && game.status === 'playing') {
           game.turn = game.players[0].id;
           delete game.botJoinAt;
+          this.beginSoloTurn(game);
         }
         if (game.gameType === 'millionaire_team' && game.status === 'playing') this.beginTeamTurn(game, 'A');
         if (game.status === 'playing' && Array.isArray(game.matchmakingBotSchedule)) game.matchmakingBotSchedule.forEach(function (event) { if (!event.joined) event.cancelled = true; });
@@ -1130,7 +1131,7 @@ export class ChallengeRoom {
           if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
           else {
             game.turn = game.players[0].id;
-            if (game.gameType !== 'gibha_sah') this.beginSoloTurn(game);
+            this.beginSoloTurn(game);
           }
         }
         await this.updateRegistry(game.status === 'waiting' ? 'waiting' : 'playing', game);
@@ -1161,7 +1162,7 @@ export class ChallengeRoom {
       game.status = 'playing';
       delete game.botJoinAt;
       if (game.gameType === 'millionaire_team') this.beginTeamTurn(game, 'A');
-      else if (game.gameType !== 'gibha_sah') this.beginSoloTurn(game);
+      else this.beginSoloTurn(game);
       await this.updateRegistry('playing', game);
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
@@ -1187,7 +1188,7 @@ export class ChallengeRoom {
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
     }
-    if ((game.gameType === 'true_false' || game.gameType === 'gibha_sah') && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
+    if ((game.gameType === 'true_false' || game.gameType === 'gibha_sah' || game.gameType === 'millionaire') && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
       var timedOutPlayer = game.players.find(function (player) { return player.id === game.turn; });
       var timedOutIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
       var timedOutQuestion = game.questions[timedOutIndex];
@@ -1196,6 +1197,7 @@ export class ChallengeRoom {
         game.round = game.gameType === 'gibha_sah' ? this.advanceGibhaQuestion(game, timedOutIndex, false) : timedOutIndex + 1;
         game.questionIndex = game.round;
         game.turn = game.gameType === 'gibha_sah' ? game.players[(game.players.findIndex(function (player) { return player.id === timedOutId; }) + 1) % game.players.length]?.id || null : game.players.find(function (player) { return player.id !== timedOutId; })?.id || null;
+        if (game.gameType === 'gibha_sah') timedOutPlayer.streak = 0;
         game.players.forEach(function (player) { player.answer = null; });
         if (game.questionIndex >= game.questions.length) {
           game.status = 'finished';

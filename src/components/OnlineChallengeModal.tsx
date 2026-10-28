@@ -373,6 +373,13 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'round_result') {
+        if (payload.timedOut) {
+          resultUntilRef.current = 0;
+          if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
+          setRoundResult(null);
+          setPendingAnswer(false);
+          return;
+        }
         const isCorrect = payload.correct ?? payload.selected === payload.answer;
         const answeringCharacter = stateRef.current?.players.find(player => player.id === payload.answeredBy)?.character || 'anime';
         const resultDuration = roomGameTypeRef.current === 'true_false'
@@ -561,11 +568,11 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, [isTrueFalse, isGibhaSah, room, state?.status]);
 
   useEffect(() => {
-    setTurnSeconds(Math.max(0, Math.ceil(((state?.questionDeadline || Date.now() + (isMillionaireTeam ? 60000 : isTrueFalse ? 20000 : 25000)) - Date.now()) / 1000)));
+    setTurnSeconds(Math.max(0, Math.ceil(((state?.questionDeadline || Date.now() + (isMillionaire ? 60000 : isTrueFalse ? 20000 : 25000)) - Date.now()) / 1000)));
     if (!connected || state?.status !== 'playing' || roundResult) return;
     const timer = window.setInterval(() => setTurnSeconds(value => Math.max(0, Math.ceil(((state?.questionDeadline || Date.now()) - Date.now()) / 1000))), 250);
     return () => window.clearInterval(timer);
-  }, [isTrueFalse, isMillionaireTeam, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
+  }, [isTrueFalse, isMillionaire, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
 
   useEffect(() => {
     if (isGibhaSah) gameAudio.setGameSessionThemeRate(turnSeconds <= 5 ? 1.28 : 1);
