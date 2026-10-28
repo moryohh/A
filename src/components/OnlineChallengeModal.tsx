@@ -1,3 +1,4 @@
+import { OnlineTrueFalseOctober19 } from './OnlineTrueFalseOctober19';
 import { playVoice, unlockVoices, captureVoice } from '../utils/voiceAudio';
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Crosshair, MessageCircle, Mic, MicOff, Music, Music2, Send, Sparkles, Trophy, Volume2, VolumeX, UserRound, X, XCircle, Zap } from 'lucide-react';
@@ -20,7 +21,7 @@ type ReactionPath = { startX: number; startY: number; endX: number; endY: number
 
 interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; }
 
-export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1, initialRoomCode }) => {
+const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1, initialRoomCode }) => {
   const [room, setRoom] = useState('');
   const [entry, setEntry] = useState('');
   const [state, setState] = useState<State | null>(null);
@@ -783,3 +784,8 @@ export const OnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     </div>{chatPanel}
   </div>;
 };
+
+// Restore only online true/false; all other game modes keep their current component.
+export const OnlineChallengeModal: React.FC<Props> = props => props.gameType === 'true_false'
+  ? <OnlineTrueFalseOctober19 {...props} />
+  : <CurrentOnlineChallengeModal {...props} />;

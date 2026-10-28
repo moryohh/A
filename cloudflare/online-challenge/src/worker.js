@@ -1,3 +1,4 @@
+import { ChallengeRoom as October19TrueFalseRoom } from './true-false-october19.js';
 function json(body, status, origin) {
   return new Response(JSON.stringify(body), {
     status,
@@ -235,6 +236,7 @@ export default {
 };
 
 export class ChallengeRoom {
+  october19() { return new October19TrueFalseRoom(this.ctx, { ...this.env, REGISTRY: this.env?.REGISTRY_V2 || this.env?.REGISTRY }); }
   constructor(ctx, env) { this.ctx = ctx; this.env = env; }
   async read() { return this.ctx.storage.get('game'); }
   sockets() { return this.ctx.getWebSockets(); }
@@ -483,6 +485,7 @@ export class ChallengeRoom {
     } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
   view(game) {
+    if (game.gameType === 'true_false') return this.october19().view(game);
     var currentIndex = Number.isInteger(game.questionIndex) ? game.questionIndex : game.round;
     if (game.gameType === 'gibha_sah' && game.status === 'playing') this.prepareGibhaBoard(game);
     var current = game.status === 'playing' ? game.questions[currentIndex] : null;
@@ -537,6 +540,10 @@ export class ChallengeRoom {
     };
   }
   async fetch(request) {
+    const existing = await this.read();
+    const legacyInit = !existing && new URL(request.url).pathname === '/internal/init' && request.method === 'POST'
+      ? await request.clone().json().catch(() => null) : null;
+    if ((existing?.gameType || legacyInit?.gameType) === 'true_false') return this.october19().fetch(request);
     var url = new URL(request.url);
     var game = await this.read();
     if (url.pathname === '/internal/init' && request.method === 'POST') {
@@ -695,6 +702,7 @@ export class ChallengeRoom {
     return json({ error: 'not_found' }, 404, '');
   }
   async webSocketMessage(socket, message) {
+    if (this.ctx.storage?.get && (await this.read())?.gameType === 'true_false') return this.october19().webSocketMessage(socket, message);
     var payload;
     try { payload = JSON.parse(message); } catch (_) { return; }
     var sender = socket.deserializeAttachment();
@@ -1047,6 +1055,7 @@ export class ChallengeRoom {
     if (game.status === 'finished') await this.updateRegistry('ended', game);
   }
   async handleDisconnect(socket) {
+    if ((await this.read())?.gameType === 'true_false') return this.october19().handleDisconnect(socket);
     var game = await this.read();
     if (!game || game.status === 'closed' || game.status === 'finished' || game.status === 'abandoned') return;
     var attachment = socket && socket.deserializeAttachment ? socket.deserializeAttachment() : null;
@@ -1080,6 +1089,7 @@ export class ChallengeRoom {
     await this.ctx.storage.setAlarm(game.disconnectDeadline);
   }
   async alarm() {
+    if ((await this.read())?.gameType === 'true_false') return this.october19().alarm();
     var game = await this.read();
     if (!game || ['closed', 'finished', 'abandoned'].includes(game.status)) return;
     var now = Date.now();

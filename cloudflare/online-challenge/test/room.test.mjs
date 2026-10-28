@@ -373,7 +373,7 @@ test('true false assigns different random characters to two players', () => {
   assert.notEqual(game.players[0].character, game.players[1].character);
 });
 
-test('two-player games schedule one development bot after five-to-ten seconds', async () => {
+test('matchmaking keeps current millionaire timing and restores October 19 true-false timing', async () => {
   for (const gameType of ['millionaire', 'true_false']) {
   const data = new Map();
   let alarmAt = null;
@@ -393,6 +393,17 @@ test('two-player games schedule one development bot after five-to-ten seconds', 
   await room.fetch(new Request('https://room/internal/init', {
     method: 'POST', body: JSON.stringify({ hostId: 'host', gameType, roomCode: '4321', questions }),
   }));
+  if (gameType === 'true_false') {
+    assert.ok(alarmAt >= startedAt + 180000);
+    assert.ok(alarmAt <= Date.now() + 300000);
+    const waiting = data.get('game');
+    waiting.botJoinAt = Date.now() - 1;
+    data.set('game', waiting);
+    await room.alarm();
+    assert.equal(data.get('game').status, 'playing');
+    assert.equal(data.get('game').players[1].id, 'bot:duha-challenge');
+    continue;
+  }
   assert.ok(alarmAt >= startedAt + 5000);
   assert.ok(alarmAt <= Date.now() + 10000);
   const waiting = data.get('game');
@@ -696,34 +707,19 @@ test('gibha sah allows one synchronized reaction per player and turn', async () 
   assert.equal(messages.at(-1).targetId, 'guest');
 });
 
-test('true false preserves the complete result before starting the next human or bot clock', async () => {
-  const originalNow = Date.now;
-  let now = 100000;
-  Date.now = () => now;
-  try {
-    for (const nextIsBot of [false, true]) {
-      for (const correct of [false, true]) {
-        const data = new Map();
-        const received = [];
-        const guestId = nextIsBot ? 'bot:duha-challenge' : 'guest';
-        const sockets = ['host', guestId].map(userId => ({ deserializeAttachment: () => ({ userId }), send: message => received.push(JSON.parse(message)) }));
-        const room = new ChallengeRoom({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} }, getWebSockets: () => sockets });
-        room.botAnswerDelay = () => 5000;
-        data.set('game', { gameType: 'true_false', status: 'playing', round: 0, questionIndex: 0, turn: 'host', hostId: 'host', questions: Array.from({ length: 3 }, (_, i) => ({ question: `Q${i}`, options: ['صح', 'خطأ'], correctAnswer: 0 })), players: [{ id: 'host', character: 'anime', score: 0, answer: null }, { id: guestId, bot: nextIsBot, character: 'student', score: 0, answer: null }] });
-        await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: correct ? 0 : 1, round: 0 }));
-        const game = data.get('game');
-        const duration = correct ? 6500 : 9500;
-        assert.equal(received.find(message => message.type === 'round_result').resultDurationMs, duration);
-        assert.equal(game.resultUntil, now + duration);
-        assert.equal((nextIsBot ? game.botAnswerAt : game.questionDeadline) - game.resultUntil, nextIsBot ? 5000 : 20000);
-        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 1 }));
-        assert.equal(data.get('game').round, 1, 'answers cannot skip the result');
-        now += duration;
-        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 0 }));
-        assert.equal(data.get('game').round, 1, 'a stale answer cannot affect the new question');
-        await room.webSocketMessage(sockets[1], JSON.stringify({ type: 'answer', option: 0, round: 1 }));
-        assert.equal(data.get('game').round, 2);
-      }
-    }
-  } finally { Date.now = originalNow; }
+test('true false uses October 19 round results while other games retain the current protocol', async () => {
+  for (const gameType of ['true_false', 'millionaire', 'gibha_sah']) {
+    const data = new Map();
+    const messages = [];
+    const sockets = ['host', 'guest'].map(userId => ({ deserializeAttachment: () => ({ userId }), send: value => messages.push(JSON.parse(value)) }));
+    const room = new ChallengeRoom({ storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} }, getWebSockets: () => sockets });
+    data.set('game', { gameType, status: 'playing', round: 0, questionIndex: 0, turn: 'host', hostId: 'host', questions: Array.from({ length: 3 }, (_, i) => ({ question: `Q${i}`, options: ['صح', 'خطأ'], correctAnswer: 0 })), players: [{ id: 'host', character: 'anime', score: 0, answer: null }, { id: 'guest', character: 'student', score: 0, answer: null }] });
+    await room.webSocketMessage(sockets[0], JSON.stringify({ type: 'answer', option: 0 }));
+    assert.equal(data.get('game').round, 1);
+    assert.equal(data.get('game').turn, 'guest');
+    assert.equal(messages.find(message => message.type === 'round_result').resultDurationMs, undefined);
+    assert.equal(data.get('game').players[0].score, 1);
+    if (gameType === 'true_false') assert.equal(data.get('game').resultUntil, undefined);
+    else assert.ok(data.get('game').resultUntil > 0);
+  }
 });
