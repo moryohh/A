@@ -359,7 +359,7 @@ test('gibha sah timeout keeps the card, awards no point, and passes to the next 
   assert.equal(next.status, 'playing');
   assert.deepEqual(next.players.map(player => player.score), [0, 0, 0, 0]);
   assert.equal(next.gibhaBoardOptions.includes('right-0'), true);
-  assert.equal(next.questionDeadline > Date.now(), true);
+  assert.equal(next.questionDeadline >= Date.now() + 27000, true);
   assert.equal(messages.some(message => message.type === 'round_result' && message.timedOut), true);
 });
 
@@ -516,6 +516,7 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   assert.equal(data.get('game').status, 'playing');
   assert.equal(data.get('game').players.length, 4);
   assert.equal(data.get('game').turn, 'host');
+  assert.equal(data.get('game').questionDeadline > Date.now() + 24000, true);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 1 }));
   assert.equal(data.get('game').round, 1);
   assert.equal(data.get('game').gibhaQuestionQueue.at(-1), 0);
@@ -523,8 +524,10 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   assert.equal(wrongResult.answer, undefined);
   assert.equal(data.get('game').players[0].score, 0);
   assert.equal(data.get('game').gibhaBoardSlots.filter(Boolean).length, 6);
+  assert.equal(data.get('game').questionDeadline >= Date.now() + 27000, true);
   const retry = data.get('game');
   retry.turn = 'host';
+  retry.resultUntil = Date.now() - 1;
   data.set('game', retry);
   await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: 1 }));
   assert.equal(data.get('game').round, 2);
@@ -535,6 +538,7 @@ test('gibha sah fills four seats and rotates the turn through all players', asyn
   for (const expectedRound of [3, 4]) {
     const continued = data.get('game');
     continued.turn = 'host';
+    continued.resultUntil = Date.now() - 1;
     data.set('game', continued);
     await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'answer', option: expectedRound - 1 }));
     assert.equal(data.get('game').round, expectedRound);
@@ -593,6 +597,7 @@ test('gibha sah completes all 24 questions even when answers repeat', async () =
     const slot = current.gibhaBoardOptions.indexOf(answer);
     assert.ok(slot >= 0, `answer ${answer} must be on the board`);
     current.turn = 'host';
+    current.resultUntil = Date.now() - 1;
     data.set('game', current);
     await room.webSocketMessage(socket, JSON.stringify({ type: 'answer', option: slot }));
   }

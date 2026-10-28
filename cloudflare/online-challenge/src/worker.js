@@ -262,6 +262,7 @@ export class ChallengeRoom {
     return player.character;
   }
   resultDuration(game, player, correct) {
+    if (game.gameType === 'gibha_sah') return 3000;
     if (game.gameType !== 'true_false') return 0;
     var durations = { anime: [5000, 8000], student: [4000, 4100], student2: [4000, 3350] };
     return (durations[player?.character] || durations.anime)[correct ? 0 : 1] + 1500;
@@ -273,7 +274,7 @@ export class ChallengeRoom {
     var active = game.players.find(function (player) { return player.id === game.turn; });
     if (!active || game.status !== 'playing') return;
     if (this.isBot(active)) game.botAnswerAt = Math.max(Date.now(), game.resultUntil || 0) + this.botAnswerDelay(game);
-    else if (game.gameType === 'true_false' || game.gameType === 'gibha_sah' || game.gameType === 'millionaire') game.questionDeadline = Math.max(Date.now(), game.resultUntil || 0) + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : game.gameType === 'gibha_sah' ? GIBHA_SAH_TURN_MS : 60000);
+    if (game.gameType === 'gibha_sah' || (!this.isBot(active) && (game.gameType === 'true_false' || game.gameType === 'millionaire'))) game.questionDeadline = Math.max(Date.now(), game.resultUntil || 0) + (game.gameType === 'true_false' ? TRUE_FALSE_TURN_MS : game.gameType === 'gibha_sah' ? GIBHA_SAH_TURN_MS : 60000);
   }
   teamPlayers(game, team) { return game.players.filter(function (player) { return player.team === team; }); }
   sendToTeam(game, team, payload) {
@@ -1221,7 +1222,7 @@ export class ChallengeRoom {
         if (game.questionIndex >= game.questions.length) {
           game.status = 'finished';
           delete game.questionDeadline;
-        } else this.beginSoloTurn(game);
+        } else this.beginSoloTurn(game, this.resultDuration(game, timedOutPlayer, false));
         this.broadcast({ type: 'round_result', question: { question: timedOutQuestion.question, options: game.gameType === 'gibha_sah' ? game.gibhaBoardOptions.slice() : timedOutQuestion.options }, selected: -1, correct: false, timedOut: true, scores: game.players.map(function (player) { return { id: player.id, score: player.score }; }), answeredBy: timedOutId, ...(game.gameType === 'true_false' ? { answer: timedOutQuestion.correctAnswer } : {}) });
         this.broadcast(this.view(game));
         if (game.status === 'finished') await this.updateRegistry('ended', game);

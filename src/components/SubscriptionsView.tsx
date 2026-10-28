@@ -384,7 +384,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
               const attendance = room.gameType === 'live_classroom'
                 ? `${Math.max(0, room.players - 1)}/${room.capacity || 8} طالب`
-                : `${room.players}/2 لاعبين`;
+                : `${room.players}/${room.gameType === 'gibha_sah' || room.gameType === 'millionaire_team' ? 4 : 2} لاعبين`;
               return <button key={room.code} type="button" disabled={ended || (!classroomJoinable && (status === 'playing' || status === 'reconnecting'))} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' || classroomJoinable ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{classroomJoinable ? 'متاحة للدخول' : statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{room.gameTitle || room.gameType} · {room.lessonTitle} · {attendance}</span></button>;
             })}
           </div>
