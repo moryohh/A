@@ -1,3 +1,4 @@
+import { ONLINE_WAITING_MUSIC } from './onlineWaitingMusic';
 // Advanced Web Audio API Sound Synthesizer for Educational Games
 // Provides rich, lively sound effects without needing external asset downloads
 
@@ -5,7 +6,7 @@
 
 
 const GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/game-session-theme.mp3`;
-const ONLINE_GAME_SESSION_AUDIO = `${import.meta.env.BASE_URL}audio/online-game-session-loop-38s.m4a`;
+const ONLINE_GAME_SESSION_AUDIO = ONLINE_WAITING_MUSIC;
 const GAME_LOSS_AUDIO = `${import.meta.env.BASE_URL}audio/game-loss.mp3`;
 const TRUE_FALSE_CORRECT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct.mp3`;
 const TRUE_FALSE_CORRECT_ALT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct-alt.mp3`;
