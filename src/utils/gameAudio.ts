@@ -64,7 +64,12 @@ class GameAudioEngine {
         player.preload = 'auto';
         this.externalPlayers.set(key, player);
       }
-      if (loop) volume = Math.min(volume, 0.25);
+      if (loop) {
+        volume = Math.min(volume, 0.08);
+        this.externalPlayers.forEach((other, otherKey) => {
+          if (other !== player && (otherKey === 'game-session-theme' || otherKey === 'online-game-session-theme' || otherKey === 'exam-session-theme' || otherKey === 'millionaire-thinking')) other.pause();
+        });
+      }
       player.loop = loop;
       player.volume = volume;
       player.currentTime = 0;
@@ -112,7 +117,7 @@ class GameAudioEngine {
   public playGameSessionTheme() {
     // The external player loops the compressed game theme while the game is open.
     this.gameSessionThemeRequested = true;
-    this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.25, true);
+    this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.08, true);
   }
 
   public stopGameSessionTheme() {
@@ -121,7 +126,7 @@ class GameAudioEngine {
   }
 
   public playOnlineGameSessionTheme() {
-    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.25, true);
+    this.playExternal('online-game-session-theme', ONLINE_GAME_SESSION_AUDIO, 0.08, true);
   }
 
   public stopOnlineGameSessionTheme() {
@@ -132,12 +137,12 @@ class GameAudioEngine {
   public setOnlineVoiceActive(active: boolean) {
     this.onlineVoiceActive = active;
     const player = this.externalPlayers.get('online-game-session-theme');
-    if (player) player.volume = 0.25;
+    if (player) player.volume = 0.08;
   }
 
   public playExamSessionTheme() {
     // Exams are intentionally reduced by 75%, leaving 25% of normal game volume.
-    this.playExternal('exam-session-theme', GAME_SESSION_AUDIO, 0.25, true);
+    this.playExternal('exam-session-theme', GAME_SESSION_AUDIO, 0.08, true);
   }
 
   public stopExamSessionTheme() {
@@ -165,10 +170,10 @@ class GameAudioEngine {
         if (shouldResumeTheme && this.gameSessionThemeRequested && !this.isMuted) {
           if (themePlayer) {
             themePlayer.loop = true;
-            themePlayer.volume = 0.25;
+            themePlayer.volume = 0.08;
             void themePlayer.play().catch(() => {});
           } else {
-            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.25, true);
+            this.playExternal('game-session-theme', GAME_SESSION_AUDIO, 0.08, true);
           }
         }
       };
