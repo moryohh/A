@@ -45,6 +45,7 @@ import { OnlineChallengeModal } from './components/OnlineChallengeModal';
 import { LiveClassroomModal } from './components/LiveClassroomModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
 import { appSfx } from './utils/appSfx';
+import { useSwipeSfx } from './utils/useSwipeSfx';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { cleanTeacherName } from './utils/cleanTeacherName';
@@ -178,6 +179,7 @@ function saveStoredPosition(pos: LearningPosition) {
 
 function AppContent() {
   const { theme } = useAppTheme();
+  useSwipeSfx();
 
   // Authentication state - Strictly driven by Supabase Auth sessions
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {

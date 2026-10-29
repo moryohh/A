@@ -20,6 +20,7 @@ import { fetchLessonCurriculum } from '../services/curriculumService';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
 import { extractYoutubeId, formatArabicLessonTitle } from '../services/lessonsService';
 import { useAppTheme } from '../services/themeService';
+import { appSfx } from '../utils/appSfx';
 
 interface VideoPlayerCardProps {
   lesson: EducationalLesson;
@@ -393,7 +394,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
           id="board-tab"
           aria-selected={studyView === 'board'}
           aria-controls="study-panel"
-          onClick={() => setStudyView('board')}
+          onClick={() => { appSfx.boardSelect(); setStudyView('board'); }}
           className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'board' ? 'study-switch-active study-switch-board border-cyan-300 bg-gradient-to-br from-cyan-800 to-indigo-950 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.55)]' : 'border-cyan-900/60 bg-gradient-to-br from-slate-900 to-cyan-950/70 text-cyan-400/65'}`}
         >
           <Presentation className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />
@@ -404,7 +405,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
           id="booklet-tab"
           aria-selected={studyView === 'booklet'}
           aria-controls="study-panel"
-          onClick={() => setStudyView('booklet')}
+          onClick={() => { appSfx.bookletSelect(); setStudyView('booklet'); }}
           className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'booklet' ? 'study-switch-active study-switch-booklet border-emerald-300 bg-gradient-to-br from-emerald-800 to-teal-950 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.5)]' : 'border-emerald-900/60 bg-gradient-to-br from-slate-900 to-emerald-950/70 text-emerald-400/65'}`}
         >
           <BookOpen className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />

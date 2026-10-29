@@ -8,6 +8,7 @@ import biome4Img from '../assets/images/biome4_night_realm_1786898703967.webp';
 import biologyChapterCardsImg from '../assets/images/biology-chapter-cards-v1.webp';
 import { SubjectChapter, SubjectChapterLesson } from '../types';
 import { useAppTheme } from '../services/themeService';
+import { appSfx } from '../utils/appSfx';
 import { formatArabicLessonTitle } from '../services/lessonsService';
 import { ChapterExamIcons } from './ChapterExamIcons';
 import { LaboratoryBalloon } from './LaboratoryBalloon';
@@ -186,6 +187,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
   }, [selectedChapterIndex, totalStepsCount]);
 
   const scrollToChapter = (chapter: SubjectChapter, chapterIndex: number) => {
+    appSfx.chapterSelect();
     setInternalChapterIndex(chapterIndex);
     if (onSelectChapterNumber) {
       onSelectChapterNumber(chapter.number);
@@ -301,7 +303,12 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
           {/* Main Chapter Selector Button */}
           <div ref={chapterSelectorRef} className="relative min-w-0 flex-1">
             <button
-              onClick={() => !isLoadingChapters && setIsChapterDropdownOpen(!isChapterDropdownOpen)}
+              onClick={() => {
+                if (isLoadingChapters) return;
+                if (isChapterDropdownOpen) appSfx.panelClose();
+                else appSfx.panelOpen();
+                setIsChapterDropdownOpen(!isChapterDropdownOpen);
+              }}
               disabled={isLoadingChapters}
               className={`group relative flex min-h-[58px] w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border border-cyan-200/50 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 px-3.5 py-2.5 text-white shadow-[0_10px_30px_rgba(37,99,235,.38)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:cursor-wait ${isChapterDropdownOpen ? 'ring-2 ring-cyan-300/60 shadow-[0_14px_38px_rgba(99,102,241,.48)]' : ''}`}
               aria-expanded={isChapterDropdownOpen}
@@ -394,7 +401,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
 
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => { appSfx.navigation(); onBack?.(); }}
             className="flex shrink-0 items-center gap-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 px-3 py-2.5 text-[11px] font-black text-black shadow-[0_0_10px_rgba(251,191,36,0.6)] transition-transform active:scale-95 hover:brightness-110"
             title="العودة إلى الصفحة السابقة"
             aria-label="العودة إلى الصفحة السابقة"
@@ -661,6 +668,8 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                 {/* THE REFINED SEMI-GLOWING TACTILE NODE BUTTON WITH LESSON NUMBER */}
                 <button
                   onClick={() => {
+                    if (isLocked) appSfx.attention();
+                    else appSfx.lessonSelect();
                     if (node.lessonItem) {
                       setPreviewLesson({
                         lesson: node.lessonItem.lesson,

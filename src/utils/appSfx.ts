@@ -9,7 +9,11 @@ type AppSfxName =
   | 'panelClose'
   | 'subjectSelect'
   | 'chapterSelect'
-  | 'lessonSelect';
+  | 'lessonSelect'
+  | 'boardSelect'
+  | 'bookletSelect'
+  | 'swipeUp'
+  | 'swipeDown';
 
 const SOURCES: Record<AppSfxName, string> = {
   navigation: `${import.meta.env.BASE_URL}audio/ui/navigation.mp3`,
@@ -23,6 +27,10 @@ const SOURCES: Record<AppSfxName, string> = {
   subjectSelect: `${import.meta.env.BASE_URL}audio/ui/subject-select.mp3`,
   chapterSelect: `${import.meta.env.BASE_URL}audio/ui/chapter-select.mp3`,
   lessonSelect: `${import.meta.env.BASE_URL}audio/ui/lesson-select.mp3`,
+  boardSelect: `${import.meta.env.BASE_URL}audio/ui/board-select.mp3`,
+  bookletSelect: `${import.meta.env.BASE_URL}audio/ui/booklet-select.mp3`,
+  swipeUp: `${import.meta.env.BASE_URL}audio/ui/swipe-up.mp3`,
+  swipeDown: `${import.meta.env.BASE_URL}audio/ui/swipe-down.mp3`,
 };
 
 const VOLUMES: Record<AppSfxName, number> = {
@@ -37,6 +45,10 @@ const VOLUMES: Record<AppSfxName, number> = {
   subjectSelect: 0.3,
   chapterSelect: 0.3,
   lessonSelect: 0.3,
+  boardSelect: 0.28,
+  bookletSelect: 0.28,
+  swipeUp: 0.2,
+  swipeDown: 0.2,
 };
 
 class AppSfxEngine {
@@ -78,6 +90,10 @@ class AppSfxEngine {
   lessonSelect() { this.play('lessonSelect', 220); }
   gameSelect() { this.play('success', 220); }
   gameSwitch() { this.play('toggle', 140); }
+  boardSelect() { this.play('boardSelect', 180); }
+  bookletSelect() { this.play('bookletSelect', 180); }
+  swipeUp() { this.play('swipeUp', 420); }
+  swipeDown() { this.play('swipeDown', 420); }
 }
 
 export const appSfx = new AppSfxEngine();
