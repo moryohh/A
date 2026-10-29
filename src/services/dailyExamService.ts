@@ -75,13 +75,12 @@ function uniqueExamItems<T extends { q: string }>(pool: T[]): T[] {
 
 function bestLessonFact(prompt: string, facts: string[]) {
   const promptTokens = new Set(prompt.replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, ' ').split(/\s+/).filter((token) => token.length > 2));
-  return [...facts].sort((left, right) => {
-    const score = (value: string) => value.split(/\s+/).filter((rawToken) => {
+  const score = (value: string) => value.split(/\s+/).filter((rawToken) => {
       const token = rawToken.replace(/[^\u0600-\u06FFa-zA-Z0-9]/g, '');
       return [...promptTokens].some((promptToken) => token === promptToken || (token.length >= 4 && promptToken.length >= 4 && (token.includes(promptToken) || promptToken.includes(token))));
     }).length;
-    return score(right) - score(left);
-  })[0] || '';
+  const sorted = [...facts].sort((left, right) => score(right) - score(left));
+  return sorted[0] && score(sorted[0]) > 0 ? sorted[0] : '';
 }
 
 function createUnavailableDailyExam(lessonTitle: string, subject: string): DailyExamConfig {
@@ -288,9 +287,8 @@ export function extractDailyExamFromCurriculum(
     q1Instruction = 'أجب عن السؤال الآتي بدقة واختصار منهجي:';
   }
   q1Branches.forEach((branch) => {
-    if (/الإجابة العلمية المعتمدة|التعريف العلمي المعتمد|التعليل العلمي الدقيق|الكلمات والمصطلحات العلمية/.test(branch.modelAnswer)) {
-      branch.modelAnswer = bestLessonFact(branch.prompt, lessonFacts) || branch.modelAnswer;
-    }
+    const matchedFact = bestLessonFact(branch.prompt, lessonFacts);
+    if (matchedFact) branch.modelAnswer = matchedFact;
   });
 
   // ==========================================
