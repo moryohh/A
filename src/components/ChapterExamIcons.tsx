@@ -63,7 +63,17 @@ function isAnswerKey(key: string) {
 
 function titleFromKey(key: string) {
   const clean = key.replace(/[_-]+/g, ' ').trim();
+  const questionMatch = clean.match(/^question\s*(\d+)$/i);
+  if (questionMatch) return `س${questionMatch[1]}`;
+  const branchMatch = clean.match(/^branch\s*(.*)$/i);
+  if (branchMatch) return `الفرع ${branchMatch[1] || ''}`.trim();
+  const partMatch = clean.match(/^part\s*(.*)$/i);
+  if (partMatch) return `الفرع ${partMatch[1] || ''}`.trim();
   return clean || 'سؤال';
+}
+
+function displayPartTitle(value: string, fallback: string) {
+  return titleFromKey(value || fallback).replace(/^س\d+$/, 'المطلوب');
 }
 
 function questionTitleFromKey(key: string, index: number) {
@@ -85,12 +95,20 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function firstText(obj: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const text = cleanText(obj[key]);
+    if (text) return text;
+  }
+  return '';
+}
+
 function formatQuestionItem(item: unknown, index: number) {
   if (typeof item === 'string') return `${index + 1}. ${item.trim()}`;
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.label) || cleanText(obj.number) || cleanText(obj.id) || `${index + 1}`;
-  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
@@ -99,7 +117,7 @@ function formatQuestionPoint(item: unknown, index: number) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.point_number) || cleanText(obj.label) || cleanText(obj.number) || `${index + 1}`;
-  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
@@ -107,8 +125,8 @@ function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null
   if (!value || typeof value !== 'object' || Array.isArray(value)) return readQuestion(value, fallbackTitle);
   const obj = value as Record<string, unknown>;
   const points = Array.isArray(obj.points) ? obj.points.map(formatQuestionPoint).filter(Boolean) : [];
-  const title = cleanText(obj.branch_label) || cleanText(obj.title) || titleFromKey(fallbackTitle);
-  const heading = cleanText(obj.title);
+  const title = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label', 'title']), fallbackTitle);
+  const heading = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction', 'title']);
   if (points.length > 0) return { title, text: [heading, ...points].filter(Boolean).join('\n\n') };
   return readQuestion(value, fallbackTitle);
 }
@@ -136,7 +154,7 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  const question = obj.question || obj.text || obj.prompt || obj.content || obj.body;
+  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
   const itemValues = Array.isArray(obj.items)
     ? obj.items
     : obj.items && typeof obj.items === 'object'
@@ -144,9 +162,9 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
       : [];
   const items = itemValues.map(formatQuestionItem).filter(Boolean);
   const answer = obj.answer || obj.model_answer;
-  if (typeof question !== 'string' || !question.trim()) return null;
-  const text = [question.trim(), ...items].join('\n\n');
-  const entryTitle = cleanText(obj.question_number) || cleanText(obj.label) || titleFromKey(title);
+  if (!question) return null;
+  const text = [question, ...items].join('\n\n');
+  const entryTitle = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label']), title);
   return { title: entryTitle, text, answer: typeof answer === 'string' ? answer : undefined };
 }
 
@@ -175,6 +193,17 @@ function questionNumber(title: string) {
 }
 
 function groupResettingQuestionSeries(entries: ExamQuestion[]): ExamQuestion[] {
+  const groupedByNumber: ExamQuestion[] = [];
+  entries.forEach((entry) => {
+    const number = questionNumber(entry.title);
+    const previous = groupedByNumber[groupedByNumber.length - 1];
+    if (number !== null && previous && questionNumber(previous.title) === number) {
+      previous.parts.push(...entry.parts);
+    } else {
+      groupedByNumber.push({ title: entry.title, parts: [...entry.parts] });
+    }
+  });
+  if (groupedByNumber.length < entries.length) return groupedByNumber;
   if (entries.length < 4) return entries;
   const numbers = entries.map((entry) => questionNumber(entry.title));
   if (numbers.some((number) => number === null)) return entries;
@@ -219,7 +248,8 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
     const direct = source
       .map((item, index) => {
         const itemObj = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : null;
-        const title = cleanText(itemObj?.question_number) || `س${index + 1}`;
+        const rawTitle = cleanText(itemObj?.question_number);
+        const title = rawTitle ? (/^\d+$/.test(rawTitle) ? `س${rawTitle}` : titleFromKey(rawTitle)) : `س${index + 1}`;
         const parts = readQuestionParts(item, title);
         return parts.length > 0 ? { title, parts } : null;
       })
@@ -501,9 +531,20 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
   );
 
   const completedCount = results.filter((result) => result.status === 'completed').length;
-  if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result: { results } };
-  if (completedCount > 0) return { status: 'partial' as const, endpoint: 'distributed', result: { results }, error: 'تم تصحيح بعض الإجابات فقط.' };
-  return { status: 'failed' as const, endpoint: '', result: { results }, error: 'تعذر تصحيح كل الإجابات عبر مسارات API.' };
+  const percentages = results.flatMap((entryResult) => {
+    if (entryResult.status !== 'completed') return [];
+    const score = findNumericValue(entryResult.result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+    const total = findNumericValue(entryResult.result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
+    if (score === null) return [];
+    return [Math.max(0, Math.min(100, total && total > 0 ? Math.round((score / total) * 100) : Math.round(score)))];
+  });
+  const aggregate = percentages.length > 0
+    ? { score: Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length), totalScore: 100, percentage: Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length) }
+    : {};
+  const result = { results, ...aggregate, correctedCount: completedCount, answeredCount: answeredEntries.length };
+  if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result };
+  if (completedCount > 0) return { status: 'partial' as const, endpoint: 'distributed', result, error: 'تم تصحيح بعض الإجابات فقط.' };
+  return { status: 'failed' as const, endpoint: '', result, error: 'تعذر تصحيح كل الإجابات عبر مسارات API.' };
 }
 
 function findNumericValue(value: unknown, keys: string[]): number | null {
@@ -553,13 +594,25 @@ function notifyChapterExamResult(submission: ChapterSubmission) {
       totalScore: totalScore ?? undefined,
       percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
       summary: textFromCorrectionResult(submission.correction_result) || message,
-      answers: submission.entries.map((entry) => ({
-        label: [entry.question, entry.part].filter(Boolean).join(' — '),
-        prompt: entry.prompt,
-        userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
-        modelAnswer: entry.modelAnswer,
-        status: 'ungraded' as const,
-      })),
+      answers: submission.entries.map((entry) => {
+        const resultList = submission.correction_result && typeof submission.correction_result === 'object'
+          ? (submission.correction_result as { results?: Array<{ question?: string; part?: string; result?: unknown }> }).results
+          : undefined;
+        const matchedResult = resultList?.find((item) => item.question === entry.question && item.part === entry.part)?.result;
+        const entryScore = findNumericValue(matchedResult, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+        const entryTotal = findNumericValue(matchedResult, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']) || 100;
+        const entryPercentage = entryScore === null ? null : Math.round((entryScore / Math.max(1, entryTotal)) * 100);
+        return {
+          label: [entry.question, entry.part].filter(Boolean).join(' — '),
+          prompt: entry.prompt,
+          userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
+          modelAnswer: entry.modelAnswer,
+          score: entryScore ?? undefined,
+          maxScore: entryScore === null ? undefined : entryTotal,
+          status: entryPercentage === null ? 'ungraded' as const : entryPercentage >= 90 ? 'correct' as const : entryPercentage <= 25 ? 'wrong' as const : 'partial' as const,
+          feedback: textFromCorrectionResult(matchedResult) || undefined,
+        };
+      }),
     },
   };
   window.dispatchEvent(new CustomEvent<ChapterExamNotificationDetail>('chapter-exam-result', { detail }));

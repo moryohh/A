@@ -43,6 +43,63 @@ interface DailyExamModalProps {
   }) => void;
 }
 
+const ARABIC_STOP_WORDS = new Set(['من', 'في', 'على', 'الى', 'إلى', 'عن', 'ما', 'هو', 'هي', 'هذا', 'هذه', 'ذلك', 'التي', 'الذي', 'ثم', 'او', 'أو', 'و']);
+
+function answerTokens(value: string) {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !ARABIC_STOP_WORDS.has(token));
+}
+
+function evaluateWrittenQuestion(
+  branches: DailyExamConfig['question1']['branches'],
+  drafts: Record<string, string>,
+): ImageEvaluationResult | null {
+  const answered = branches.filter((branch) => drafts[branch.id]?.trim());
+  if (answered.length === 0) return null;
+
+  let score = 0;
+  let maxScore = 0;
+  const strengths: string[] = [];
+  const recommendations: string[] = [];
+  answered.forEach((branch) => {
+    const expected = new Set(answerTokens(branch.modelAnswer || ''));
+    const actual = new Set(answerTokens(drafts[branch.id] || ''));
+    maxScore += branch.points;
+    const matches = [...expected].filter((token) => actual.has(token)).length;
+    const coverage = expected.size ? matches / expected.size : 0;
+    const branchScore = Math.max(0, Math.min(branch.points, Math.round(coverage * branch.points)));
+    score += branchScore;
+    if (coverage >= 0.7) strengths.push(`إجابة ${branch.label || branch.prompt} تغطي معظم الأفكار المطلوبة.`);
+    else recommendations.push(`راجع ${branch.label || branch.prompt} وأكمل الكلمات والمعاني الأساسية.`);
+  });
+  const percentage = Math.round((score / Math.max(1, maxScore)) * 100);
+  const statusLabel: ImageEvaluationResult['statusLabel'] = percentage >= 90 ? 'ممتاز' : percentage >= 75 ? 'جيد جداً' : percentage >= 60 ? 'مقبول' : 'يحتاج مراجعة';
+  return {
+    success: true,
+    score,
+    maxScore,
+    percentage,
+    statusLabel,
+    feedback: `تم تقييم الإجابة النصية حسب الكلمات والمعاني الأساسية في الإجابة النموذجية (${score} من ${maxScore}).`,
+    identifiedTextOrSteps: answered.map((branch) => drafts[branch.id].trim()),
+    extractedText: answered.map((branch) => drafts[branch.id].trim()).join('\n'),
+    strengths,
+    recommendations,
+    secureFileName: 'written-answer',
+    fileSize: '0 KB',
+    evaluatedAt: new Date().toISOString(),
+    processingEngine: 'local-text-comparison',
+  };
+}
+
 export const DailyExamModal: React.FC<DailyExamModalProps> = ({
   isOpen,
   onClose,
@@ -299,10 +356,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
     setIsTimerRunning(false);
 
     const nextEvaluations: Record<'q1' | 'q2', ImageEvaluationResult | null> = {
-      // Never carry a previous evaluation into a submission where that image
-      // is absent. Text-only or unanswered branches remain ungraded.
-      q1: questionImages.q1 ? evaluatedQuestions.q1 : null,
-      q2: questionImages.q2 ? evaluatedQuestions.q2 : null,
+      q1: questionImages.q1 ? evaluatedQuestions.q1 : evaluateWrittenQuestion(exam.question1.branches, studentDrafts),
+      q2: questionImages.q2 ? evaluatedQuestions.q2 : evaluateWrittenQuestion(exam.question2.branches, studentDrafts),
     };
 
     try {
@@ -337,9 +392,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
         completedAt: finishedAt,
         answers: (['q1', 'q2'] as const).map((questionKey, index) => {
           const evaluation = nextEvaluations[questionKey];
-          const writtenAnswer = Object.entries(studentDrafts)
-            .filter(([key]) => key.toLowerCase().startsWith(questionKey))
-            .map(([, value]) => String(value).trim())
+          const writtenAnswer = (questionKey === 'q1' ? exam.question1.branches : exam.question2.branches)
+            .map((branch) => String(studentDrafts[branch.id] || '').trim())
             .filter(Boolean)
             .join('\n');
           const answerScore = evaluation?.score;
@@ -453,10 +507,10 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
                 <FileCheck2 className="mx-auto mb-3 h-9 w-9 text-[#6c4b88]" />
                 <h2 className="text-lg font-black text-[#302d34]">تأكيد تسليم الامتحان</h2>
                 <p className="mt-2 text-sm leading-7 text-[#6f6963]">
-                  بعد التأكيد ستبدأ معالجة الصور ولن تستطيع إرسال الامتحان مرة أخرى أثناء المعالجة.
+                  بعد التأكيد ستبدأ معالجة الإجابات النصية والصور، ولن تستطيع إرسال الامتحان مرة أخرى أثناء المعالجة.
                 </p>
                 <p className="mt-2 text-xs font-bold text-[#6c4b88]">
-                  الصور المرفوعة: {[questionImages.q1, questionImages.q2].filter(Boolean).length}
+                  صور: {[questionImages.q1, questionImages.q2].filter(Boolean).length} — أسئلة مجابة نصياً: {[exam?.question1.branches, exam?.question2.branches].filter((branches) => branches?.some((branch) => studentDrafts[branch.id]?.trim())).length}
                 </p>
                 <div className="mt-5 grid grid-cols-2 gap-2">
                   <button
@@ -517,8 +571,8 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
           {submitState === 'completed' && exam && (
             <div className="absolute inset-0 z-50 flex min-h-0 flex-col bg-[#302f3f] text-right text-white">
               {(() => {
-                const q1Evaluation = questionImages.q1 ? evaluatedQuestions.q1 : null;
-                const q2Evaluation = questionImages.q2 ? evaluatedQuestions.q2 : null;
+                const q1Evaluation = evaluatedQuestions.q1;
+                const q2Evaluation = evaluatedQuestions.q2;
                 const finalScore = getResultsTotal({ q1: q1Evaluation, q2: q2Evaluation });
                 const finalTotal = Number(exam.totalPoints) || 1;
                 const finalPercentage = Math.round((finalScore / finalTotal) * 100);
@@ -660,6 +714,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
                         <p className="text-right text-xl font-black leading-9 text-[#2f2d31]">
                           س1: {exam.question1.title}
                         </p>
+                        {exam.question1.instruction && <p className="mt-2 text-right text-sm font-bold leading-7 text-[#6c4b88]">{exam.question1.instruction}</p>}
                         <p className="mt-2 text-right text-base font-bold text-[#514b47]">الإجابة:</p>
                         <div className="mt-3 space-y-1">
                           {exam.question1.branches.slice(0, 2).map((branch, index) => (
@@ -721,6 +776,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
                         <p className="text-right text-xl font-black leading-9 text-[#2f2d31]">
                           س2: {exam.question2.title}
                         </p>
+                        {exam.question2.instruction && <p className="mt-2 text-right text-sm font-bold leading-7 text-[#6c4b88]">{exam.question2.instruction}</p>}
                         <p className="mt-2 text-right text-base font-bold text-[#514b47]">الإجابة:</p>
                         {exam.question2.branches.slice(0, 1).map((branch) => (
                           <div key={branch.id} className="mt-3">
