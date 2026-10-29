@@ -124,6 +124,20 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
     peerRef.current = peer;
     localStreamRef.current?.getTracks().forEach(track => peer.addTrack(track, localStreamRef.current as MediaStream));
     peer.onicecandidate = event => { if (event.candidate) sendSocket({ type: 'audio_signal', signal: { candidate: event.candidate.toJSON() } }); };
+    peer.oniceconnectionstatechange = () => {
+      if (peer.iceConnectionState === 'failed') {
+        peer.restartIce();
+        void (async () => {
+          try {
+            const offer = await peer.createOffer({ iceRestart: true });
+            await peer.setLocalDescription(offer);
+            sendSocket({ type: 'audio_signal', signal: { description: peer.localDescription } });
+          } catch (_) {
+            setError('تعذر استعادة الاتصال الصوتي. أوقف الميكروفون ثم شغّله مرة أخرى.');
+          }
+        })();
+      }
+    };
     peer.ontrack = event => {
       if (remoteAudioRef.current && event.streams[0]) {
         remoteAudioRef.current.srcObject = event.streams[0];
@@ -508,7 +522,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
 
   useEffect(() => {
     const deadlineSeconds = state?.questionDeadline ? Math.max(0, Math.ceil((state.questionDeadline - Date.now()) / 1000)) : null;
-    setTurnSeconds(isMillionaireTeam ? (deadlineSeconds ?? 60) : isTrueFalse ? (deadlineSeconds ?? 20) : isGibhaSah ? (deadlineSeconds ?? 25) : 25);
+    setTurnSeconds(isMillionaireTeam ? (deadlineSeconds ?? 60) : isTrueFalse ? Math.min(20, deadlineSeconds ?? 20) : isGibhaSah ? (deadlineSeconds ?? 25) : 25);
     if (!connected || state?.status !== 'playing' || roundResult) return;
     const timer = window.setInterval(() => setTurnSeconds(value => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
@@ -565,7 +579,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
     <div className="flex gap-1.5"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2.5 text-cyan-300"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2.5 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2.5 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>
   </div>;
 
-  const trueFalseControls = <div className="flex items-center gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button></div>;
+  const trueFalseControls = <div className="flex items-center gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} aria-label="المحادثة" className="relative rounded-full border border-cyan-400/50 bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-5 w-5" />{unreadChat > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black">{unreadChat}</span>}</button><button type="button" aria-label={audioEnabled ? 'إغلاق الميكروفون' : 'فتح الميكروفون'} disabled={audioBusy || !opponent || opponent.bot} onClick={() => void toggleMicrophone()} className={`rounded-full border p-2 ${audioEnabled ? 'border-emerald-300 bg-emerald-500' : 'border-white/20 bg-white/5'} disabled:opacity-40`}>{audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button><button type="button" aria-label={remoteAudioEnabled ? 'كتم صوت المنافس' : 'تشغيل صوت المنافس'} disabled={!opponent || opponent.bot} onClick={toggleRemoteAudio} className="rounded-full border border-white/20 bg-white/5 p-2 disabled:opacity-40">{remoteAudioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button type="button" aria-label={musicMuted ? 'تشغيل الموسيقى' : 'كتم الموسيقى'} onClick={toggleMusic} className="rounded-full border border-white/20 bg-white/5 p-2">{musicMuted ? <Music className="h-5 w-5 text-rose-300" /> : <Music2 className="h-5 w-5 text-amber-200" />}</button></div>;
 
   const waitingOrReconnect = <>{state?.status === 'waiting' && <div className="rounded-2xl border border-cyan-400/30 bg-white/5 p-5 text-center"><p>{isGibhaSah ? 'بانتظار اكتمال أربعة لاعبين…' : 'بانتظار اللاعب الثاني…'}</p><p className="mt-3">رمز الغرفة: <b className="select-all text-xl text-amber-300">{room}</b></p><button onClick={() => void navigator.clipboard.writeText(room)} className="mt-3 rounded-xl bg-sky-700 px-4 py-2">نسخ الرمز</button></div>}{!connected && state?.status !== 'finished' && <button disabled={busy} onClick={reconnect} className="w-full rounded-xl bg-amber-600 p-3 font-bold">إعادة الاتصال بالغرفة</button>}{state?.reconnectDeadline && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-sm text-amber-200">انقطع اتصال المنافس؛ ننتظر عودته ثم تستمر المباراة.</p>}</>;
 

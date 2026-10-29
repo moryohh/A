@@ -373,7 +373,7 @@ test('true false assigns different random characters to two players', () => {
   assert.notEqual(game.players[0].character, game.players[1].character);
 });
 
-test('matchmaking keeps current millionaire timing and restores October 19 true-false timing', async () => {
+test('matchmaking adds a bot within ten seconds for millionaire and true-false', async () => {
   for (const gameType of ['millionaire', 'true_false']) {
   const data = new Map();
   let alarmAt = null;
@@ -394,8 +394,8 @@ test('matchmaking keeps current millionaire timing and restores October 19 true-
     method: 'POST', body: JSON.stringify({ hostId: 'host', gameType, roomCode: '4321', questions }),
   }));
   if (gameType === 'true_false') {
-    assert.ok(alarmAt >= startedAt + 180000);
-    assert.ok(alarmAt <= Date.now() + 300000);
+    assert.ok(alarmAt >= startedAt + 5000);
+    assert.ok(alarmAt <= Date.now() + 10000);
     const waiting = data.get('game');
     waiting.botJoinAt = Date.now() - 1;
     data.set('game', waiting);
