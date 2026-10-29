@@ -400,7 +400,7 @@ function textFromCorrectionResult(value: unknown): string {
 function inferScoreFromCorrectionText(text: string): number | null {
   const normalized = text.trim();
   if (!normalized) return null;
-  if (/غير صحيحة|غير صحيح|لا تحتوي|لم يتم تقديم|لا توجد إجابة|ليست إجابة|خاطئة/i.test(normalized)) return 0;
+  if (/غير صحيحة|غير صحيح|لا تحتوي|لم يتم تقديم|لا توجد إجابة|ليست إجابة|خاطئة|مختلف(?:ة|ين)|لا ترتبط|لا يتعلق|غير متعلق|لا علاقة/i.test(normalized)) return 0;
   if (/جزئي|جزئياً|جزئيا|ناقص/i.test(normalized)) return 50;
   if (/صحيحة|صحيح|دقيقة|ممتاز/i.test(normalized)) return 100;
   return null;
@@ -539,7 +539,7 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
     return [Math.max(0, Math.min(100, total && total > 0 ? Math.round((score / total) * 100) : Math.round(score)))];
   });
   const aggregate = percentages.length > 0
-    ? { score: Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length), totalScore: 100, percentage: Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length) }
+    ? { score: Math.round(percentages.reduce((sum, value) => sum + value, 0) / Math.max(1, submission.entries.length)), totalScore: 100, percentage: Math.round(percentages.reduce((sum, value) => sum + value, 0) / Math.max(1, submission.entries.length)) }
     : {};
   const result = { results, ...aggregate, correctedCount: completedCount, answeredCount: answeredEntries.length };
   if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result };
