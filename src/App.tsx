@@ -44,6 +44,7 @@ import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { OnlineChallengeModal } from './components/OnlineChallengeModal';
 import { LiveClassroomModal } from './components/LiveClassroomModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
+import { appSfx } from './utils/appSfx';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { cleanTeacherName } from './utils/cleanTeacherName';
@@ -360,6 +361,10 @@ function AppContent() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isTeacherInfoOpen, setIsTeacherInfoOpen] = useState(false);
   const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const openGames = () => {
+    appSfx.panelOpen();
+    setIsGamesOpen(true);
+  };
   const [isChallengeHubOpen, setIsChallengeHubOpen] = useState(false);
   const [challengeRoomCode, setChallengeRoomCode] = useState<string | undefined>();
   const [challengeConfig, setChallengeConfig] = useState<any | null>(null);
@@ -1314,7 +1319,7 @@ function AppContent() {
             setIsNotificationsOpen(true);
           }}
           onOpenProfile={() => setActiveTab('profile')}
-          onOpenGames={() => setIsGamesOpen(true)}
+          onOpenGames={openGames}
           onOpenMessenger={isGuestPreview ? undefined : () => openMessenger()}
           unreadMessagesCount={unreadMessageCount}
         />
@@ -1328,7 +1333,7 @@ function AppContent() {
               onSelectLesson={(selectedLesson) => {
                 handleSelectLessonWithContext(selectedLesson);
               }}
-              onOpenGames={() => setIsGamesOpen(true)}
+              onOpenGames={openGames}
             />
           )}
 
@@ -1345,7 +1350,7 @@ function AppContent() {
               onBack={() => {
                 setHomeSubView('main_home');
               }}
-              onOpenGames={() => setIsGamesOpen(true)}
+              onOpenGames={openGames}
               onScoreUpdate={handleScoreUpdate}
             />
           )}
@@ -1359,7 +1364,7 @@ function AppContent() {
                 currentPlayingYoutubeId={lesson.youtubeId}
                 currentPlayingTeacher={lesson.teacherName}
                 onSelectStory={handleSelectStory}
-                onOpenQuiz={() => setIsGamesOpen(true)}
+                onOpenQuiz={openGames}
               />
 
               {/* Main Educational Video & Content Card */}
@@ -1370,7 +1375,7 @@ function AppContent() {
                   onOpenTeacherInfo={() => setIsTeacherInfoOpen(true)}
                   isPaused={isGamesOpen || isAttachmentOpen || isTeacherInfoOpen || isNotificationsOpen}
                   onBackToMap={() => setHomeSubView('learning_path')}
-                  onOpenGames={() => setIsGamesOpen(true)}
+                  onOpenGames={openGames}
                 />
               </div>
             </div>

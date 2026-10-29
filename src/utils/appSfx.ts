@@ -1,4 +1,15 @@
-type AppSfxName = 'navigation' | 'tap' | 'toggle' | 'notification' | 'success' | 'attention';
+type AppSfxName =
+  | 'navigation'
+  | 'tap'
+  | 'toggle'
+  | 'notification'
+  | 'success'
+  | 'attention'
+  | 'panelOpen'
+  | 'panelClose'
+  | 'subjectSelect'
+  | 'chapterSelect'
+  | 'lessonSelect';
 
 const SOURCES: Record<AppSfxName, string> = {
   navigation: `${import.meta.env.BASE_URL}audio/ui/navigation.mp3`,
@@ -7,6 +18,11 @@ const SOURCES: Record<AppSfxName, string> = {
   notification: `${import.meta.env.BASE_URL}audio/ui/notification.mp3`,
   success: `${import.meta.env.BASE_URL}audio/ui/success.mp3`,
   attention: `${import.meta.env.BASE_URL}audio/ui/attention.mp3`,
+  panelOpen: `${import.meta.env.BASE_URL}audio/ui/panel-open.mp3`,
+  panelClose: `${import.meta.env.BASE_URL}audio/ui/panel-close.mp3`,
+  subjectSelect: `${import.meta.env.BASE_URL}audio/ui/subject-select.mp3`,
+  chapterSelect: `${import.meta.env.BASE_URL}audio/ui/chapter-select.mp3`,
+  lessonSelect: `${import.meta.env.BASE_URL}audio/ui/lesson-select.mp3`,
 };
 
 const VOLUMES: Record<AppSfxName, number> = {
@@ -16,6 +32,11 @@ const VOLUMES: Record<AppSfxName, number> = {
   notification: 0.3,
   success: 0.34,
   attention: 0.28,
+  panelOpen: 0.3,
+  panelClose: 0.28,
+  subjectSelect: 0.3,
+  chapterSelect: 0.3,
+  lessonSelect: 0.3,
 };
 
 class AppSfxEngine {
@@ -50,6 +71,13 @@ class AppSfxEngine {
   notification() { this.play('notification', 350); }
   success() { this.play('success', 350); }
   attention() { this.play('attention', 350); }
+  panelOpen() { this.play('panelOpen', 220); }
+  panelClose() { this.play('panelClose', 220); }
+  subjectSelect() { this.play('subjectSelect', 180); }
+  chapterSelect() { this.play('chapterSelect', 180); }
+  lessonSelect() { this.play('lessonSelect', 220); }
+  gameSelect() { this.play('success', 220); }
+  gameSwitch() { this.play('toggle', 140); }
 }
 
 export const appSfx = new AppSfxEngine();

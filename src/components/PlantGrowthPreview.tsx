@@ -1,6 +1,7 @@
 import React, { useId, useMemo, useState } from 'react';
 import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
+import { appSfx } from '../utils/appSfx';
 import { PlantStageVideo } from './PlantStageVideo';
 
 const growthStages = [
@@ -311,7 +312,7 @@ export const PlantGrowthPreview: React.FC = () => {
     <>
       <button
         type="button"
-        onClick={() => { gameAudio.playClick(); setIsOpen(true); }}
+        onClick={() => { appSfx.panelOpen(); setIsOpen(true); }}
         className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
         aria-label="فتح مختبر النمو والدروع"
         title="مختبر النمو والدروع"
@@ -329,7 +330,7 @@ export const PlantGrowthPreview: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => { appSfx.panelClose(); setIsOpen(false); }}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm transition-colors active:bg-slate-100"
                 aria-label="إغلاق المعاينة"
               >

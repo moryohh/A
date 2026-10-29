@@ -35,14 +35,14 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
   }, []);
 
   return (
-    <div className="min-h-full px-3 py-3 pb-24 text-right animate-in fade-in duration-300 select-none" onClickCapture={() => appSfx.tap()}>
+    <div className="min-h-full px-3 py-3 pb-24 text-right animate-in fade-in duration-300 select-none">
       {/* 2-Column Grid of 8 Subjects matching the image exactly */}
       <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
         {GRADE_6_SUBJECTS.map((subject) => {
           return (
             <button
               key={subject.id}
-              onClick={() => onSelectSubject(subject)}
+              onClick={() => { appSfx.subjectSelect(); onSelectSubject(subject); }}
               className="relative flex min-h-[168px] cursor-pointer flex-col items-center justify-between rounded-2xl border p-3.5 pb-3 pt-4 text-center shadow-lg backdrop-blur-xl transition-all duration-200 active:scale-[0.96] hover:scale-[1.02] sm:min-h-[185px] group"
               style={{
                 background: `linear-gradient(155deg, color-mix(in srgb, ${theme.colors.bgCard} 92%, ${subject.color}), color-mix(in srgb, ${theme.colors.bgCardSubtle} 96%, ${subject.color}))`,

@@ -2,7 +2,7 @@ import React from 'react';
 import { Home, Layers, Users } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { FALLBACK_DEFAULT_AVATAR } from '../data/cartoonAvatars';
-import { appSfx } from '../utils/appSfx';
+import { gameAudio } from '../utils/gameAudio';
 
 export type NavTab = 'home' | 'subscriptions' | 'community' | 'settings' | 'profile';
 
@@ -42,7 +42,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           return (
             <button
               key={tab.id}
-              onClick={() => { appSfx.navigation(); onSelectTab(tab.id); }}
+              onClick={() => { gameAudio.playPrimaryNavigation(); onSelectTab(tab.id); }}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all active:scale-90 cursor-pointer ${
                 isActive ? 'font-bold opacity-100' : `${theme.classes.textMuted} opacity-60 hover:opacity-100`
               }`}

@@ -3,6 +3,7 @@ import { EducationalLesson, SubjectChapter, SubjectChapterLesson, OpenLessonCont
 import { getSubjectIndex, getSubjectChapters, getChapterLessons, getLessonDetails, formatArabicLessonTitle, buildLessonKey } from '../services/lessonsService';
 import { MapRewardsModal } from './MapRewardsModal';
 import { gameAudio } from '../utils/gameAudio';
+import { appSfx } from '../utils/appSfx';
 import { MapLeaderboardModal } from './MapLeaderboardModal';
 import { AdventureWorldMap } from './AdventureWorldMap';
 import { ScienceLaboratoryModal } from './ScienceLaboratoryModal';
@@ -268,6 +269,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
 
   // Lazy load specific lesson JSON when clicked by user
   const handleSelectLessonWithLazyLoad = async (lessonItem: SubjectChapterLesson) => {
+    appSfx.lessonSelect();
     try {
       const parentChapter =
         chapters.find((ch) => ch.lessons.some((l) => l.id === lessonItem.id)) ||
@@ -424,7 +426,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
                 <div className="rounded-2xl bg-[#091124]/95 border border-sky-500/30 overflow-hidden shadow-xl">
                   {/* Chapter Header */}
                   <div
-                    onClick={() => { gameAudio.playPrimaryNavigation(); toggleChapter(chapter.id); }}
+                    onClick={() => { appSfx.chapterSelect(); toggleChapter(chapter.id); }}
                     className="p-3.5 sm:p-4 bg-gradient-to-r from-[#0e1b3d] to-[#0a142c] flex items-center justify-between gap-3 cursor-pointer border-b border-white/5 select-none hover:bg-[#12224d] transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
