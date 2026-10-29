@@ -7,7 +7,7 @@ import { ONLINE_WAITING_MUSIC } from './onlineWaitingMusic';
 
 const GAME_SESSION_AUDIO = ONLINE_WAITING_MUSIC;
 const GAME_LOSS_AUDIO = `${import.meta.env.BASE_URL}audio/game-loss.mp3`;
-const TRUE_FALSE_CORRECT_ALT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct-alt.mp3`;
+const TRUE_FALSE_CORRECT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct.mp3`;
 const TRUE_FALSE_CORRECT_APPLAUSE_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-correct-applause.mp3`;
 const TRUE_FALSE_WRONG_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-wrong.mp3`;
 const TRUE_FALSE_WRONG_ALT_AUDIO = `${import.meta.env.BASE_URL}audio/true-false-wrong-alt.mp3`;
@@ -452,7 +452,7 @@ class GameAudioEngine {
   // Bright answer confirmation for the True/False challenge.
   public playTrueFalseCorrect() {
     const sounds = [
-      { key: 'true-false-correct-alt', url: TRUE_FALSE_CORRECT_ALT_AUDIO },
+      { key: 'true-false-correct', url: TRUE_FALSE_CORRECT_AUDIO },
       { key: 'true-false-correct-applause', url: TRUE_FALSE_CORRECT_APPLAUSE_AUDIO },
     ];
     const sound = sounds[Math.floor(Math.random() * sounds.length)];
