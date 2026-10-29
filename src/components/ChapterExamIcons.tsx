@@ -532,7 +532,7 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
 
   const completedCount = results.filter((result) => result.status === 'completed').length;
   const percentages = results.flatMap((entryResult) => {
-    if (entryResult.status !== 'completed') return [];
+    if (entryResult.status !== 'completed' || !('result' in entryResult)) return [];
     const score = findNumericValue(entryResult.result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
     const total = findNumericValue(entryResult.result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
     if (score === null) return [];
