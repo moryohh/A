@@ -459,7 +459,7 @@ class GameAudioEngine {
     this.playExternal(
       sound.key,
       sound.url,
-      0.9,
+      0.45,
       false,
     );
   }
@@ -471,7 +471,7 @@ class GameAudioEngine {
       { key: 'true-false-wrong-alt', url: TRUE_FALSE_WRONG_ALT_AUDIO },
     ];
     const sound = sounds[Math.floor(Math.random() * sounds.length)];
-    this.playExternal(sound.key, sound.url, 0.9, false);
+    this.playExternal(sound.key, sound.url, 0.45, false);
   }
 
   // Short sparkle for a growing True/False streak.
