@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, ArrowRight, Send } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
+import { appSfx } from '../utils/appSfx';
 
 interface HeaderProps {
   title?: string;
@@ -33,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-2 z-10">
         {showBackButton && onBack ? (
           <button
-            onClick={onBack}
+            onClick={() => { appSfx.navigation(); onBack(); }}
             className={`px-3 py-1.5 rounded-xl ${theme.classes.cardBg} border ${theme.classes.cardBorder} flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 shadow-lg cursor-pointer`}
             aria-label="رجوع للرئيسية"
             title="الرجوع للصفحة الرئيسية"
@@ -77,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-2.5 z-10">
         {/* Private Messenger shortcut */}
         {onOpenMessenger && <button
-          onClick={onOpenMessenger}
+          onClick={() => { appSfx.notification(); onOpenMessenger(); }}
           disabled={!onOpenMessenger}
           className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-sky-400/60 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-[0_4px_14px_rgba(14,165,233,0.35)] transition-all hover:from-sky-300 hover:to-blue-500 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
           aria-label="Messenger"
@@ -93,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Notification Bell with Badge */}
         {onOpenNotifications && <button
-          onClick={onOpenNotifications}
+          onClick={() => { appSfx.notification(); onOpenNotifications(); }}
           className={`relative w-9 h-9 rounded-full ${theme.classes.cardBg} border ${theme.classes.cardBorder} flex items-center justify-center transition-all active:scale-95 ${theme.classes.textMuted} hover:${theme.classes.textMain} cursor-pointer`}
           aria-label="الإشعارات"
           title="الإشعارات"

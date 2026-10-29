@@ -2,6 +2,7 @@ import React from 'react';
 import { AppNotification } from '../types';
 import { X, Bell, CheckCheck, Sparkles, FileText, Users, MessageSquare } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
+import { appSfx } from '../utils/appSfx';
 
 interface NotificationsModalProps {
   notifications: AppNotification[];
@@ -33,7 +34,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
             <h3 className={`text-base font-bold ${theme.classes.textMain}`}>الإشعارات والتحديثات</h3>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { appSfx.tap(); onClose(); }}
             className={`p-1.5 rounded-full ${theme.classes.cardSubtleBg} ${theme.classes.textMuted} hover:${theme.classes.textMain} border ${theme.classes.cardBorder} cursor-pointer`}
           >
             <X className="w-5 h-5" />
@@ -46,7 +47,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
             لديك {notifications.filter((n) => !n.isRead).length} إشعار جديد
           </span>
           <button
-            onClick={onMarkAllAsRead}
+            onClick={() => { appSfx.success(); onMarkAllAsRead(); }}
             className="font-semibold hover:underline flex items-center gap-1 cursor-pointer"
             style={{ color: theme.colors.primary }}
           >
@@ -61,7 +62,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
             <button
               type="button"
               key={item.id}
-              onClick={() => onOpenNotification(item)}
+              onClick={() => { appSfx.navigation(); onOpenNotification(item); }}
               className={`w-full p-3 rounded-2xl border text-right transition-all cursor-pointer active:scale-[0.99]`}
               style={{
                 backgroundColor: !item.isRead
@@ -116,7 +117,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
         {/* Close Button Footer */}
         <button
-          onClick={onClose}
+          onClick={() => { appSfx.tap(); onClose(); }}
           className="w-full py-2.5 mt-2 rounded-xl text-white font-bold text-xs shadow-lg transition-all active:scale-95 cursor-pointer"
           style={{
             backgroundColor: theme.colors.primary,
