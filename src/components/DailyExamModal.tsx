@@ -73,7 +73,7 @@ function evaluateWrittenQuestion(
     const expected = new Set(answerTokens(branch.modelAnswer || ''));
     const actual = new Set(answerTokens(drafts[branch.id] || ''));
     maxScore += branch.points;
-    const matches = [...expected].filter((token) => actual.has(token)).length;
+    const matches = [...expected].filter((token) => [...actual].some((actualToken) => actualToken === token || (actualToken.length >= 4 && token.length >= 4 && actualToken.slice(0, 4) === token.slice(0, 4)))).length;
     const coverage = expected.size ? matches / expected.size : 0;
     const branchScore = Math.max(0, Math.min(branch.points, Math.round(coverage * branch.points)));
     score += branchScore;

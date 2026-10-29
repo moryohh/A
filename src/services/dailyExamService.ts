@@ -76,7 +76,10 @@ function uniqueExamItems<T extends { q: string }>(pool: T[]): T[] {
 function bestLessonFact(prompt: string, facts: string[]) {
   const promptTokens = new Set(prompt.replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, ' ').split(/\s+/).filter((token) => token.length > 2));
   return [...facts].sort((left, right) => {
-    const score = (value: string) => value.split(/\s+/).filter((token) => promptTokens.has(token.replace(/[^\u0600-\u06FFa-zA-Z0-9]/g, ''))).length;
+    const score = (value: string) => value.split(/\s+/).filter((rawToken) => {
+      const token = rawToken.replace(/[^\u0600-\u06FFa-zA-Z0-9]/g, '');
+      return [...promptTokens].some((promptToken) => token === promptToken || (token.length >= 4 && promptToken.length >= 4 && (token.includes(promptToken) || promptToken.includes(token))));
+    }).length;
     return score(right) - score(left);
   })[0] || '';
 }
@@ -334,7 +337,7 @@ export function extractDailyExamFromCurriculum(
         id: 'q2-b1',
         label: 'أ',
         prompt: `اشرح أهم الأحكام والأفكار الواردة في درس (${lessonTitle}) مع ذكر التفاصيل والأمثلة المتاحة.`,
-        modelAnswer: lessonFacts.join('\n') || `شرح الأفكار والأحكام الأساسية الواردة في درس ${lessonTitle} وفق نص المنهج.`,
+        modelAnswer: lessonFacts.slice(0, 3).join('\n') || `شرح الأفكار والأحكام الأساسية الواردة في درس ${lessonTitle} وفق نص المنهج.`,
         points: 10,
       });
     }
