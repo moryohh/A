@@ -43,6 +43,79 @@ a,
   touch-action: manipulation;
 }
 
+/* Shared interface motion: scroll reveals, tactile choices and button ripples.
+   It uses transform/opacity only so long lesson pages remain smooth on phones. */
+@keyframes ui-reveal-in {
+  from { opacity: 0; transform: translate3d(0, 22px, 0) scale(.975); filter: blur(2px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+
+@keyframes ui-ripple-out {
+  from { opacity: .32; transform: scale(.08); }
+  to { opacity: 0; transform: scale(1); }
+}
+
+@keyframes ui-confirm-pop {
+  0% { transform: scale(1); }
+  42% { transform: scale(.955); filter: brightness(1.16); }
+  76% { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ui-stage-in {
+  from { opacity: 0; transform: translate3d(-18px, 10px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes ui-choice-glow {
+  0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, .55); }
+  55% { box-shadow: 0 0 0 8px rgba(34, 211, 238, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+
+.ui-motion-reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0) scale(.975);
+}
+
+.ui-motion-reveal.ui-motion-visible {
+  animation: ui-reveal-in 560ms var(--ui-motion-delay, 0ms) cubic-bezier(.2,.82,.2,1) both;
+}
+
+.ui-motion-pressable {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ui-motion-ripple {
+  position: absolute;
+  z-index: 20;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,.82) 0%, rgba(103,232,249,.38) 42%, transparent 72%);
+  transform: scale(.08);
+  animation: ui-ripple-out 520ms cubic-bezier(.16,.75,.24,1) forwards;
+}
+
+.ui-motion-confirm { animation: ui-confirm-pop 410ms cubic-bezier(.2,.85,.25,1); }
+.ui-stage-enter { animation: ui-stage-in 440ms cubic-bezier(.18,.82,.2,1) both; }
+.ui-choice-selected { animation: ui-choice-glow 820ms ease-out both; }
+
+button > svg,
+a[href] > svg,
+[role='button'] > svg {
+  transition: transform 260ms cubic-bezier(.2,.8,.2,1), filter 260ms ease;
+}
+
+button:hover > svg,
+button:focus-visible > svg,
+a[href]:hover > svg,
+[role='button']:hover > svg {
+  transform: translateY(-1px) scale(1.08);
+  filter: drop-shadow(0 3px 5px rgba(34,211,238,.28));
+}
+
 .no-scrollbar,
 .custom-scrollbar {
   -webkit-overflow-scrolling: touch;
@@ -58,6 +131,19 @@ a,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .ui-motion-reveal,
+  .ui-motion-reveal.ui-motion-visible {
+    opacity: 1;
+    transform: none;
+    animation: none;
+    filter: none;
+  }
+
+  .ui-motion-ripple,
+  .ui-motion-confirm,
+  .ui-stage-enter,
+  .ui-choice-selected { animation: none; }
 }
 
 /* Lightweight game motion: transform/opacity only, with no layout animation. */

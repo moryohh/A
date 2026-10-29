@@ -349,7 +349,7 @@ export const AdventureWorldMap: React.FC<AdventureWorldMapProps> = ({
                       <button
                         key={chapter.id || `ch-${idx}`}
                         onClick={() => scrollToChapter(chapter, idx)}
-                        className={`group/chapter relative flex min-h-[86px] w-full cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-[22px] border p-3.5 text-right transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] ${
+                        className={`group/chapter relative flex min-h-[86px] w-full cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-[22px] border p-3.5 text-right transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] ${isSelected ? 'ui-choice-selected ' : ''}${
                           isSelected
                             ? 'border-cyan-100/80 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 text-white shadow-[0_12px_30px_rgba(37,99,235,.48)] ring-2 ring-cyan-300/35'
                             : idx % 3 === 0

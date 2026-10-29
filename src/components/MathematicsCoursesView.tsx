@@ -66,6 +66,8 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
   const duration = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const stageTitle = lecture ? 'مشاهدة المحاضرة' : topic ? topic.title : chapter ? MATH_CHAPTER_TITLES[chapter] : teacherId ? teacherName : 'اختر مدرس الرياضيات';
 
+  const stageKey = lecture ? `lecture-${lecture.id}` : topic ? `topic-${topic.topicId}` : chapter !== null ? `chapter-${chapter}` : teacherId ? `teacher-${teacherId}` : 'teachers';
+
   return <section dir="rtl" className="relative p-3 space-y-4 pb-8">
     <div className="flex items-center gap-3">
       <button type="button" onClick={goBack} aria-label="رجوع" className={`rounded-xl border p-2 ${theme.classes.cardBorder}`}><ArrowRight size={22} /></button>
@@ -80,7 +82,7 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
 
     {(loading || loadingLectures) && <div role="status" className="flex justify-center items-center gap-2 py-12"><Loader2 className="animate-spin" size={24} />جارٍ تحميل {loadingLectures ? 'المحاضرات' : 'المدرسين'}…</div>}
     {error && <div role="alert" className={`${theme.classes.cardBg} rounded-2xl border p-5 text-center space-y-3`}><p>{error}</p><button onClick={() => setRetry((value) => value + 1)} className="inline-flex gap-2 items-center"><RefreshCw size={16} />إعادة المحاولة</button></div>}
-    {!loading && !loadingLectures && !error && <>
+    {!loading && !loadingLectures && !error && <div key={stageKey} className="ui-stage-enter space-y-3">
       {!teacherId && <div className="space-y-3">{teachers.map(([id, name]) => {
         const items = topics.filter((item) => item.teacherId === id);
         return <button key={id} onClick={() => { appSfx.subjectSelect(); setTeacherId(id); }} className={cardClass}>
@@ -117,6 +119,6 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
         </button>)}
         {lectures.length === 0 && <p className="text-center py-8">لا توجد محاضرات متاحة لهذا الموضوع.</p>}
       </div>}
-    </>}
+    </div>}
   </section>;
 }
