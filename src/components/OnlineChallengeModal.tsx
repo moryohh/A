@@ -709,7 +709,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     </div>{chatPanel}
   </div>;
 
-  if (room && state && isMillionaire) return <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/95 p-2 text-white sm:p-5" dir="rtl">
+  if (room && state && isMillionaire) return <div data-motion="off" className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/95 p-2 text-white sm:p-5" dir="rtl">
     <ClappingCelebration show={didIWin} label={isMillionaireTeam ? 'مبروك — فاز فريقكم!' : 'مبروك — فزت بالتحدي!'} />
     <div className="mx-auto min-h-full w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-[#2049a4] bg-[radial-gradient(circle_at_center,#0b1b51,#03091e_72%)] shadow-[0_0_40px_rgba(32,73,164,.6)]">
       <header className="flex items-center justify-between border-b border-blue-500/30 bg-[#03091e] p-4">

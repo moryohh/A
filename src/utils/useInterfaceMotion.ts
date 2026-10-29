@@ -55,14 +55,16 @@ export function useInterfaceMotion() {
 
       const rect = target.getBoundingClientRect();
       const diameter = Math.max(rect.width, rect.height) * 1.7;
-      const ripple = document.createElement('span');
-      ripple.className = 'ui-motion-ripple';
-      ripple.style.width = ripple.style.height = `${diameter}px`;
-      ripple.style.left = `${event.clientX - rect.left - diameter / 2}px`;
-      ripple.style.top = `${event.clientY - rect.top - diameter / 2}px`;
       target.classList.add('ui-motion-pressable');
-      target.appendChild(ripple);
-      ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+      [0, 1, 2].forEach((ringIndex) => {
+        const ripple = document.createElement('span');
+        ripple.className = `ui-motion-ripple ui-motion-ripple-${ringIndex + 1}`;
+        ripple.style.width = ripple.style.height = `${diameter}px`;
+        ripple.style.left = `${event.clientX - rect.left - diameter / 2}px`;
+        ripple.style.top = `${event.clientY - rect.top - diameter / 2}px`;
+        target.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+      });
     };
 
     const onClick = (event: MouseEvent) => {
@@ -71,7 +73,7 @@ export function useInterfaceMotion() {
       target.classList.remove('ui-motion-confirm');
       void target.offsetWidth;
       target.classList.add('ui-motion-confirm');
-      window.setTimeout(() => target.classList.remove('ui-motion-confirm'), 430);
+      window.setTimeout(() => target.classList.remove('ui-motion-confirm'), 880);
     };
 
     document.addEventListener('pointerdown', onPointerDown, { passive: true });

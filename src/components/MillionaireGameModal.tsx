@@ -846,7 +846,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
 
   if (gameConfig.questions.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 font-cairo">
+      <div data-motion="off" className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 font-cairo">
         <div className="w-full max-w-sm rounded-3xl border border-amber-400/40 bg-[#08152e] p-6 text-center text-white shadow-2xl">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/10 text-amber-300">
             <BookOpen className="h-7 w-7" aria-hidden="true" />
@@ -1260,6 +1260,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   return (
     <div
       id="millionaire-game-modal"
+      data-motion="off"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none font-cairo"
       dir="rtl"
     >

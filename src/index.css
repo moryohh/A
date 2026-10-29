@@ -51,8 +51,10 @@ a,
 }
 
 @keyframes ui-ripple-out {
-  from { opacity: .32; transform: scale(.08); }
-  to { opacity: 0; transform: scale(1); }
+  0% { opacity: 0; transform: scale(.04); }
+  14% { opacity: .85; }
+  68% { opacity: .28; }
+  100% { opacity: 0; transform: scale(1); }
 }
 
 @keyframes ui-confirm-pop {
@@ -60,6 +62,13 @@ a,
   42% { transform: scale(.955); filter: brightness(1.16); }
   76% { transform: scale(1.025); }
   100% { transform: scale(1); }
+}
+
+@keyframes ui-halo-breathe {
+  0% { box-shadow: 0 0 0 0 rgba(34,211,238,0), 0 0 0 rgba(99,102,241,0); filter: brightness(1); }
+  18% { box-shadow: 0 0 0 3px rgba(165,243,252,.72), 0 0 22px 7px rgba(34,211,238,.48); filter: brightness(1.24) saturate(1.16); }
+  48% { box-shadow: 0 0 0 9px rgba(34,211,238,.16), 0 0 34px 12px rgba(99,102,241,.28); filter: brightness(1.12) saturate(1.1); }
+  100% { box-shadow: 0 0 0 15px rgba(34,211,238,0), 0 0 8px rgba(99,102,241,0); filter: brightness(1); }
 }
 
 @keyframes ui-stage-in {
@@ -93,12 +102,34 @@ a,
   z-index: 20;
   border-radius: 9999px;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(255,255,255,.82) 0%, rgba(103,232,249,.38) 42%, transparent 72%);
+  border: 2px solid rgba(207,250,254,.86);
+  background: radial-gradient(circle, rgba(255,255,255,.72) 0%, rgba(103,232,249,.32) 24%, rgba(56,189,248,.14) 46%, transparent 68%);
+  box-shadow: inset 0 0 14px rgba(165,243,252,.44), 0 0 12px rgba(34,211,238,.34);
   transform: scale(.08);
-  animation: ui-ripple-out 520ms cubic-bezier(.16,.75,.24,1) forwards;
+  animation: ui-ripple-out 720ms cubic-bezier(.12,.72,.18,1) forwards;
 }
 
-.ui-motion-confirm { animation: ui-confirm-pop 410ms cubic-bezier(.2,.85,.25,1); }
+.ui-motion-ripple-2 {
+  border-width: 1px;
+  background: transparent;
+  animation-delay: 75ms;
+  animation-duration: 780ms;
+}
+
+.ui-motion-ripple-3 {
+  border-color: rgba(129,140,248,.65);
+  border-width: 1px;
+  background: transparent;
+  animation-delay: 145ms;
+  animation-duration: 850ms;
+}
+
+.ui-motion-confirm {
+  z-index: 1;
+  animation:
+    ui-confirm-pop 440ms cubic-bezier(.2,.85,.25,1),
+    ui-halo-breathe 840ms cubic-bezier(.16,.72,.2,1);
+}
 .ui-stage-enter { animation: ui-stage-in 440ms cubic-bezier(.18,.82,.2,1) both; }
 .ui-choice-selected { animation: ui-choice-glow 820ms ease-out both; }
 
@@ -114,6 +145,14 @@ a[href]:hover > svg,
 [role='button']:hover > svg {
   transform: translateY(-1px) scale(1.08);
   filter: drop-shadow(0 3px 5px rgba(34,211,238,.28));
+}
+
+[data-motion='off'] button > svg,
+[data-motion='off'] a[href] > svg,
+[data-motion='off'] [role='button'] > svg {
+  transform: none;
+  filter: none;
+  transition: none;
 }
 
 .no-scrollbar,
