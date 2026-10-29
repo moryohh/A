@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, BookOpen, ChevronLeft, Clock, Loader2, Play, RefreshCw, Users } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { fetchMathematicsTopics, fetchMathematicsLectures, MATH_CHAPTER_TITLES, MathTopicIndex, MathLecture } from '../services/mathematicsCoursesService';
+import { appSfx } from '../utils/appSfx';
 
 export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
@@ -37,6 +38,7 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
   }, [topic?.recordId, retry]);
 
   const goBack = () => {
+    appSfx.navigation();
     if (lecture) setLecture(null);
     else if (topic) setTopic(null);
     else if (chapter !== null) setChapter(null);
@@ -70,10 +72,10 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
       <div className="min-w-0"><p className={`text-xs ${theme.classes.textMuted}`}>الرياضيات • السادس العلمي</p><h1 className="font-black text-lg leading-relaxed">{stageTitle}</h1></div>
     </div>
     <nav aria-label="مسار الرياضيات" className={`flex flex-wrap items-center gap-1 text-xs leading-6 ${theme.classes.textMuted}`}>
-      <button onClick={() => { setTeacherId(null); setChapter(null); setTopic(null); setLecture(null); }}>المدرسون</button>
-      {teacherId && <><ChevronLeft size={13} /><button onClick={() => { setChapter(null); setTopic(null); setLecture(null); }}>{teacherName}</button></>}
-      {chapter !== null && <><ChevronLeft size={13} /><button onClick={() => { setTopic(null); setLecture(null); }}>الفصل {chapter}</button></>}
-      {topic && <><ChevronLeft size={13} /><button onClick={() => setLecture(null)}>{topic.title}</button></>}
+      <button onClick={() => { appSfx.navigation(); setTeacherId(null); setChapter(null); setTopic(null); setLecture(null); }}>المدرسون</button>
+      {teacherId && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setChapter(null); setTopic(null); setLecture(null); }}>{teacherName}</button></>}
+      {chapter !== null && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setTopic(null); setLecture(null); }}>الفصل {chapter}</button></>}
+      {topic && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setLecture(null); }}>{topic.title}</button></>}
     </nav>
 
     {(loading || loadingLectures) && <div role="status" className="flex justify-center items-center gap-2 py-12"><Loader2 className="animate-spin" size={24} />جارٍ تحميل {loadingLectures ? 'المحاضرات' : 'المدرسين'}…</div>}
@@ -81,15 +83,15 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
     {!loading && !loadingLectures && !error && <>
       {!teacherId && <div className="space-y-3">{teachers.map(([id, name]) => {
         const items = topics.filter((item) => item.teacherId === id);
-        return <button key={id} onClick={() => setTeacherId(id)} className={cardClass}>
+        return <button key={id} onClick={() => { appSfx.subjectSelect(); setTeacherId(id); }} className={cardClass}>
           <div className="rounded-2xl p-3" style={{ background: `${theme.colors.primary}15`, color: theme.colors.primary }}><Users size={26} /></div>
           <div className="flex-1"><h2 className="font-bold">{name}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{new Set(items.map((item) => item.chapterNumber)).size} فصول • {items.reduce((sum, item) => sum + item.videoCount, 0)} محاضرة</p></div><ChevronLeft size={18} />
         </button>;
       })}{teachers.length === 0 && <p className="text-center py-8">لا توجد شروحات رياضيات متاحة حالياً.</p>}</div>}
-      {teacherId && chapter === null && <div className="space-y-3">{chapters.map((number) => <button key={number} onClick={() => setChapter(number)} className={cardClass}>
+      {teacherId && chapter === null && <div className="space-y-3">{chapters.map((number) => <button key={number} onClick={() => { appSfx.chapterSelect(); setChapter(number); }} className={cardClass}>
         <BookOpen size={24} style={{ color: theme.colors.primary }} /><div className="flex-1"><h2 className="font-bold">الفصل {number} — {MATH_CHAPTER_TITLES[number]}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{teacherTopics.filter((item) => item.chapterNumber === number).length} موضوع</p></div><ChevronLeft size={18} />
       </button>)}</div>}
-      {chapter !== null && !topic && <div className="space-y-3">{chapterTopics.map((item) => <button key={item.topicId} onClick={() => setTopic(item)} className={cardClass}>
+      {chapter !== null && !topic && <div className="space-y-3">{chapterTopics.map((item) => <button key={item.topicId} onClick={() => { appSfx.lessonSelect(); setTopic(item); }} className={cardClass}>
         <BookOpen size={22} style={{ color: theme.colors.primary }} /><div className="flex-1 min-w-0"><h2 className="font-bold text-sm leading-relaxed">{item.title}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{item.videoCount} محاضرة</p></div><ChevronLeft size={18} />
       </button>)}</div>}
       {topic && <div className="space-y-3">
@@ -109,7 +111,7 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
           />
         </section>}
         <h2 className="font-bold text-sm">محاضرات الموضوع بالترتيب</h2>
-        {lectures.map((item) => <button key={item.id} onClick={() => setLecture(item)} aria-pressed={lecture?.id === item.id} className={cardClass} style={lecture?.id === item.id ? { borderColor: theme.colors.primary } : undefined}>
+        {lectures.map((item) => <button key={item.id} onClick={() => { appSfx.boardSelect(); setLecture(item); }} aria-pressed={lecture?.id === item.id} className={cardClass} style={lecture?.id === item.id ? { borderColor: theme.colors.primary } : undefined}>
           <img src={item.thumbnailUrl} alt="" loading="lazy" className="w-24 aspect-video object-cover rounded-lg shrink-0" />
           <div className="flex-1 min-w-0"><p className="font-bold text-xs leading-relaxed">{item.title}</p><p className={`text-xs mt-2 flex gap-1 items-center ${theme.classes.textMuted}`}><Clock size={12} />{duration(item.durationSeconds)}</p></div><Play size={17} style={{ color: theme.colors.primary }} />
         </button>)}
