@@ -73,6 +73,14 @@ function uniqueExamItems<T extends { q: string }>(pool: T[]): T[] {
   return Array.from(new Map(pool.map((item) => [item.q.trim(), item])).values());
 }
 
+function bestLessonFact(prompt: string, facts: string[]) {
+  const promptTokens = new Set(prompt.replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, ' ').split(/\s+/).filter((token) => token.length > 2));
+  return [...facts].sort((left, right) => {
+    const score = (value: string) => value.split(/\s+/).filter((token) => promptTokens.has(token.replace(/[^\u0600-\u06FFa-zA-Z0-9]/g, ''))).length;
+    return score(right) - score(left);
+  })[0] || '';
+}
+
 function createUnavailableDailyExam(lessonTitle: string, subject: string): DailyExamConfig {
   return {
     id: `exam-unavailable-${lessonTitle}`,
@@ -272,7 +280,15 @@ export function extractDailyExamFromCurriculum(
     }
   }
 
-  if (q1Branches.length === 1) q1Branches[0].points = 10;
+  if (q1Branches.length === 1) {
+    q1Branches[0].points = 10;
+    q1Instruction = 'أجب عن السؤال الآتي بدقة واختصار منهجي:';
+  }
+  q1Branches.forEach((branch) => {
+    if (/الإجابة العلمية المعتمدة|التعريف العلمي المعتمد|التعليل العلمي الدقيق|الكلمات والمصطلحات العلمية/.test(branch.modelAnswer)) {
+      branch.modelAnswer = bestLessonFact(branch.prompt, lessonFacts) || branch.modelAnswer;
+    }
+  });
 
   // ==========================================
   // --- QUESTION 2: STRICTLY 1 SINGLE COMPREHENSIVE QUESTION ---
