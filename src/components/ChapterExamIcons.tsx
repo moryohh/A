@@ -1118,10 +1118,11 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                       accept="image/*"
                       capture="environment"
                       className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) handleImageSelected(file);
-                        event.target.value = '';
+                      onChange={async (event) => {
+                        const input = event.currentTarget;
+                        const file = input.files?.[0];
+                        if (file) await handleImageSelected(file);
+                        input.value = '';
                       }}
                     />
                   </label>
