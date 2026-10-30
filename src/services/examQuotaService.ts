@@ -36,3 +36,9 @@ export async function reserveExamAttempt(
   }
   return (data || { allowed: false, code: 'EMPTY_RESPONSE', message: 'تعذر التحقق من رصيد الامتحانات.' }) as ExamQuotaReservation;
 }
+
+export async function releaseFailedExamAttempt(requestKey: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('release_failed_exam_attempt', { p_request_key: requestKey });
+  if (error) console.error('Failed to release exam quota reservation:', error);
+}

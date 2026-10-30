@@ -3,7 +3,7 @@ import { Award, CalendarDays, Camera, CheckCircle2, ChevronLeft, DoorOpen, FileT
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
-import { reserveExamAttempt } from '../services/examQuotaService';
+import { releaseFailedExamAttempt, reserveExamAttempt } from '../services/examQuotaService';
 import { NotificationExamResult } from '../types';
 
 interface ChapterExamIconsProps {
@@ -844,6 +844,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       notifyChapterExamResult(finalSubmission);
       setSubmitState('completed');
     } catch {
+      await releaseFailedExamAttempt(submission.id);
       setSubmitMessage('تعذر إكمال الإرسال أو الحفظ. حاول مرة أخرى بصورة أوضح وأصغر.');
       setSubmitState('error');
     }

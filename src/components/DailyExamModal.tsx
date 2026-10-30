@@ -21,7 +21,7 @@ import {
 } from '../services/imageEvaluationService';
 import { NotificationExamAnswer, OpenLessonContext } from '../types';
 import { getDailyExamReward } from '../services/pointsService';
-import { reserveExamAttempt } from '../services/examQuotaService';
+import { releaseFailedExamAttempt, reserveExamAttempt } from '../services/examQuotaService';
 
 interface DailyExamModalProps {
   isOpen: boolean;
@@ -438,6 +438,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
       }
       gameAudio.playVictoryFanfare();
     } catch {
+      await releaseFailedExamAttempt(submissionId);
       submissionLockRef.current = false;
       setSubmitState('idle');
       setIsTimerRunning(true);
