@@ -116,7 +116,7 @@ export default {
             var directCode = String(Math.floor(1000 + Math.random() * 9000));
             var directRoomId = 'classroom:' + directCode;
             var directRegistration = await directRegistry.fetch(new Request('https://registry/internal/register', {
-              method: 'POST', body: JSON.stringify({ code: directCode, roomId: directRoomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board' }),
+              method: 'POST', body: JSON.stringify({ code: directCode, roomId: directRoomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', durationMinutes: Number(body.durationMinutes) || 30 }),
             }));
             if (directRegistration.status === 409) continue;
             if (!directRegistration.ok) return json({ error: 'room_code_unavailable' }, 503, origin);
@@ -481,7 +481,7 @@ export class ChallengeRoom {
       var registry = registryBinding(this.env);
       await registry.get(registry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/update', {
         method: 'POST',
-        body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: game.players.length }),
+        body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: game.players.length, endsAt: game.endsAt, contentMode: game.contentMode, activePlayers: game.players.filter(function (player) { return !this.isBot(player) && this.connected(player.id); }, this).slice(0, 5).map(function (player) { var profile = player.profile || {}; return { name: profile.name || 'طالب', avatar: profile.avatar || '', level: profile.level || 1, activity: player.activity || 'يدرس الآن' }; }) }),
       }));
     } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
@@ -587,6 +587,7 @@ export class ChallengeRoom {
       var profile = ticketBody.profile && typeof ticketBody.profile === 'object' ? {
         name: typeof ticketBody.profile.name === 'string' ? ticketBody.profile.name.slice(0, 60) : '',
         avatar: typeof ticketBody.profile.avatar === 'string' && ticketBody.profile.avatar.length <= 800 ? ticketBody.profile.avatar : '',
+        level: Math.max(1, Math.min(999, Number(ticketBody.profile.level) || 1)),
       } : null;
       await this.ctx.storage.put('ticket:' + ticket, { userId: ticketBody.userId, profile: profile, expires: Date.now() + 60000 });
       return json({ ticket: ticket, joined: game.players.some(function (p) { return p.id !== ticketBody.userId; }) }, 200, '');
@@ -1331,7 +1332,7 @@ export class ChallengeRegistry {
         }
       }
       if (!code) return json({ error: 'no_room_code' }, 503, '');
-      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, contentMode: body.gameType === 'live_classroom' ? (body.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now() };
+      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, contentMode: body.gameType === 'live_classroom' ? (body.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now(), endsAt: body.gameType === 'live_classroom' ? Date.now() + Math.max(5, Math.min(180, Number(body.durationMinutes) || 30)) * 60000 : undefined, activePlayers: [] };
       await this.ctx.storage.put('rooms', rooms);
       return json({ code: code }, 201, '');
     }
@@ -1351,6 +1352,9 @@ export class ChallengeRegistry {
       if (!roomKey || !rooms[roomKey] || !['waiting', 'playing', 'reconnecting', 'ended'].includes(updateBody.status)) return json({ error: 'room_not_found' }, 404, '');
       rooms[roomKey].status = updateBody.status;
       rooms[roomKey].players = Number.isInteger(updateBody.players) ? updateBody.players : rooms[roomKey].players;
+      if (Number.isFinite(updateBody.endsAt)) rooms[roomKey].endsAt = updateBody.endsAt;
+      if (typeof updateBody.contentMode === 'string') rooms[roomKey].contentMode = updateBody.contentMode;
+      if (Array.isArray(updateBody.activePlayers)) rooms[roomKey].activePlayers = updateBody.activePlayers.slice(0, 5);
       if (updateBody.status === 'ended') rooms[roomKey].endedAt = Date.now();
       await this.ctx.storage.put('rooms', rooms);
       return json({ ok: true }, 200, '');

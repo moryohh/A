@@ -69,6 +69,7 @@ type Participant = {
   bot?: boolean;
   name?: string;
   avatar?: string;
+  level?: number;
   connected: boolean;
   handRaised?: boolean;
   micAllowed?: boolean;
@@ -144,7 +145,7 @@ async function authorization() {
 
 async function profile() {
   const guest = loadGuestSession();
-  if (guest) return { name: guest.name, avatar: localStorage.getItem(`nahnu_maak_avatar_${guest.id}`) || "" };
+  if (guest) return { name: guest.name, avatar: localStorage.getItem(`nahnu_maak_avatar_${guest.id}`) || "", level: 1 };
   const client = getSupabaseClient();
   const { data } = (await client?.auth.getSession()) || {
     data: { session: null },
@@ -158,6 +159,7 @@ async function profile() {
         "طالب",
     ),
     avatar: String(localStorage.getItem(`nahnu_maak_avatar_${data.session?.user?.id}`) || meta.avatar_url || meta.picture || ""),
+    level: Number(meta.level || 1),
   };
 }
 
@@ -368,7 +370,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     ? localStorage.getItem(`nahnu_maak_avatar_${offlineGuest.id}`) || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`
     : `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`;
   const [capacity, setCapacity] = useState<Capacity>(8);
-  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [durationMinutes, setDurationMinutes] = useState(30);
   const [studyMode, setStudyMode] = useState<"teacher" | "together">("together");
   const [sharedMissionDraft, setSharedMissionDraft] = useState("");
   const [room, setRoom] = useState(offlineBooklet ? "OFFLINE" : "");
@@ -436,6 +438,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [missionOpen, setMissionOpen] = useState(false);
   const [missionText, setMissionText] = useState("");
   const [missionTarget, setMissionTarget] = useState(4);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1085,6 +1088,16 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
   const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
   const timedTreeStage = Math.min(12, Math.floor(elapsedSeconds / 30));
+  const rankedParticipants = [...(state?.players || [])]
+    .filter((player) => player.connected || offlineBooklet)
+    .sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1)));
+  const activeParticipants = rankedParticipants.filter((player) => player.activityAt && Date.now() - Number(player.activityAt) < 60000);
+  const earnedChallenges = [
+    ...(self?.mission?.completed ? [{ label: "أنجز المهمة", icon: "🎯" }] : []),
+    ...((self?.progress?.solved || 0) > 0 ? [{ label: "بدأ الحل", icon: "✏️" }] : []),
+    ...((classroom?.bookletShares || []).some((share) => share.from === me) ? [{ label: "شارك سؤالًا", icon: "📚" }] : []),
+    ...(activeParticipants.length >= 3 ? [{ label: "رفاق نشيطون", icon: "🌱" }] : []),
+  ];
   const bookletQuestions = useMemo(() => (booklet?.pages || [])
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
@@ -1177,10 +1190,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
             onChange={(event) => setDurationMinutes(Number(event.target.value))}
             className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
           >
-            <option value={15}>15 دقيقة</option>
+            <option value={5}>5 دقائق</option>
+            <option value={10}>10 دقائق</option>
+            <option value={20}>20 دقيقة</option>
             <option value={30}>30 دقيقة</option>
-            <option value={45}>45 دقيقة</option>
             <option value={60}>60 دقيقة</option>
+            <option value={120}>ساعتان</option>
           </select>
           {defaultMode === "booklet" && <>
             <label className="mt-4 block text-xs font-black">نوع الغرفة</label>
@@ -1238,7 +1253,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           <div className="min-w-0"><b className="block truncate text-xs">{currentContent.lessonTitle || lessonTitle}</b><small className="text-[9px] text-emerald-200">{offlineBooklet ? "معاينة أوفلاين" : "غرفة دراسة أونلاين"} · {state?.players.length || 0} طلاب</small></div>
           </div>
           <div className="order-3 flex w-full items-center justify-center gap-1 sm:order-none sm:w-auto">
-          <div className="text-center"><span className="block text-[7px] font-black text-slate-400">مدة الدراسة</span><strong className="block font-mono text-base tracking-[.12em] text-white">{elapsedTimerText}</strong></div>
+          <div className="text-center"><span className="block text-[7px] font-black text-amber-200">الوقت المتبقي</span><strong className="block font-mono text-base tracking-[.12em] text-white">{timerText}</strong></div>
           <div className="relative z-30">
             <button onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-cyan-200/45 bg-gradient-to-br from-cyan-400/25 via-blue-500/20 to-violet-500/30 text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,.18)]" aria-label="تبديل الدرس" title="تبديل الدرس"><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-300"/></button>
             {lessonMenuOpen && <div className="absolute left-0 top-11 max-h-[70dvh] w-52 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 shadow-2xl backdrop-blur" dir="rtl">
@@ -1262,6 +1277,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={() => setAchievementsOpen(true)} className="grid h-9 w-9 place-items-center rounded-xl border border-amber-200/40 bg-amber-400/15 text-amber-100" aria-label="تحدياتي" title="تحدياتي"><Target className="h-4 w-4"/></button>
             {!offlineBooklet && <span className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
             {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
             <button onClick={() => void toggleMic()} className={`grid h-9 w-9 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
@@ -1272,18 +1288,19 @@ export const LiveClassroomModal: React.FC<Props> = ({
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
           <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
-            <aside className="max-h-36 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
-              <b className="mb-2 block text-center text-[10px] text-emerald-200">الطلاب وإنجازهم</b>
+            <aside className="relative max-h-44 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
+              <b className="mb-1 block text-center text-[10px] text-emerald-200">الأعضاء النشطون · {activeParticipants.length}</b>
+              <small className="mb-2 block text-center text-[8px] text-slate-400">اسحب لرؤية بقية الأعضاء</small>
               <div className="space-y-2">
-                {state?.players.filter((player) => player.connected || offlineBooklet).map((player, index) => {
+                {rankedParticipants.map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
                   const ratio = Math.round((progress / target) * 100);
                   const shieldTier = Math.min(4, Math.floor((index + 1) / 2));
-                  return <div key={player.id} className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                  return <div key={player.id} className={`rounded-xl border border-white/10 bg-white/5 p-2 text-center ${index === 4 ? "opacity-60" : ""}`}>
                     <div className="flex items-center gap-1.5 text-right">
                       <img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className="h-8 w-8 rounded-xl border border-emerald-300/40 object-cover"/>
-                      <div className="min-w-0 flex-1"><b className="block truncate text-[10px]">{player.name || "طالب"}</b><span className="text-[8px] text-slate-300">المستوى {index + 1}</span></div>
+                      <div className="min-w-0 flex-1"><b className="block truncate text-[10px]">{player.name || "طالب"}</b><span className="text-[8px] text-slate-300">المستوى {player.level || 1} · {player.activity || "يدرس الآن"}</span></div>
                       <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldTier}.png`} alt="درع الطالب" className="h-7 w-7 object-contain"/>
                     </div>
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{width: `${ratio}%`}}/></div>
@@ -1372,6 +1389,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
         {openSharedBy && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setOpenSharedBy(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[72vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-200 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><b className="text-sm">الأسئلة المشاركة</b><button onClick={() => setOpenSharedBy(null)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="space-y-3">{openShares.slice().reverse().map((share) => <article key={share.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3"><small className="font-black text-emerald-700">السؤال {share.index + 1}</small><p className="mt-1 text-sm font-black leading-7">{share.question}</p><div className="mt-2 rounded-xl bg-white p-3 text-xs font-bold leading-6">{share.answer || "لا توجد إجابة مسجلة."}</div></article>)}</div></section></div>}
+        {achievementsOpen && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setAchievementsOpen(false)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-amber-200/60 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="block text-base">تحدياتي</b><small className="text-[10px] text-slate-500">إنجازاتك داخل هذه الغرفة</small></div><button onClick={() => setAchievementsOpen(false)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="grid grid-cols-2 gap-2">{earnedChallenges.length ? earnedChallenges.map((challenge) => <div key={challenge.label} className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-center"><span className="text-2xl">{challenge.icon}</span><b className="mt-1 block text-[10px] text-amber-900">{challenge.label}</b></div>) : <p className="col-span-2 rounded-2xl bg-slate-50 p-4 text-center text-xs text-slate-500">ابدأ مهمة أو شارك سؤالًا لتحصل على أول شارة.</p>}</div><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center"><PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="mx-auto h-16"/><b className="mt-1 block text-xs text-emerald-900">نمو تركيزك مستمر</b></div></section></div>}
         {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
       </div>
     );
