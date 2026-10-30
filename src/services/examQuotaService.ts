@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { loadGuestSession } from './guestPreviewService';
 
 export type ExamQuotaKind = 'daily' | 'monthly' | 'ministry';
 
@@ -16,6 +17,20 @@ export async function reserveExamAttempt(
   examKey: string,
   requestKey: string,
 ): Promise<ExamQuotaReservation> {
+  // TEMPORARY GUEST EXAM ACCESS:
+  // Guest preview sessions may submit daily, monthly and ministry exams without
+  // consuming account quotas. Remove this bypass together with guest login.
+  if (loadGuestSession()) {
+    return {
+      allowed: true,
+      code: 'GUEST_UNLIMITED',
+      message: 'وضع الضيف: المحاولات مفتوحة ولا تخضع للحدود اليومية.',
+      used: 0,
+      limit: null,
+      remaining: null,
+    };
+  }
+
   if (!supabase) {
     return { allowed: false, code: 'SERVICE_UNAVAILABLE', message: 'خدمة الامتحانات غير متاحة حالياً.' };
   }
@@ -38,6 +53,8 @@ export async function reserveExamAttempt(
 }
 
 export async function releaseFailedExamAttempt(requestKey: string): Promise<void> {
+  // Guest attempts never reserve quota rows, so there is nothing to release.
+  if (loadGuestSession()) return;
   if (!supabase) return;
   const { error } = await supabase.rpc('release_failed_exam_attempt', { p_request_key: requestKey });
   if (error) console.error('Failed to release exam quota reservation:', error);
