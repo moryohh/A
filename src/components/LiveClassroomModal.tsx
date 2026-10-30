@@ -1103,6 +1103,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
   const openShares = openSharedBy ? (classroom?.bookletShares || []).filter((share) => share.from === openSharedBy) : [];
+  const isTimeFinished = Boolean(classroom?.endsAt && (seconds <= 0 || state?.status === "ended"));
+  const lessonGoalText = classroom?.sharedMission || self?.mission?.text || "إنجاز هدف الدرس";
+  const lessonGoalTarget = Math.max(1, Number(self?.mission?.target || bookletQuestions.length || 1));
+  const lessonGoalProgress = Math.min(lessonGoalTarget, Number(self?.mission?.progress || (bookletQuestions.length ? Math.min(bookletItemIndex, bookletQuestions.length) : 0)));
+  const lessonGoalRemaining = Math.max(0, lessonGoalTarget - lessonGoalProgress);
   const openPlayerShares = (playerId: string) => {
     const total = (classroom?.bookletShares || []).filter((share) => share.from === playerId).length;
     setSeenShareCounts((current) => ({ ...current, [playerId]: total }));
@@ -1286,12 +1291,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
-          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(220px,29vw,290px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
+          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(240px,31vw,360px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
             <aside className="relative max-h-44 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
               <b className="mb-1 block text-center text-[10px] text-emerald-200">الأعضاء النشطون · {activeParticipants.length}</b>
               <small className="mb-2 block text-center text-[8px] text-slate-400">اسحب لرؤية بقية الأعضاء</small>
-              <div className="space-y-2">
+              <div className="max-h-[16rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5">
                 {rankedParticipants.map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
@@ -1311,7 +1316,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </aside>
 
             <main className="flex min-h-[55dvh] flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner min-[600px]:min-h-0" dir="rtl">
-              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-xl grid-cols-2 gap-2 overflow-y-auto content-start">
+              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-[20rem] grid-cols-2 content-start justify-items-center gap-2 overflow-y-auto px-1">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
@@ -1320,9 +1325,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
                   const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
-                  return <div key={player.id} className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
+                  return <div key={player.id} className={`relative flex min-h-24 w-full max-w-[150px] flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="drop-shadow-md" />
+                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="!h-[52px] !w-[72px] drop-shadow-md" />
                     <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
@@ -1372,6 +1377,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
               </div>
               <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
+                <div className={`mb-3 rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}>
+                  <div className="flex items-center justify-between gap-2"><b className="text-[10px] text-emerald-900">هدف الدرس</b><span className={`text-[10px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{lessonGoalProgress}/{lessonGoalTarget}</span></div>
+                  <p className="mt-1 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p>
+                  <p className={`mt-1 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${lessonGoalRemaining}` : `المتبقي ${lessonGoalRemaining}`}</p>
+                </div>
                 {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
                   <div className="mb-3 flex items-center gap-2">
                     <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
@@ -1388,6 +1398,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </aside>}
           </div>
         </div>
+        {isTimeFinished && <div className="absolute inset-0 z-40 grid place-items-center bg-slate-950/35 p-4" role="status"><section className="w-full max-w-sm rounded-3xl border border-amber-200/70 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><b className="block text-base text-amber-900">انتهى وقت الدرس</b><p className="mt-2 text-xs leading-6 text-slate-600">توقف التحدي عند انتهاء الوقت. راجع هدف الدرس وما تبقى منه.</p><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><b className="block text-xs text-emerald-900">{lessonGoalText}</b><span className="mt-1 block text-[10px] font-black text-emerald-700">أنجزت {lessonGoalProgress} من {lessonGoalTarget} · المتبقي {lessonGoalRemaining}</span></div></section></div>}
         {openSharedBy && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setOpenSharedBy(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[72vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-200 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><b className="text-sm">الأسئلة المشاركة</b><button onClick={() => setOpenSharedBy(null)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="space-y-3">{openShares.slice().reverse().map((share) => <article key={share.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3"><small className="font-black text-emerald-700">السؤال {share.index + 1}</small><p className="mt-1 text-sm font-black leading-7">{share.question}</p><div className="mt-2 rounded-xl bg-white p-3 text-xs font-bold leading-6">{share.answer || "لا توجد إجابة مسجلة."}</div></article>)}</div></section></div>}
         {achievementsOpen && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setAchievementsOpen(false)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-amber-200/60 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="block text-base">تحدياتي</b><small className="text-[10px] text-slate-500">إنجازاتك داخل هذه الغرفة</small></div><button onClick={() => setAchievementsOpen(false)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="grid grid-cols-2 gap-2">{earnedChallenges.length ? earnedChallenges.map((challenge) => <div key={challenge.label} className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-center"><span className="text-2xl">{challenge.icon}</span><b className="mt-1 block text-[10px] text-amber-900">{challenge.label}</b></div>) : <p className="col-span-2 rounded-2xl bg-slate-50 p-4 text-center text-xs text-slate-500">ابدأ مهمة أو شارك سؤالًا لتحصل على أول شارة.</p>}</div><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center"><PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="mx-auto h-16"/><b className="mt-1 block text-xs text-emerald-900">نمو تركيزك مستمر</b></div></section></div>}
         {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}

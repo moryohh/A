@@ -152,11 +152,16 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [challengeMessage, setChallengeMessage] = useState('');
 
   const selectedChallengeSubject = GRADE_6_SUBJECTS.find((subject) => subject.id === challengeSubject);
-  const visibleRooms = activeRooms.filter((room) =>
-    (!challengeSubject || room.subject === selectedChallengeSubject?.name || room.subject === challengeSubject) &&
-    (!challengeChapter || room.chapter === Number(challengeChapter)) &&
-    (!challengeGame || room.gameType === challengeGame)
-  );
+  const visibleRooms = activeRooms.filter((room) => {
+    const status = room.status || 'waiting';
+    const classroomCapacity = (room.capacity || 8) + 1;
+    const hasTime = !room.endsAt || room.endsAt > Date.now();
+    const available = hasTime && (status === 'waiting' || (room.gameType === 'live_classroom' && status === 'playing' && room.players < classroomCapacity));
+    return available &&
+      (!challengeSubject || room.subject === selectedChallengeSubject?.name || room.subject === challengeSubject) &&
+      (!challengeChapter || room.chapter === Number(challengeChapter)) &&
+      (!challengeGame || room.gameType === challengeGame);
+  });
 
   React.useEffect(() => {
     let cancelled = false;
@@ -385,7 +390,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             <div className="absolute inset-x-4 bottom-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${theme.colors.primary}, ${theme.colors.secondary})` }} />
           </div>
           <div className="space-y-2 p-4">
-            {visibleRooms.length === 0 ? <p className={`rounded-2xl p-4 text-center text-xs ${theme.classes.textMuted}`} style={{ backgroundColor: theme.colors.bgCardSubtle }}>لا توجد غرف مطابقة حالياً.</p> : visibleRooms.map((room) => {
+            {visibleRooms.length === 0 ? <p className={`rounded-2xl p-4 text-center text-xs ${theme.classes.textMuted}`} style={{ backgroundColor: theme.colors.bgCardSubtle }}>لا توجد غرف نشطة متاحة حاليًا.</p> : visibleRooms.map((room) => {
               const status = room.status || 'waiting';
               const ended = status === 'ended';
               const classroomJoinable = room.gameType === 'live_classroom' && status === 'playing';

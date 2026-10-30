@@ -19,6 +19,7 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
         ? Math.round(regularSize * 1.1 * 1.15)
         : regularSize
     : undefined;
+  const compactSize = progressiveSize === undefined ? undefined : Math.min(progressiveSize, 78);
   const visualScale = safeStage === 10 ? 1.1 : safeStage >= 11 ? 1.265 : 1;
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
   return (
     <div
       className={`relative shrink-0 overflow-hidden bg-[#dff7ff] shadow-sm transition-[width,height] duration-700 ${compact ? 'rounded-2xl' : 'h-full w-full rounded-[2rem]'} ${className}`}
-      style={compact ? { width: progressiveSize, height: Math.round(progressiveSize! * 0.72) } : undefined}
+      style={compact ? { width: compactSize, height: Math.round(compactSize! * 0.72) } : undefined}
       onPointerDown={enableSound}
     >
       <video

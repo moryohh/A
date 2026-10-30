@@ -290,7 +290,7 @@ export class ChallengeRoom {
       return event.joined ? [event.leaveAt] : [event.joinAt];
     }) : [];
     var matchmakingBotDeadlines = game.status === 'waiting' && Array.isArray(game.matchmakingBotSchedule) ? game.matchmakingBotSchedule.filter(function (event) { return !event.joined && !event.cancelled; }).map(function (event) { return event.joinAt; }) : [];
-    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline].concat(classroomBotDeadlines, matchmakingBotDeadlines).filter(function (value) {
+    var deadlines = [game.botJoinAt, game.disconnectDeadline, game.emptyDeadline, game.botDiscussionAt, game.botAnswerAt, game.questionDeadline, game.gameType === 'live_classroom' ? game.endsAt : null].concat(classroomBotDeadlines, matchmakingBotDeadlines).filter(function (value) {
       return Number.isFinite(value);
     });
     if (deadlines.length && this.ctx.storage.setAlarm) await this.ctx.storage.setAlarm(Math.min.apply(Math, deadlines));
@@ -1105,6 +1105,14 @@ export class ChallengeRoom {
         return;
       }
       delete game.emptyDeadline;
+    }
+    if (game.gameType === 'live_classroom' && game.endsAt && now >= game.endsAt) {
+      game.status = 'ended';
+      game.endedReason = 'time_expired';
+      await this.ctx.storage.put('game', game);
+      await this.updateRegistry('ended', game);
+      this.broadcast(this.view(game));
+      return;
     }
     if (game.gameType === 'live_classroom' && Array.isArray(game.classroomBotSchedule)) {
       var classroomBotsChanged = false;
