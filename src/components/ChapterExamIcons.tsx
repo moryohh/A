@@ -96,6 +96,37 @@ function parseJsonString(value: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
+    // Some imported text files contain one valid JSON value followed by source
+    // notes. Recover only the first balanced JSON object/array.
+    const opening = text[0];
+    const closing = opening === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === opening) depth += 1;
+      else if (char === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            return JSON.parse(text.slice(0, index + 1));
+          } catch {
+            return value;
+          }
+        }
+      }
+    }
     return value;
   }
 }
@@ -117,7 +148,7 @@ function formatQuestionItem(item: unknown, index: number) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.label) || cleanText(obj.number) || cleanText(obj.id) || `${index + 1}`;
-  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction']);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
@@ -126,20 +157,36 @@ function formatQuestionPoint(item: unknown, index: number) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.point_number) || cleanText(obj.label) || cleanText(obj.number) || `${index + 1}`;
-  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction']);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
 function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null {
+  if (typeof value === 'string') {
+    const parsed = parseJsonString(value);
+    if (parsed !== value) return readBranch(parsed, fallbackTitle);
+    const branchText = value.trim();
+    return branchText.length >= 4
+      ? { title: displayPartTitle('', fallbackTitle), text: branchText }
+      : null;
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return readQuestion(value, fallbackTitle);
   const obj = value as Record<string, unknown>;
   const rawPoints = Array.isArray(obj.points) ? obj.points : [];
   const points = rawPoints.map(formatQuestionPoint).filter(Boolean);
   const title = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label', 'title']), fallbackTitle);
-  const heading = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction', 'title']);
+  const heading = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction', 'title']);
   // Some imported exams store the model answer as a plain string list in
   // `points`. It must feed correction, never appear inside the student's prompt.
-  if (rawPoints.length > 0 && rawPoints.every((point) => typeof point === 'string')) {
+  const plainTextPoints = rawPoints.length > 0 && rawPoints.every((point) => typeof point === 'string');
+  const pointsArePrompts = plainTextPoints && (
+    rawPoints.some((point) => /^\s*[٠-٩0-9]+[.)-]/.test(String(point)))
+    || /(?:استخرج|علل|صوّب|صوب|أنشئ|اختر|مثّل|مثل|أعرب|حوّل|حول|النصوص الآتية|العبارات الآتية|ما يأتي)/i.test(heading)
+  );
+  if (pointsArePrompts) {
+    return { title, text: [heading, ...rawPoints.map(formatQuestionPoint)].filter(Boolean).join('\n\n') };
+  }
+  if (plainTextPoints) {
     return {
       title,
       text: heading,
@@ -183,15 +230,21 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  const question = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
   const itemValues = Array.isArray(obj.items)
     ? obj.items
     : obj.items && typeof obj.items === 'object'
       ? Object.values(obj.items as Record<string, unknown>)
       : [];
   const items = itemValues.map(formatQuestionItem).filter(Boolean);
-  const answer = obj.answer || obj.model_answer;
-  if (!question) return null;
+  const itemAnswers = itemValues.flatMap((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const itemObj = item as Record<string, unknown>;
+    const itemAnswer = firstText(itemObj, ['answer', 'model_answer', 'solution', 'correct_answer']);
+    return itemAnswer ? [`${index + 1}. ${itemAnswer}`] : [];
+  });
+  const answer = obj.answer || obj.model_answer || (itemAnswers.length > 0 ? itemAnswers.join('\n') : undefined);
+  if (!question && items.length === 0) return null;
   const text = [question, ...items].join('\n\n');
   const entryTitle = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label']), title);
   return { title: entryTitle, text, answer: typeof answer === 'string' ? answer : undefined };
@@ -204,12 +257,19 @@ function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry
   if (branches.length > 0) return branches;
   const nestedParts = readPartCollection(obj.parts);
   if (nestedParts.length > 0) return nestedParts;
-  const nestedItems = readPartCollection(obj.items);
-  if (nestedItems.length > 0) return nestedItems;
+  const nestedSubQuestions = readPartCollection(obj.sub_questions);
+  if (nestedSubQuestions.length > 0) return nestedSubQuestions;
+  const nestedQuestions = readPartCollection(obj.questions);
+  if (nestedQuestions.length > 0) return nestedQuestions;
   const entry = readQuestion(value, fallbackTitle);
   if (entry) return [entry];
   const keyedBranches = Object.entries(obj)
-    .filter(([key, branchValue]) => !IGNORED_KEY_PATTERN.test(key) && !isAnswerKey(key) && branchValue && typeof branchValue === 'object')
+    .filter(([key, branchValue]) =>
+      !IGNORED_KEY_PATTERN.test(key)
+      && !isAnswerKey(key)
+      && Boolean(branchValue)
+      && (typeof branchValue === 'object' || typeof branchValue === 'string')
+    )
     .map(([key, branchValue]) => readBranch(branchValue, key))
     .filter(Boolean) as QuestionEntry[];
   if (keyedBranches.length > 0) return keyedBranches;
