@@ -103,6 +103,14 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   <p className={`text-xs ${theme.classes.textMuted} mt-1 leading-relaxed`}>
                     {item.message}
                   </p>
+                  {item.action?.kind === 'exam-result' && item.action.examResult && (
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="rounded-lg bg-emerald-500/15 px-2 py-1 text-[11px] font-black text-emerald-500" dir="ltr">
+                        {item.action.examResult.score ?? '—'} / {item.action.examResult.totalScore ?? 100}
+                      </span>
+                      <span className="rounded-lg px-2 py-1 text-[11px] font-black text-sky-500">عرض النتيجة والتصحيح</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </button>
