@@ -50,7 +50,7 @@ type ChapterExamNotificationDetail = {
 
 const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
 const QUESTION_KEY_PATTERN = /question|prompt|content|body|^q\d*$|^س\d*$/i;
-const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|date|year|round|dawr|chapter|subject/i;
+const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|section|instructions|marks?|date|year|round|dawr|chapter|subject/i;
 const CHAPTER_EXAM_CORRECTION_ENDPOINTS = [
   'https://hhh-two-black.vercel.app/api/ocr',
   'https://hhh-main-wheat.vercel.app/api/ocr',
@@ -148,7 +148,7 @@ function formatQuestionItem(item: unknown, index: number) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.label) || cleanText(obj.number) || cleanText(obj.id) || `${index + 1}`;
-  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction']);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'title', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
@@ -230,7 +230,7 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'instructions', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
   const itemValues = Array.isArray(obj.items)
     ? obj.items
     : obj.items && typeof obj.items === 'object'
