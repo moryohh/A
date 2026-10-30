@@ -487,6 +487,11 @@ function textFromCorrectionResult(value: unknown): string {
     obj.output,
     obj.text,
     obj.extractedText,
+    obj.extracted_text,
+    obj.recognizedText,
+    obj.recognized_text,
+    obj.ocrText,
+    obj.ocr_text,
     obj.message,
   ].filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).join(' ');
   if (direct) return direct;
@@ -495,6 +500,31 @@ function textFromCorrectionResult(value: unknown): string {
     if (nested) return nested;
   }
   return '';
+}
+
+function normalizedAnswerTokens(value: string): string[] {
+  return value
+    .toLocaleLowerCase('ar')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 2);
+}
+
+function inferScoreFromAnswerSimilarity(studentAnswer: string, modelAnswer: string): number | null {
+  const studentTokens = new Set(normalizedAnswerTokens(studentAnswer));
+  const modelTokens = [...new Set(normalizedAnswerTokens(modelAnswer))];
+  if (studentTokens.size === 0 || modelTokens.length === 0) return null;
+  const matched = modelTokens.filter((token) => studentTokens.has(token)).length;
+  const coverage = matched / modelTokens.length;
+  if (coverage < 0.12) return 0;
+  if (coverage < 0.3) return 25;
+  if (coverage < 0.55) return 50;
+  if (coverage < 0.78) return 75;
+  return 100;
 }
 
 function inferScoreFromCorrectionText(text: string): number | null {
@@ -506,7 +536,7 @@ function inferScoreFromCorrectionText(text: string): number | null {
   return null;
 }
 
-function normalizeCorrectionResult(result: unknown): unknown {
+function normalizeCorrectionResult(result: unknown, modelAnswer = ''): unknown {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   const obj = result as Record<string, unknown>;
   const nested = obj.result && typeof obj.result === 'object' && !Array.isArray(obj.result)
@@ -515,12 +545,17 @@ function normalizeCorrectionResult(result: unknown): unknown {
   const target = nested || obj;
   const currentScore = findNumericValue(target, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
   if (currentScore !== null) return result;
-  const inferredScore = inferScoreFromCorrectionText(textFromCorrectionResult(target));
+  const correctionText = textFromCorrectionResult(target);
+  const inferredScore = inferScoreFromCorrectionText(correctionText)
+    ?? inferScoreFromAnswerSimilarity(correctionText, modelAnswer);
   if (inferredScore === null) return result;
+  const fallbackFeedback = inferredScore === 0
+    ? 'الإجابة المرفوعة لا تطابق عناصر الإجابة النموذجية. تم احتسابها بدرجة صفر بواسطة المقارنة الاحتياطية بعد أن أعاد مسار القراءة نصاً بلا درجة.'
+    : 'تم احتساب الدرجة بواسطة المقارنة الاحتياطية مع الإجابة النموذجية لأن مسار القراءة أعاد نصاً بلا درجة صريحة.';
   if (nested) {
-    return { ...obj, result: { ...nested, score: inferredScore, inferred_score: true } };
+    return { ...obj, result: { ...nested, score: inferredScore, maxScore: 100, percentage: inferredScore, feedback: nested.feedback || fallbackFeedback, inferred_score: true } };
   }
-  return { ...obj, score: inferredScore, inferred_score: true };
+  return { ...obj, score: inferredScore, maxScore: 100, percentage: inferredScore, feedback: obj.feedback || fallbackFeedback, inferred_score: true };
 }
 
 async function correctSingleChapterExamEntry(submission: ChapterSubmission, entry: SubmissionEntry, index: number) {
@@ -594,7 +629,7 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
       if (!response.ok) {
         throw new Error(`${endpoint} رفض الطلب برمز ${response.status}`);
       }
-      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result) };
+      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result, entry.modelAnswer || '') };
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.');
     } finally {
