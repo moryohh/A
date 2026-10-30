@@ -119,6 +119,7 @@ type ClassroomState = {
     bookletShares?: Array<{ id: string; from: string; index: number; question: string; answer: string; createdAt: number }>;
   };
 };
+type ActiveRoomPreview = { code: string; status?: string; contentMode?: "board" | "booklet"; lessonTitle?: string; players?: number; endsAt?: number };
 
 interface Props {
   onClose: () => void;
@@ -417,6 +418,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
   const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers">("plants");
   const [biologyLabOpen, setBiologyLabOpen] = useState(false);
+  const [activeRoomsPreview, setActiveRoomsPreview] = useState<ActiveRoomPreview[]>([]);
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
@@ -794,6 +796,24 @@ export const LiveClassroomModal: React.FC<Props> = ({
       .finally(() => { if (!cancelled) setTeachersLoading(false); });
     return () => { cancelled = true; };
   }, [classroom?.contentMode, currentContent.subject, currentContent.chapter, currentContent.lesson, currentContent.lessonId, currentContent.lessonTitle, category, lessonTitle]);
+  useEffect(() => {
+    if (!room || classroom?.contentMode !== "booklet" || offlineBooklet || !API) return;
+    let cancelled = false;
+    const loadRooms = async () => {
+      try {
+        const response = await fetch(`${API}/rooms`);
+        const payload = await response.json();
+        const now = Date.now();
+        const rooms = Array.isArray(payload?.rooms) ? payload.rooms.filter((item: ActiveRoomPreview) =>
+          (item.status === "waiting" || item.status === "playing") && (!item.endsAt || item.endsAt > now),
+        ).slice(0, 8) : [];
+        if (!cancelled) setActiveRoomsPreview(rooms);
+      } catch (_) { if (!cancelled) setActiveRoomsPreview([]); }
+    };
+    void loadRooms();
+    const timer = window.setInterval(loadRooms, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [room, classroom?.contentMode, offlineBooklet]);
   useEffect(() => {
     if (!room || !isTeacher) return;
     let cancelled = false;
@@ -1282,7 +1302,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => setAchievementsOpen(true)} className="grid h-9 w-9 place-items-center rounded-xl border border-amber-200/40 bg-amber-400/15 text-amber-100" aria-label="تحدياتي" title="تحدياتي"><Target className="h-4 w-4"/></button>
+            <button onClick={() => setAchievementsOpen(true)} className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-amber-200/50 bg-amber-400/20 px-2 text-amber-100 shadow-[0_0_12px_rgba(251,191,36,.16)]" aria-label="تحدياتي" title="تحدياتي"><Target className="h-4 w-4"/><span className="text-[9px] font-black">تحدياتي</span></button>
             {!offlineBooklet && <span className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
             {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
             <button onClick={() => void toggleMic()} className={`grid h-9 w-9 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
@@ -1291,32 +1311,35 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
-          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(215px,1fr)_clamp(240px,31vw,360px)]" : "min-[600px]:grid-cols-[clamp(105px,15vw,145px)_minmax(280px,1fr)]"}`}>
+          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(82px,10vw,118px)_minmax(180px,1fr)_minmax(210px,29vw)]" : "min-[600px]:grid-cols-[clamp(82px,10vw,118px)_minmax(280px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
             <aside className="relative max-h-44 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
-              <b className="mb-1 block text-center text-[10px] text-emerald-200">الأعضاء النشطون · {activeParticipants.length}</b>
-              <small className="mb-2 block text-center text-[8px] text-slate-400">اسحب لرؤية بقية الأعضاء</small>
-              <div className="max-h-[16rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+              <div className="mb-2 grid grid-cols-2 gap-1 text-center">
+                <div className="min-w-0 rounded-xl border border-cyan-200/15 bg-cyan-400/10 px-1 py-1"><b className="block text-[8px] text-cyan-100">الغرف</b><div className="mt-1 max-h-10 space-y-0.5 overflow-y-auto">{(activeRoomsPreview.length ? activeRoomsPreview : [{ code: room, status: "playing" }]).map((activeRoom) => <span key={activeRoom.code} className={`block truncate text-[7px] ${activeRoom.code === room ? "font-black text-amber-200" : "text-slate-300"}`}>#{activeRoom.code}</span>)}</div></div>
+                <div className="min-w-0 rounded-xl border border-emerald-200/15 bg-emerald-400/10 px-1 py-1"><b className="block text-[8px] text-emerald-100">الأسماء</b><small className="mt-1 block text-[7px] text-slate-400">{activeParticipants.length} نشط</small></div>
+              </div>
+              <small className="mb-1 block text-center text-[7px] text-slate-400">اسحب لرؤية بقية الأعضاء</small>
+              <div className="max-h-[16rem] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">
                 {rankedParticipants.map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
                   const ratio = Math.round((progress / target) * 100);
                   const shieldTier = Math.min(4, Math.floor((index + 1) / 2));
-                  return <div key={player.id} className={`rounded-xl border border-white/10 bg-white/5 p-2 text-center ${index === 4 ? "opacity-60" : ""}`}>
+                  return <div key={player.id} className={`rounded-xl border border-white/10 bg-white/5 p-1.5 text-center ${index === 4 ? "opacity-60" : ""}`}>
                     <div className="flex items-center gap-1.5 text-right">
-                      <img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className="h-8 w-8 rounded-xl border border-emerald-300/40 object-cover"/>
-                      <div className="min-w-0 flex-1"><b className="block truncate text-[10px]">{player.name || "طالب"}</b><span className="text-[8px] text-slate-300">المستوى {player.level || 1} · {player.activity || "يدرس الآن"}</span></div>
-                      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldTier}.png`} alt="درع الطالب" className="h-7 w-7 object-contain"/>
+                      <img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className="h-6 w-6 rounded-lg border border-emerald-300/40 object-cover"/>
+                      <div className="min-w-0 flex-1"><b className="block truncate text-[8px]">{player.name || "طالب"}</b><span className="block truncate text-[7px] text-slate-300">المستوى {player.level || 1}</span></div>
+                      <img src={`${import.meta.env.BASE_URL}assets/shields/shield-${shieldTier}.png`} alt="درع الطالب" className="h-5 w-5 object-contain"/>
                     </div>
-                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{width: `${ratio}%`}}/></div>
-                    <span className="mt-1 block text-[8px] text-emerald-200">إنجاز الدرس {progress}/{target}</span>
+                    <div className="mt-1 h-0.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{width: `${ratio}%`}}/></div>
+                    <span className="mt-0.5 block text-[7px] text-emerald-200">{progress}/{target}</span>
                   </div>;
                 })}
               </div>
             </aside>
 
             <main className="flex min-h-[55dvh] flex-col overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#fffdf7] p-2 shadow-inner min-[600px]:min-h-0" dir="rtl">
-              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-[20rem] grid-cols-2 content-start justify-items-center gap-2 overflow-y-auto px-1">
+              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full max-w-[18rem] grid-cols-2 content-start justify-items-center gap-2 overflow-y-auto px-1">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
@@ -1325,12 +1348,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
                   const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
-                  return <div key={player.id} className={`relative flex min-h-24 w-full max-w-[150px] flex-col items-center justify-center rounded-2xl border p-1.5 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
+                  return <div key={player.id} className={`relative flex h-fit min-h-0 w-[132px] max-w-full flex-col items-center justify-center rounded-xl border p-1 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="!h-[52px] !w-[72px] drop-shadow-md" />
-                    <b className="mt-1 text-[10px] text-emerald-950">{player.name || "طالب"}</b>
-                    <span className="text-[9px] font-black text-amber-700">{points} نقطة</span>
-                    <small className="mt-1 max-w-full truncate text-[8px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
+                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="!h-[46px] !w-[64px] drop-shadow-md" />
+                    <b className="mt-0.5 max-w-full truncate text-[9px] text-emerald-950">{player.name || "طالب"}</b>
+                    <span className="text-[8px] font-black text-amber-700">{points} نقطة</span>
+                    <small className="mt-0.5 max-w-full truncate text-[7px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
                     {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
                   </div>;
                 })}
@@ -1370,13 +1393,13 @@ export const LiveClassroomModal: React.FC<Props> = ({
               })()}
             </main>
 
-            {bookletPanelVisible && <aside className="grid min-h-[65dvh] grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
+            {bookletPanelVisible && <aside className="grid min-h-[65dvh] min-w-0 grid-rows-[41px_minmax(0,1fr)_58px] overflow-hidden rounded-2xl border border-[#d7c9a4] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
               <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
                 {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4 text-cyan-600"/>{currentQuestionShared ? "تمت المشاركة" : "مشاركة"}</button> : <span className="flex-1" aria-hidden="true" />}
                 <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
                 <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
               </div>
-              <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
+              <div className="min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3">
                 <div className={`mb-3 rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[10px] text-emerald-900">هدف الدرس</b><span className={`text-[10px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{lessonGoalProgress}/{lessonGoalTarget}</span></div>
                   <p className="mt-1 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p>
