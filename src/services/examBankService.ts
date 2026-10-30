@@ -26,6 +26,9 @@ export async function fetchChapterExamBank(
       .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
       .eq('subject_id', subjectId)
       .eq('exam_type', 'monthly')
+      // Rows marked raw_text failed ingestion and can expose truncated or
+      // corrupted questions. Keep them quarantined until their source is restored.
+      .neq('parse_status', 'raw_text')
       .eq('chapter_number', chapterNumber)
       .order('title')
       .limit(200),
@@ -34,6 +37,7 @@ export async function fetchChapterExamBank(
       .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
       .eq('subject_id', subjectId)
       .eq('exam_type', 'ministry')
+      .neq('parse_status', 'raw_text')
       .order('title')
       .limit(200),
   ]);
