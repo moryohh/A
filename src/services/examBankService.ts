@@ -16,15 +16,24 @@ export interface CurriculumExamRecord {
 
 export type CurriculumExamIndexRecord = Omit<CurriculumExamRecord, 'payload'>;
 
+function examBankSubjectId(subjectId: string) {
+  // The application routes use arabic-1/arabic-2 while the imported bank uses
+  // arabic_1/arabic_2. Other subject identifiers already match exactly.
+  return subjectId === 'arabic-1' || subjectId === 'arabic-2'
+    ? subjectId.replace('-', '_')
+    : subjectId;
+}
+
 export async function fetchChapterExamBank(
   subjectId: string,
   chapterNumber: number,
 ): Promise<{ monthly: CurriculumExamIndexRecord[]; ministry: CurriculumExamIndexRecord[] }> {
+  const bankSubjectId = examBankSubjectId(subjectId);
   const [monthlyResult, ministryResult] = await Promise.all([
     supabase
       .from('curriculum_exam_bank')
       .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
-      .eq('subject_id', subjectId)
+      .eq('subject_id', bankSubjectId)
       .eq('exam_type', 'monthly')
       // Rows marked raw_text failed ingestion and can expose truncated or
       // corrupted questions. Keep them quarantined until their source is restored.
@@ -35,7 +44,7 @@ export async function fetchChapterExamBank(
     supabase
       .from('curriculum_exam_bank')
       .select('id,subject_id,exam_type,chapter_number,lesson_ids,title,source_file,parse_status')
-      .eq('subject_id', subjectId)
+      .eq('subject_id', bankSubjectId)
       .eq('exam_type', 'ministry')
       .neq('parse_status', 'raw_text')
       .order('title')
