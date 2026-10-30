@@ -3,6 +3,7 @@ import { Award, CalendarDays, Camera, CheckCircle2, ChevronLeft, DoorOpen, FileT
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
+import { reserveExamAttempt } from '../services/examQuotaService';
 import { NotificationExamResult } from '../types';
 
 interface ChapterExamIconsProps {
@@ -781,6 +782,13 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       submitted_at: submittedAt,
       entries,
     };
+
+    const quota = await reserveExamAttempt(examKind, exam.id, submission.id);
+    if (!quota.allowed) {
+      setSubmitMessage(quota.message || 'لا يمكن بدء محاولة جديدة الآن.');
+      setSubmitState('error');
+      return;
+    }
 
     setSubmitState('processing');
     setProcessingPhase(0);

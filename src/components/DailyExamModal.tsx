@@ -21,6 +21,7 @@ import {
 } from '../services/imageEvaluationService';
 import { NotificationExamAnswer, OpenLessonContext } from '../types';
 import { getDailyExamReward } from '../services/pointsService';
+import { reserveExamAttempt } from '../services/examQuotaService';
 
 interface DailyExamModalProps {
   isOpen: boolean;
@@ -148,6 +149,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitState, setSubmitState] = useState<'idle' | 'confirming' | 'processing' | 'completed'>('idle');
   const [processingPhase, setProcessingPhase] = useState(0);
+  const [quotaError, setQuotaError] = useState('');
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const submissionLockRef = useRef(false);
   const rewardIssuedRef = useRef(false);
@@ -184,6 +186,7 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
     setCurrentQuestionPage(1);
     setIsTimerRunning(true);
     setProcessingPhase(0);
+    setQuotaError('');
 
     if (customExam) {
       setExam(customExam);
@@ -350,6 +353,16 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
     submissionLockRef.current = true;
     const submissionId = `submission_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     submissionIdRef.current = submissionId;
+    const quota = await reserveExamAttempt('daily', `${lessonId}:${exam.lessonTitle}`, submissionId);
+    if (!quota.allowed) {
+      submissionLockRef.current = false;
+      submissionIdRef.current = null;
+      setQuotaError(quota.message || 'لا يمكن بدء محاولة جديدة الآن.');
+      setSubmitState('idle');
+      setIsTimerRunning(true);
+      return;
+    }
+    setQuotaError('');
     setProcessingPhase(0);
     setSubmitState('processing');
     setQuestionErrors({ q1: '', q2: '' });
@@ -500,6 +513,12 @@ export const DailyExamModal: React.FC<DailyExamModalProps> = ({
               </div>
             </div>
           </header>
+
+          {quotaError && (
+            <div className="relative z-20 mx-auto mt-3 w-[calc(100%-2rem)] max-w-2xl border border-red-300 bg-red-50 px-4 py-3 text-center text-sm font-black text-red-700" role="alert">
+              {quotaError}
+            </div>
+          )}
 
           {submitState === 'confirming' && (
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#302f3f]/60 p-4 backdrop-blur-sm">
