@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
 import { releaseFailedExamAttempt, reserveExamAttempt } from '../services/examQuotaService';
 import { NotificationExamResult } from '../types';
+import { ExamResultDetailsModal } from './ExamResultDetailsModal';
 
 interface ChapterExamIconsProps {
   subjectId: string;
@@ -477,13 +478,23 @@ function textFromCorrectionResult(value: unknown): string {
   if (typeof value === 'string') return value;
   if (!value || typeof value !== 'object') return '';
   const obj = value as Record<string, unknown>;
-  return [
+  const direct = [
     obj.feedback,
+    obj.explanation,
+    obj.correction,
+    obj.mistakes,
+    obj.errors,
     obj.output,
     obj.text,
     obj.extractedText,
     obj.message,
-  ].filter((item): item is string => typeof item === 'string').join(' ');
+  ].filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).join(' ');
+  if (direct) return direct;
+  for (const child of Object.values(obj)) {
+    const nested = textFromCorrectionResult(child);
+    if (nested) return nested;
+  }
+  return '';
 }
 
 function inferScoreFromCorrectionText(text: string): number | null {
@@ -666,43 +677,47 @@ function buildResultMessage(submission: ChapterSubmission) {
   return `تم حفظ إجابات ${submission.exam_title}، لكن لم تصل نتيجة التصحيح بعد.`;
 }
 
-function notifyChapterExamResult(submission: ChapterSubmission) {
-  const message = buildResultMessage(submission);
+function buildChapterExamResult(submission: ChapterSubmission): NotificationExamResult {
   const score = findNumericValue(submission.correction_result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
   const totalScore = findNumericValue(submission.correction_result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
+  return {
+    title: submission.exam_title,
+    subject: submission.subject_name,
+    completedAt: submission.submitted_at,
+    score: score ?? undefined,
+    totalScore: totalScore ?? undefined,
+    percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
+    summary: textFromCorrectionResult(submission.correction_result) || buildResultMessage(submission),
+    answers: submission.entries.map((entry) => {
+      const resultList = submission.correction_result && typeof submission.correction_result === 'object'
+        ? (submission.correction_result as { results?: Array<{ question?: string; part?: string; result?: unknown }> }).results
+        : undefined;
+      const matchedResult = resultList?.find((item) => item.question === entry.question && item.part === entry.part)?.result;
+      const entryScore = findNumericValue(matchedResult, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+      const entryTotal = findNumericValue(matchedResult, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']) || 100;
+      const entryPercentage = entryScore === null ? null : Math.round((entryScore / Math.max(1, entryTotal)) * 100);
+      return {
+        label: [entry.question, entry.part].filter(Boolean).join(' — '),
+        prompt: entry.prompt,
+        userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
+        modelAnswer: entry.modelAnswer,
+        score: entryScore ?? undefined,
+        maxScore: entryScore === null ? undefined : entryTotal,
+        status: entryPercentage === null ? 'ungraded' as const : entryPercentage >= 90 ? 'correct' as const : entryPercentage <= 25 ? 'wrong' as const : 'partial' as const,
+        feedback: textFromCorrectionResult(matchedResult) || undefined,
+      };
+    }),
+  };
+}
+
+function notifyChapterExamResult(submission: ChapterSubmission, examResult = buildChapterExamResult(submission)) {
+  const message = buildResultMessage(submission);
   const detail: ChapterExamNotificationDetail = {
     id: `chapter-exam-result-${submission.id}`,
     title: 'نتيجة الامتحان',
     message,
     submittedAt: submission.submitted_at,
-    examResult: {
-      title: submission.exam_title,
-      subject: submission.subject_name,
-      completedAt: submission.submitted_at,
-      score: score ?? undefined,
-      totalScore: totalScore ?? undefined,
-      percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
-      summary: textFromCorrectionResult(submission.correction_result) || message,
-      answers: submission.entries.map((entry) => {
-        const resultList = submission.correction_result && typeof submission.correction_result === 'object'
-          ? (submission.correction_result as { results?: Array<{ question?: string; part?: string; result?: unknown }> }).results
-          : undefined;
-        const matchedResult = resultList?.find((item) => item.question === entry.question && item.part === entry.part)?.result;
-        const entryScore = findNumericValue(matchedResult, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
-        const entryTotal = findNumericValue(matchedResult, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']) || 100;
-        const entryPercentage = entryScore === null ? null : Math.round((entryScore / Math.max(1, entryTotal)) * 100);
-        return {
-          label: [entry.question, entry.part].filter(Boolean).join(' — '),
-          prompt: entry.prompt,
-          userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
-          modelAnswer: entry.modelAnswer,
-          score: entryScore ?? undefined,
-          maxScore: entryScore === null ? undefined : entryTotal,
-          status: entryPercentage === null ? 'ungraded' as const : entryPercentage >= 90 ? 'correct' as const : entryPercentage <= 25 ? 'wrong' as const : 'partial' as const,
-          feedback: textFromCorrectionResult(matchedResult) || undefined,
-        };
-      }),
-    },
+    examResult,
   };
   window.dispatchEvent(new CustomEvent<ChapterExamNotificationDetail>('chapter-exam-result', { detail }));
 }
@@ -717,6 +732,8 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
   const [submitState, setSubmitState] = useState<'idle' | 'confirming' | 'processing' | 'completed' | 'error'>('idle');
   const [processingPhase, setProcessingPhase] = useState(0);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [completedResult, setCompletedResult] = useState<NotificationExamResult | null>(null);
+  const [isResultOpen, setIsResultOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -929,7 +946,9 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       } else {
         setSubmitMessage('تم حفظ الإجابات، لكن تعذر استلام نتيجة التصحيح من مسارات API.');
       }
-      notifyChapterExamResult(finalSubmission);
+      const examResult = buildChapterExamResult(finalSubmission);
+      setCompletedResult(examResult);
+      notifyChapterExamResult(finalSubmission, examResult);
       setSubmitState('completed');
     } catch {
       await releaseFailedExamAttempt(submission.id);
@@ -1194,8 +1213,24 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
               ) : (
                 <>
                   <Award className="mx-auto h-10 w-10 text-emerald-600" />
-                  <h3 className="mt-4 text-lg font-black text-slate-950">تم إرسال إجاباتك</h3>
+                  <h3 className="mt-4 text-lg font-black text-slate-950">اكتمل تصحيح الامتحان</h3>
+                  {completedResult?.score !== undefined && (
+                    <div className="mt-4 rounded-2xl bg-gradient-to-l from-emerald-500 to-cyan-600 px-4 py-4 text-white shadow-lg">
+                      <p className="text-xs font-bold text-white/80">النتيجة النهائية</p>
+                      <p className="mt-1 text-3xl font-black" dir="ltr">{completedResult.score} / {completedResult.totalScore || 100}</p>
+                      <p className="mt-1 text-sm font-black">%{completedResult.percentage ?? completedResult.score}</p>
+                    </div>
+                  )}
                   <p className="mt-2 text-sm leading-7 text-slate-600">{submitMessage || 'تم تسجيل نتيجة الامتحان.'}</p>
+                  {completedResult && (
+                    <button
+                      type="button"
+                      onClick={() => setIsResultOpen(true)}
+                      className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm"
+                    >
+                      عرض النتيجة والتصحيح
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
@@ -1208,6 +1243,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
             </div>
           </div>
         )}
+        <ExamResultDetailsModal result={isResultOpen ? completedResult : null} onClose={() => setIsResultOpen(false)} />
       </div>
     </div>
   );
