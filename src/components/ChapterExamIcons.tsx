@@ -74,7 +74,15 @@ function titleFromKey(key: string) {
 }
 
 function displayPartTitle(value: string, fallback: string) {
-  return titleFromKey(value || fallback).replace(/^س\d+$/, 'المطلوب');
+  const raw = titleFromKey(value || fallback).replace(/^س[٠-٩0-9]+$/, 'المطلوب');
+  const marker = raw.replace(/^الفرع\s*/i, '').trim();
+  const arabicMarkers: Record<string, string> = {
+    a: 'أ',
+    b: 'ب',
+    c: 'ج',
+    d: 'د',
+  };
+  return arabicMarkers[marker.toLowerCase()] || marker || 'المطلوب';
 }
 
 function questionTitleFromKey(key: string, index: number) {
@@ -125,11 +133,28 @@ function formatQuestionPoint(item: unknown, index: number) {
 function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return readQuestion(value, fallbackTitle);
   const obj = value as Record<string, unknown>;
-  const points = Array.isArray(obj.points) ? obj.points.map(formatQuestionPoint).filter(Boolean) : [];
+  const rawPoints = Array.isArray(obj.points) ? obj.points : [];
+  const points = rawPoints.map(formatQuestionPoint).filter(Boolean);
   const title = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label', 'title']), fallbackTitle);
   const heading = firstText(obj, ['question', 'question_text', 'text', 'prompt', 'content', 'body', 'instruction', 'title']);
+  // Some imported exams store the model answer as a plain string list in
+  // `points`. It must feed correction, never appear inside the student's prompt.
+  if (rawPoints.length > 0 && rawPoints.every((point) => typeof point === 'string')) {
+    return {
+      title,
+      text: heading,
+      answer: rawPoints.map((point, index) => `${index + 1}. ${String(point).trim()}`).join('\n'),
+    };
+  }
   if (points.length > 0) return { title, text: [heading, ...points].filter(Boolean).join('\n\n') };
   return readQuestion(value, fallbackTitle);
+}
+
+function examDisplayName(title: string, examKind: 'monthly' | 'ministry') {
+  const normalized = title.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  const match = normalized.match(/(?:set|exam|نموذج|امتحان)[^0-9]*([0-9]+)/i) || normalized.match(/([0-9]+)/);
+  const kindLabel = examKind === 'monthly' ? 'الامتحان الشهري' : 'الامتحان الوزاري';
+  return match ? `${kindLabel} ${match[1]}` : kindLabel;
 }
 
 function readPartCollection(value: unknown): QuestionEntry[] {
@@ -775,7 +800,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
     const submission: ChapterSubmission = {
       id: `submission_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       exam_id: exam.id,
-      exam_title: exam.title,
+      exam_title: examDisplayName(exam.title, examKind),
       subject_id: exam.subject_id,
       subject_name: subjectName,
       chapter_number: exam.chapter_number,
@@ -960,7 +985,10 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
               className={`exam-page-turn exam-paper ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-[1.35rem] border-2 p-5 text-right shadow-[0_10px_28px_rgba(111,86,42,.2)]`}
             >
               <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#cbb98d]/70 pb-3">
-                <h3 className="text-sm font-black text-[#594a2d]">{activeQuestion.title} - الفرع {activePart.title}</h3>
+                <h3 className="text-sm font-black text-[#594a2d]">
+                  {activeQuestion.title}
+                  {activeQuestion.parts.length > 1 ? ` - الفرع ${activePart.title}` : ''}
+                </h3>
                 {activeQuestion.parts.length > 1 && (
                   <button
                     type="button"
