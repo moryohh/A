@@ -162,7 +162,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       >
         {/* Top Decorative Glow Line */}
         <div
-          className="absolute top-0 inset-x-0 h-1.5 transition-colors"
+          className="absolute top-0 inset-x-0 h-1.5 opacity-0 transition-colors"
           style={{
             background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.secondary}, ${theme.colors.accent})`,
           }}
@@ -469,7 +469,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   <label className={`text-[11px] font-bold block ${theme.classes.textMain}`}>
                     بريد Gmail الرسمي
                   </label>
-                  <span className="text-[10px] text-emerald-400 font-bold">@gmail.com حصراً</span>
+                  <span className="text-[10px] text-emerald-400 font-bold opacity-0">@gmail.com حصراً</span>
                 </div>
                 <div className="relative">
                   <input
@@ -478,7 +478,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="student@gmail.com"
-                    className={`w-full pl-3 pr-9 py-2.5 rounded-xl border text-xs focus:outline-none transition-all ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMain}`}
+                    className={`w-full pl-3 pr-9 py-2.5 rounded-xl border text-xs placeholder:text-transparent focus:outline-none transition-all ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMain}`}
                     style={{ borderColor: theme.colors.primary }}
                   />
                   <Mail
@@ -486,7 +486,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     style={{ color: theme.colors.primary }}
                   />
                 </div>
-                <p className={`text-[10px] ${theme.classes.textMuted}`}>
+                <p className={`text-[10px] opacity-0 ${theme.classes.textMuted}`}>
                   سيتم إرسال رابط تأكيد التفعيل الرسمي إلى هذا البريد.
                 </p>
               </div>
@@ -502,7 +502,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="•••••••• (6 أحرف أو أرقام على الأقل)"
-                    className={`w-full pl-3 pr-9 py-2.5 rounded-xl border text-xs focus:outline-none transition-all ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMain}`}
+                    className={`w-full pl-3 pr-9 py-2.5 rounded-xl border text-xs placeholder:text-transparent focus:outline-none transition-all ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder} ${theme.classes.textMain}`}
                     style={{ borderColor: theme.colors.primary }}
                   />
                   <Lock
