@@ -152,7 +152,10 @@ function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null
 
 function examDisplayName(title: string, examKind: 'monthly' | 'ministry') {
   const normalized = title.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
-  const match = normalized.match(/(?:set|exam|نموذج|امتحان)[^0-9]*([0-9]+)/i) || normalized.match(/([0-9]+)/);
+  const numericMatches = [...normalized.matchAll(/([0-9]+)/g)];
+  const match = normalized.match(/set[_\s-]*([0-9]+)/i)
+    || normalized.match(/(?:نموذج|امتحان)[^0-9]*([0-9]+)/i)
+    || numericMatches[numericMatches.length - 1];
   const kindLabel = examKind === 'monthly' ? 'الامتحان الشهري' : 'الامتحان الوزاري';
   return match ? `${kindLabel} ${match[1]}` : kindLabel;
 }
