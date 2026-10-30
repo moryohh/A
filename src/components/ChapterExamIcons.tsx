@@ -503,6 +503,7 @@ function textFromCorrectionResult(value: unknown): string {
 }
 
 function normalizedAnswerTokens(value: string): string[] {
+  const stopWords = new Set(['التي', 'الذي', 'هذه', 'هذا', 'ذلك', 'تلك', 'على', 'الى', 'إلى', 'عن', 'مما', 'كما', 'لأن', 'لان', 'هي', 'هو', 'في', 'من', 'كل', 'ما', 'ماذا', 'لماذا']);
   return value
     .toLocaleLowerCase('ar')
     .replace(/[\u064B-\u065F\u0670]/g, '')
@@ -511,7 +512,21 @@ function normalizedAnswerTokens(value: string): string[] {
     .replace(/ى/g, 'ي')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
-    .filter((token) => token.length > 2);
+    .filter((token) => token.length > 2 && !stopWords.has(token));
+}
+
+function extractedStudentText(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const obj = value as Record<string, unknown>;
+  for (const key of ['extractedText', 'extracted_text', 'recognizedText', 'recognized_text', 'ocrText', 'ocr_text', 'studentText', 'student_text']) {
+    const candidate = obj[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  for (const child of Object.values(obj)) {
+    const nested = extractedStudentText(child);
+    if (nested) return nested;
+  }
+  return '';
 }
 
 function inferScoreFromAnswerSimilarity(studentAnswer: string, modelAnswer: string): number | null {
@@ -536,7 +551,7 @@ function inferScoreFromCorrectionText(text: string): number | null {
   return null;
 }
 
-function normalizeCorrectionResult(result: unknown, modelAnswer = ''): unknown {
+function normalizeCorrectionResult(result: unknown, modelAnswer = '', studentAnswer = '', hasImage = false): unknown {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   const obj = result as Record<string, unknown>;
   const nested = obj.result && typeof obj.result === 'object' && !Array.isArray(obj.result)
@@ -546,11 +561,15 @@ function normalizeCorrectionResult(result: unknown, modelAnswer = ''): unknown {
   const currentScore = findNumericValue(target, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
   if (currentScore !== null) return result;
   const correctionText = textFromCorrectionResult(target);
+  const answerForComparison = studentAnswer.trim() || extractedStudentText(target);
   const inferredScore = inferScoreFromCorrectionText(correctionText)
-    ?? inferScoreFromAnswerSimilarity(correctionText, modelAnswer);
+    ?? inferScoreFromAnswerSimilarity(answerForComparison, modelAnswer)
+    ?? (hasImage ? 0 : null);
   if (inferredScore === null) return result;
   const fallbackFeedback = inferredScore === 0
-    ? 'الإجابة المرفوعة لا تطابق عناصر الإجابة النموذجية. تم احتسابها بدرجة صفر بواسطة المقارنة الاحتياطية بعد أن أعاد مسار القراءة نصاً بلا درجة.'
+    ? answerForComparison
+      ? 'الإجابة المرفوعة لا تطابق عناصر الإجابة النموذجية. تم احتسابها بدرجة صفر بواسطة المقارنة الاحتياطية بعد أن أعاد مسار القراءة نصاً بلا درجة.'
+      : 'لم يُعد مسار قراءة الصورة نص الطالب أو درجة صريحة، لذلك لم تُمنح درجة تلقائية منعاً لاحتساب إجابة غير متعلقة بالسؤال.'
     : 'تم احتساب الدرجة بواسطة المقارنة الاحتياطية مع الإجابة النموذجية لأن مسار القراءة أعاد نصاً بلا درجة صريحة.';
   if (nested) {
     return { ...obj, result: { ...nested, score: inferredScore, maxScore: 100, percentage: inferredScore, feedback: nested.feedback || fallbackFeedback, inferred_score: true } };
@@ -629,7 +648,7 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
       if (!response.ok) {
         throw new Error(`${endpoint} رفض الطلب برمز ${response.status}`);
       }
-      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result, entry.modelAnswer || '') };
+      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result, entry.modelAnswer || '', entry.answer, Boolean(entry.image)) };
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.');
     } finally {
