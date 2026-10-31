@@ -596,16 +596,18 @@ export class ChallengeRoom {
       var leaveBody = await request.json().catch(function () { return null; });
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       if (game.gameType === 'live_classroom') {
+        if (leaveBody.userId === game.hostId) {
+          game.status = 'closed';
+          game.endedReason = 'host_left';
+          game.leftPlayerId = leaveBody.userId;
+          await this.ctx.storage.put('game', game);
+          await this.updateRegistry('ended', game);
+          this.broadcast({ type: 'room_closed', reason: 'host_left' });
+          this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
+          return json({ ok: true, closed: true }, 200, '');
+        }
         game.players = game.players.filter(function (player) { return player.id !== leaveBody.userId; });
         var remainingHumans = this.humanPlayers(game);
-        if (remainingHumans.length && leaveBody.userId === game.hostId) {
-          game.hostId = remainingHumans[0].id;
-          game.presenterId = game.hostId;
-          remainingHumans[0].micAllowed = true;
-          remainingHumans[0].drawAllowed = true;
-          remainingHumans[0].activity = 'أصبح مضيف الغرفة';
-          remainingHumans[0].activityAt = Date.now();
-        }
         if (!remainingHumans.length) { game.players = []; game.emptyDeadline = Date.now() + 60000; }
         await this.ctx.storage.put('game', game);
         this.broadcast(this.view(game));
@@ -1072,16 +1074,18 @@ export class ChallengeRoom {
     // that raised this event, otherwise the reconnect grace period never starts.
     if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId, socket)) return;
     if (game.gameType === 'live_classroom') {
+      if (userId === game.hostId) {
+        game.status = 'closed';
+        game.endedReason = 'host_left';
+        game.leftPlayerId = userId;
+        await this.ctx.storage.put('game', game);
+        await this.updateRegistry('ended', game);
+        this.broadcast({ type: 'room_closed', reason: 'host_left' });
+        this.sockets().forEach(function (openSocket) { try { openSocket.close(4001, 'host_left'); } catch (_) {} });
+        return;
+      }
       game.players = game.players.filter(function (player) { return player.id !== userId; });
       var remainingClassroomHumans = this.humanPlayers(game);
-      if (remainingClassroomHumans.length && userId === game.hostId) {
-        game.hostId = remainingClassroomHumans[0].id;
-        game.presenterId = game.hostId;
-        remainingClassroomHumans[0].micAllowed = true;
-        remainingClassroomHumans[0].drawAllowed = true;
-        remainingClassroomHumans[0].activity = 'أصبح مضيف الغرفة';
-        remainingClassroomHumans[0].activityAt = Date.now();
-      }
       if (!remainingClassroomHumans.length) { game.players = []; game.emptyDeadline = Date.now() + 60000; }
       await this.ctx.storage.put('game', game);
       this.broadcast(this.view(game));

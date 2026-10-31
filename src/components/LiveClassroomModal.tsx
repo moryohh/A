@@ -44,6 +44,7 @@ import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/l
 import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
 import { LessonBookletView } from "./LessonBookletView";
 import { PlantStageVideo } from "./PlantStageVideo";
+import { OnlineChallengeModal, type OnlineChallengeGameType } from "./OnlineChallengeModal";
 import { ScienceLaboratoryModal } from "./ScienceLaboratoryModal";
 import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
 
@@ -438,6 +439,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [biologyLabOpen, setBiologyLabOpen] = useState(false);
   const [activeRoomsPreview, setActiveRoomsPreview] = useState<ActiveRoomPreview[]>([]);
   const [roomToJoin, setRoomToJoin] = useState<ActiveRoomPreview | null>(null);
+  const [externalChallengeRoom, setExternalChallengeRoom] = useState<ActiveRoomPreview | null>(null);
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
@@ -938,6 +940,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
         }
         if (payload.type === "state" && payload.gameType === "live_classroom")
           setState(payload);
+        if (payload.type === "classroom_answer" && payload.from)
+          setState((current) => current ? { ...current, players: current.players.map((player) => player.id === payload.from ? { ...player, lastAnswer: String(payload.value || "") } : player) } : current);
         if (payload.type === "audio_signal") void handleAudioSignal(payload);
       } catch {
         /* ignore malformed messages */
@@ -962,6 +966,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
     setRoomToJoin(null);
     socketRef.current?.close();
     socketRef.current = null;
+    if (["millionaire", "millionaire_team", "true_false", "gibha_sah"].includes(String(target.gameType))) {
+      setExternalChallengeRoom(target);
+      return;
+    }
     onJoinActiveRoom?.(target);
   }
 
@@ -1263,7 +1271,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <div>
               <h2 className="text-xl font-black text-cyan-100">
                 {defaultMode === "board"
-                  ? "حل معي — درس رياضيات أونلاين"
+                  ? `حل معي — ${isScienceBoard(category) ? (String(category).toLowerCase().includes("physics") || String(category).includes("فيز") ? "درس فيزياء" : String(category).toLowerCase().includes("chem") || String(category).includes("كيمي") ? "درس كيمياء" : "درس رياضيات") : category} أونلاين`
                   : "الملزمة — غرفة دراسة أونلاين"}
               </h2>
               <p className="mt-1 text-xs text-slate-300">
@@ -1279,7 +1287,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           <label className="mt-5 block text-xs font-black">عدد الطلاب</label>
           <div className="mt-2 rounded-2xl border border-cyan-300/20 bg-white/5 p-4">
             <div className="mb-3 flex items-center justify-between"><span className="text-xs text-slate-300">اسحب لتحديد السعة</span><b className="rounded-xl bg-cyan-400 px-4 py-2 text-xl text-slate-950">{capacity} طالب</b></div>
-            <input aria-label="عدد الطلاب" type="range" min="0" max={CAPACITIES.length - 1} step="1" value={CAPACITIES.indexOf(capacity)} onChange={(event) => setCapacity(CAPACITIES[Number(event.target.value)])} className="w-full accent-cyan-400" />
+            <input aria-label="عدد الطلاب" aria-valuetext={`${capacity} طالب`} type="range" min="0" max={CAPACITIES.length - 1} step="1" value={CAPACITIES.indexOf(capacity)} onChange={(event) => setCapacity(CAPACITIES[Number(event.target.value)])} className="w-full accent-cyan-400" />
             <div className="mt-2 flex justify-between text-[10px] font-black text-slate-400" dir="ltr">{CAPACITIES.map((value) => <span key={value}>{value}</span>)}</div>
           </div>
           <label className="mt-4 block text-xs font-black">مدة الدرس</label>
@@ -1440,11 +1448,23 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </div>
         {isTimeFinished && <div className="absolute inset-0 z-40 grid place-items-center bg-slate-950/35 p-4" role="status"><section className="w-full max-w-sm rounded-3xl border border-amber-200/70 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><b className="block text-base text-amber-900">انتهى وقت الدرس</b><p className="mt-2 text-xs leading-6 text-slate-600">توقف التحدي عند انتهاء الوقت. راجع هدف الدرس وما تبقى منه.</p><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><b className="block text-xs text-emerald-900">{lessonGoalText}</b><span className="mt-1 block text-[10px] font-black text-emerald-700">أنجزت {lessonGoalProgress} من {lessonGoalTarget} · المتبقي {lessonGoalRemaining}</span></div></section></div>}
         {roomToJoin && <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/65 p-4" onClick={() => setRoomToJoin(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-cyan-200/50 bg-[#102832] p-5 text-right text-white shadow-2xl" dir="rtl"><b className="block text-base">الانتقال إلى غرفة أخرى</b><p className="mt-2 text-xs leading-6 text-cyan-50">هل تريد مغادرة الغرفة الحالية والانضمام إلى «{roomToJoin.gameTitle || roomToJoin.lessonTitle || `الغرفة #${roomToJoin.code}`}»؟</p><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={confirmJoinActiveRoom} className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black">تأكيد الانضمام</button><button onClick={() => setRoomToJoin(null)} className="rounded-xl bg-white/10 px-4 py-3 text-xs font-black">إلغاء</button></div></section></div>}
-        {sharedInboxOpen && <div className="absolute inset-0 z-50 grid place-items-start bg-slate-950/50 p-3 pt-16 sm:place-items-center sm:p-6" onClick={closeSharedInbox} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[78dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-200 bg-[#fffdf7] p-4 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="flex items-center gap-2 text-sm"><Inbox className="h-5 w-5 text-cyan-700"/>صندوق الأسئلة المشتركة</b><small className="text-[9px] text-slate-500">الأسئلة التي شاركها زملاؤك داخل الغرفة</small></div><button onClick={closeSharedInbox} className="flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-[10px] font-black text-white" aria-label="الخروج من صندوق الأسئلة"><X className="h-4 w-4"/>خروج</button></div>{selectedSharedQuestion ? <article className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-xs text-cyan-800">شارك السؤال: {sharedSenderName(selectedSharedQuestion.from)}</b><button onClick={() => setSelectedSharedId(null)} className="rounded-lg bg-white px-2 py-1 text-[9px] font-black text-slate-600">رجوع للبريد</button></div><small className="font-black text-emerald-700">السؤال {selectedSharedQuestion.index + 1}</small><p className="mt-2 text-base font-black leading-8">{selectedSharedQuestion.question}</p><div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 text-sm font-bold leading-7">{selectedSharedQuestion.answer || "لا توجد إجابة مسجلة."}</div></article> : incomingShares.length ? <div className="space-y-2">{incomingShares.slice().reverse().map((share) => <button key={share.id} onClick={() => setSelectedSharedId(share.id)} className="w-full rounded-2xl border border-cyan-100 bg-white p-3 text-right transition hover:border-cyan-400 hover:bg-cyan-50"><span className="flex items-center justify-between gap-2"><b className="text-[10px] text-cyan-800">{sharedSenderName(share.from)}</b><small className="text-[8px] text-slate-400">السؤال {share.index + 1}</small></span><p className="mt-1 line-clamp-2 text-xs font-bold leading-6 text-slate-700">{share.question}</p></button>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-8 text-center"><Inbox className="mx-auto h-9 w-9 text-slate-300"/><b className="mt-2 block text-xs text-slate-500">لا توجد أسئلة مشتركة بعد</b></div>}</section></div>}
+        {sharedInboxOpen && <div className="absolute inset-0 z-50 grid place-items-start bg-slate-950/50 p-3 pt-16 sm:place-items-center sm:p-6" onClick={closeSharedInbox} role="presentation"><section onClick={closeSharedInbox} className="max-h-[78dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-200 bg-[#fffdf7] p-4 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="flex items-center gap-2 text-sm"><Inbox className="h-5 w-5 text-cyan-700"/>صندوق الأسئلة المشتركة</b><small className="text-[9px] text-slate-500">الأسئلة التي شاركها زملاؤك داخل الغرفة</small></div><button onClick={(event) => { event.stopPropagation(); closeSharedInbox(); }} className="flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-[10px] font-black text-white" aria-label="الخروج من صندوق الأسئلة"><X className="h-4 w-4"/>خروج</button></div>{selectedSharedQuestion ? <article className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-xs text-cyan-800">شارك السؤال: {sharedSenderName(selectedSharedQuestion.from)}</b><button onClick={(event) => { event.stopPropagation(); setSelectedSharedId(null); }} className="rounded-lg bg-white px-2 py-1 text-[9px] font-black text-slate-600">رجوع للبريد</button></div><small className="font-black text-emerald-700">السؤال {selectedSharedQuestion.index + 1}</small><p className="mt-2 text-base font-black leading-8">{selectedSharedQuestion.question}</p><div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 text-sm font-bold leading-7">{selectedSharedQuestion.answer || "لا توجد إجابة مسجلة."}</div></article> : incomingShares.length ? <div className="space-y-2">{incomingShares.slice().reverse().map((share) => <button key={share.id} onClick={(event) => { event.stopPropagation(); setSelectedSharedId(share.id); }} className="w-full rounded-2xl border border-cyan-100 bg-white p-3 text-right transition hover:border-cyan-400 hover:bg-cyan-50"><span className="flex items-center justify-between gap-2"><b className="text-[10px] text-cyan-800">{sharedSenderName(share.from)}</b><small className="text-[8px] text-slate-400">السؤال {share.index + 1}</small></span><p className="mt-1 line-clamp-2 text-xs font-bold leading-6 text-slate-700">{share.question}</p></button>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-8 text-center"><Inbox className="mx-auto h-9 w-9 text-slate-300"/><b className="mt-2 block text-xs text-slate-500">لا توجد أسئلة مشتركة بعد</b></div>}</section></div>}
         {achievementsOpen && <div className="absolute inset-0 z-50 flex justify-end bg-slate-950/55" onClick={() => setAchievementsOpen(false)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="h-full w-[min(390px,92vw)] overflow-y-auto rounded-l-3xl border-l border-amber-200/60 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="block text-lg">تحدياتي</b><small className="text-[10px] text-slate-500">تحدياتك الشخصية داخل هذه الغرفة</small></div><button onClick={() => setAchievementsOpen(false)} className="rounded-full bg-slate-100 p-2" aria-label="إغلاق"><X className="h-5 w-5"/></button></div><div className={`mb-3 rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}><div className="flex items-center justify-between gap-2"><b className="text-[10px] text-emerald-900">هدف الدرس</b><span className={`text-[10px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{lessonGoalProgress}/{lessonGoalTarget}</span></div><p className="mt-1 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p><p className={`mt-1 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${lessonGoalRemaining}` : `المتبقي ${lessonGoalRemaining}`}</p></div><div className="space-y-2">{challengeCards.map((challenge) => <div key={challenge.label} className={`flex items-center justify-between rounded-2xl border p-3 ${challenge.complete ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}><span className="flex items-center gap-3"><span className="text-xl">{challenge.icon}</span><b className={`text-xs ${challenge.complete ? "text-emerald-900" : "text-slate-700"}`}>{challenge.label}</b></span><span className={`text-[9px] font-black ${challenge.complete ? "text-emerald-700" : "text-slate-400"}`}>{challenge.complete ? "تم" : "لم يكتمل"}</span></div>)}</div><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center"><PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="mx-auto h-14"/><b className="mt-1 block text-xs text-emerald-900">نمو تركيزك مستمر</b><small className="mt-1 block text-[9px] text-emerald-700">الوقت داخل الغرفة: {elapsedTimerText} · مشاركة كل سؤال مرة واحدة وبحد أقصى 20 سؤالًا</small></div></section></div>}
         {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
       </div>
     );
+
+  if (externalChallengeRoom) return <OnlineChallengeModal
+    onClose={onClose}
+    questions={[]}
+    lessonTitle={externalChallengeRoom.lessonTitle || "غرفة تحدٍ نشطة"}
+    gameType={externalChallengeRoom.gameType as OnlineChallengeGameType}
+    gameTitle={externalChallengeRoom.gameTitle || "التحدّي الجماعي"}
+    subject={externalChallengeRoom.subject}
+    chapterNumber={externalChallengeRoom.chapter}
+    lessonNumber={externalChallengeRoom.lesson}
+    initialRoomCode={String(externalChallengeRoom.code)}
+  />;
 
   return (
     <div
