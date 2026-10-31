@@ -34,21 +34,21 @@ const SOURCES: Record<AppSfxName, string> = {
 };
 
 const VOLUMES: Record<AppSfxName, number> = {
-  navigation: 0.32,
-  tap: 0.22,
-  toggle: 0.24,
-  notification: 0.3,
-  success: 0.34,
-  attention: 0.28,
-  panelOpen: 0.3,
-  panelClose: 0.28,
-  subjectSelect: 0.3,
-  chapterSelect: 0.3,
-  lessonSelect: 0.3,
-  boardSelect: 0.28,
-  bookletSelect: 0.28,
-  swipeUp: 0.2,
-  swipeDown: 0.2,
+  navigation: 0.16,
+  tap: 0.11,
+  toggle: 0.12,
+  notification: 0.15,
+  success: 0.17,
+  attention: 0.14,
+  panelOpen: 0.15,
+  panelClose: 0.14,
+  subjectSelect: 0.15,
+  chapterSelect: 0.15,
+  lessonSelect: 0.15,
+  boardSelect: 0.14,
+  bookletSelect: 0.14,
+  swipeUp: 0.1,
+  swipeDown: 0.1,
 };
 
 class AppSfxEngine {
