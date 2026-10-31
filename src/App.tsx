@@ -1633,11 +1633,11 @@ function AppContent() {
             // Unmount the current room before mounting the selected one. Keeping both
             // transitions in the same render left the old full-screen portal visible.
             setIsChallengeHubOpen(false);
-            window.requestAnimationFrame(() => {
+            window.setTimeout(() => {
               setChallengeRoomCode(activeRoom.code);
               setChallengeConfig(nextConfig);
               setIsChallengeHubOpen(true);
-            });
+            }, 0);
           }}
         />
       )}
