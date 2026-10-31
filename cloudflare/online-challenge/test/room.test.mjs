@@ -687,6 +687,43 @@ test('room relays a trimmed chat message to both players', async () => {
   assert.equal(chatMessages[0].text, 'مرحباً بالمنافس');
 });
 
+test('classroom shares each lesson question once and caps every student at twenty questions', async () => {
+  const data = new Map();
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: () => {} };
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+    },
+    getWebSockets: () => [hostSocket],
+  });
+  data.set('game', {
+    gameType: 'live_classroom',
+    status: 'playing',
+    hostId: 'host',
+    round: 0,
+    questionIndex: 0,
+    turn: 'host',
+    questions: [],
+    studyMode: 'together',
+    players: [{ id: 'host', connected: true, score: 0, answer: null }],
+    bookletShares: [],
+    bookletShareKeys: {},
+  });
+
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_booklet_share', lessonId: 'lesson-a', index: 0, question: 'A1' }));
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_booklet_share', lessonId: 'lesson-a', index: 0, question: 'A1 duplicate' }));
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_booklet_share', lessonId: 'lesson-b', index: 0, question: 'B1' }));
+  for (let index = 1; index <= 19; index += 1) {
+    await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'classroom_booklet_share', lessonId: 'lesson-b', index, question: `B${index + 1}` }));
+  }
+
+  const game = data.get('game');
+  assert.equal(game.bookletShares.length, 20);
+  assert.equal(game.bookletShares.filter(share => share.index === 0).length, 2);
+  assert.equal(game.bookletShares.at(-1).question, 'B19');
+});
+
 test('gibha sah allows one synchronized reaction per player and turn', async () => {
   const data = new Map();
   const messages = [];

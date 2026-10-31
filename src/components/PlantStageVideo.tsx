@@ -8,7 +8,7 @@ type Props = {
   className?: string;
 };
 
-export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, volume = 1, className = '' }) => {
+export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, volume = 0.5, className = '' }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(!sound);
   const safeStage = Math.min(12, Math.max(1, Math.round(stage)));
@@ -36,6 +36,11 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
       setMuted(true);
       void video.play().catch(() => undefined);
     });
+    return () => {
+      video.pause();
+      video.currentTime = 0;
+      video.muted = true;
+    };
   }, [safeStage, sound, volume]);
 
   const enableSound = () => {

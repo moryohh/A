@@ -1604,6 +1604,7 @@ function AppContent() {
 
       {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && (
         <LiveClassroomModal
+          key={`live-classroom-${challengeRoomCode || 'create'}`}
           onClose={() => setIsChallengeHubOpen(false)}
           lessonTitle={challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر'}
           category={challengeConfig?.subject || 'المادة التعليمية'}
@@ -1618,10 +1619,24 @@ function AppContent() {
           }}
           initialRoomCode={challengeRoomCode}
           initialContentMode={challengeConfig?.contentMode || 'board'}
+          onJoinActiveRoom={(activeRoom) => {
+            setChallengeRoomCode(activeRoom.code);
+            setChallengeConfig({
+              questions: [],
+              lessonTitle: activeRoom.lessonTitle || 'غرفة تحدٍ نشطة',
+              gameType: activeRoom.gameType || 'live_classroom',
+              gameTitle: activeRoom.gameTitle || 'التحدّي الجماعي',
+              subject: activeRoom.subject,
+              chapterNumber: activeRoom.chapter,
+              lessonNumber: activeRoom.lesson,
+              contentMode: activeRoom.contentMode || (activeRoom.gameType === 'live_classroom' ? 'booklet' : undefined),
+            });
+          }}
         />
       )}
       {isChallengeHubOpen && challengeConfig?.gameType !== 'live_classroom' && (
         <OnlineChallengeModal
+          key={`online-challenge-${challengeRoomCode || challengeConfig?.gameType || 'create'}`}
           onClose={() => setIsChallengeHubOpen(false)}
           questions={challengeConfig?.questions || []}
           lessonTitle={challengeConfig?.lessonTitle || 'مركز الغرف النشطة'}

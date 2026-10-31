@@ -757,13 +757,19 @@ export class ChallengeRoom {
         var sharedQuestion = String(payload.question || '').trim().slice(0, 1200);
         if (!sharedQuestion) return;
         var sharedIndex = Math.max(0, Math.min(999, Number(payload.index) || 0));
-        var sharedQuestionKey = sender.userId + ':' + sharedIndex;
+        var sharedLessonId = String(payload.lessonId || 'lesson').trim().slice(0, 160) || 'lesson';
+        var sharedQuestionKey = sender.userId + ':' + sharedLessonId + ':' + sharedIndex;
         liveGame.bookletShareKeys = liveGame.bookletShareKeys && typeof liveGame.bookletShareKeys === 'object' ? liveGame.bookletShareKeys : {};
         if (liveGame.bookletShareKeys[sharedQuestionKey]) return;
+        var senderShareCount = Object.keys(liveGame.bookletShareKeys).filter(function (key) {
+          return key.indexOf(sender.userId + ':') === 0;
+        }).length;
+        if (senderShareCount >= 20) return;
         liveGame.bookletShareKeys[sharedQuestionKey] = true;
         liveGame.bookletShares = (liveGame.bookletShares || []).slice(-49).concat({
           id: crypto.randomUUID(),
           from: sender.userId,
+          lessonId: sharedLessonId,
           index: sharedIndex,
           question: sharedQuestion,
           answer: String(payload.answer || '').trim().slice(0, 1800),

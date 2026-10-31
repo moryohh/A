@@ -461,7 +461,7 @@ class GameAudioEngine {
     this.playExternal(
       sound.key,
       sound.url,
-      0.45,
+      0.225,
       false,
     );
   }
@@ -474,7 +474,7 @@ class GameAudioEngine {
       { key: 'true-false-millionaire-wrong', url: millionaireAudio.wrong },
     ];
     const sound = sounds[Math.floor(Math.random() * sounds.length)];
-    this.playExternal(sound.key, sound.url, 0.45, false);
+    this.playExternal(sound.key, sound.url, 0.225, false);
   }
 
   // Short sparkle for a growing True/False streak.

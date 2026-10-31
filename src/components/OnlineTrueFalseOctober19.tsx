@@ -191,10 +191,8 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
   useEffect(() => () => {
     socketRef.current?.close();
     closePeer();
-    gameAudio.stopExternal('millionaire-thinking');
-    gameAudio.stopExternal('millionaire-prize');
-    gameAudio.stopExternal('millionaire-correct');
-    gameAudio.stopExternal('millionaire-wrong');
+    // Stop every game/character effect on exit without touching WebRTC voice.
+    gameAudio.stopAllExternal();
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
     if (messageBubbleTimerRef.current) clearTimeout(messageBubbleTimerRef.current);

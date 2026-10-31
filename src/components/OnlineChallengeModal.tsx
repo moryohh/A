@@ -204,10 +204,9 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   useEffect(() => () => {
     socketRef.current?.close();
     closePeers();
-    gameAudio.stopExternal('millionaire-thinking');
-    gameAudio.stopExternal('millionaire-prize');
-    gameAudio.stopExternal('millionaire-correct');
-    gameAudio.stopExternal('millionaire-wrong');
+    // Game and character effects must never continue after leaving the room.
+    // Real-player voice is handled by WebRTC and remains independent.
+    gameAudio.stopAllExternal();
     if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
     if (messageBubbleTimerRef.current) clearTimeout(messageBubbleTimerRef.current);
