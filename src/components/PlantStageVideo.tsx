@@ -6,9 +6,10 @@ type Props = {
   sound?: boolean;
   volume?: number;
   className?: string;
+  bare?: boolean;
 };
 
-export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, volume = 0.5, className = '' }) => {
+export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, volume = 0.5, className = '', bare = false }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(!sound);
   const safeStage = Math.min(12, Math.max(1, Math.round(stage)));
@@ -53,7 +54,7 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden bg-[#dff7ff] shadow-sm transition-[width,height] duration-700 ${compact ? 'rounded-2xl' : 'h-full w-full rounded-[2rem]'} ${className}`}
+      className={`relative shrink-0 transition-[width,height] duration-700 ${bare ? 'overflow-visible bg-transparent shadow-none' : `overflow-hidden bg-[#dff7ff] shadow-sm ${compact ? 'rounded-2xl' : 'h-full w-full rounded-[2rem]'}`} ${className}`}
       style={compact ? { width: compactSize, height: Math.round(compactSize! * 0.72) } : undefined}
       onPointerDown={enableSound}
     >
@@ -61,7 +62,7 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
         key={safeStage}
         ref={videoRef}
         src={`${import.meta.env.BASE_URL}assets/plant-growth/stage-${String(safeStage).padStart(2, '0')}.mp4`}
-        className="h-full w-full object-cover transition-transform duration-700"
+        className={`h-full w-full transition-transform duration-700 ${bare ? 'object-contain mix-blend-multiply' : 'object-cover'}`}
         style={{ transform: `scale(${visualScale})` }}
         autoPlay
         playsInline

@@ -1330,7 +1330,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
       <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#0b1d24] font-cairo text-white" dir="rtl">
         <header className="grid min-h-14 shrink-0 grid-cols-[auto_minmax(150px,1fr)_auto] items-center gap-2 border-b border-white/10 bg-[#102832] px-2 py-1.5 shadow-lg sm:px-3" dir="ltr">
           <div className="flex min-w-0 items-center gap-1" dir="rtl">
-            <button onClick={closeClassroom} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-500" aria-label="إغلاق الغرفة"><X className="h-5 w-5"/></button>
             <button onClick={() => setRoomSoundOn((enabled) => !enabled)} className={`grid h-10 w-10 place-items-center rounded-xl border ${roomSoundOn ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-400"}`} aria-label={roomSoundOn ? "كتم سماعة الغرفة" : "تشغيل سماعة الغرفة"}>{roomSoundOn ? <Volume2 className="h-4 w-4"/> : <VolumeX className="h-4 w-4"/>}</button>
             <button onClick={() => void toggleMic()} className={`grid h-10 w-10 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
             {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
@@ -1342,28 +1341,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <div className="text-center"><span className="block text-[8px] font-black text-amber-200">الوقت المتبقي</span><strong className="block font-mono text-lg tracking-[.12em] text-white">{timerText}</strong></div>
           </div>
 
-          <div className="flex items-center justify-end gap-1" dir="rtl">
-          <button disabled={!canNavigateBooklet || bookletItemIndex <= 0} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex h-10 items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-3 text-[10px] font-black text-white disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-4 w-4"/>السابق</button>
-          <div className="relative z-30">
-            <button disabled={!canChangeLesson} onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-cyan-200/45 bg-gradient-to-br from-cyan-400/25 via-blue-500/20 to-violet-500/30 text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,.18)] disabled:cursor-not-allowed disabled:opacity-40" aria-label="تبديل الدرس" title={canChangeLesson ? "تبديل الدرس" : "المدرس يتحكم بالتنقل في هذه الغرفة"}><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-300"/></button>
-            {lessonMenuOpen && <div className="absolute left-0 top-11 max-h-[70dvh] w-52 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 shadow-2xl backdrop-blur" dir="rtl">
-              <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
-              <div className="grid grid-cols-2 gap-1.5">
-                {lessonChoices.map((lesson, index) => {
-                  const active = lesson.lessonId === currentContent.lessonId || lesson.lessonNumber === Number(currentContent.lesson);
-                  const colors = ["from-cyan-400 to-blue-500", "from-violet-400 to-fuchsia-500", "from-amber-300 to-orange-500", "from-emerald-300 to-teal-500", "from-rose-400 to-pink-500"];
-                  return <button key={lesson.lessonId} onClick={() => selectLesson(lesson)} className={`flex min-h-12 items-center gap-2 rounded-xl border px-2 py-1.5 text-right ${active ? "border-white/70 bg-white/15" : "border-white/10 bg-white/5 hover:bg-white/10"}`} title={lesson.title}>
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${colors[index % colors.length]} text-[10px] font-black text-slate-950 shadow-sm`}>{lesson.lessonNumber}</span>
-                    <span className="line-clamp-2 text-[8px] font-bold leading-4 text-white">{lesson.title || `الدرس ${lesson.lessonNumber}`}</span>
-                  </button>;
-                })}
-              </div>
-              {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
-            </div>}
-          </div>
-          <button disabled={!canNavigateBooklet || bookletItemIndex >= bookletQuestions.length - 1} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex h-10 items-center gap-1 rounded-xl border border-emerald-200/45 bg-emerald-500/25 px-3 text-[10px] font-black text-emerald-50 disabled:opacity-35" aria-label="السؤال التالي">التالي<ChevronLeft className="h-4 w-4"/></button>
-          {isBiologyClassroom && <button onClick={() => setBiologyLabOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:border-cyan-200 hover:bg-cyan-500 hover:text-white" aria-label="الانتقال إلى رسومات الأحياء" title="رسومات الأحياء"><Presentation className="h-4 w-4"/></button>}
-          <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`grid h-10 w-10 place-items-center rounded-xl border transition ${studyWorkspace === "teachers" ? "border-violet-200 bg-violet-500 text-white" : "border-white/10 bg-white/5 text-slate-300"}`} aria-label="مدرسو هذا الدرس" title="مدرسو هذا الدرس"><GraduationCap className="h-4 w-4"/></button>
+          <div className="flex items-center justify-end" dir="rtl">
+            <button onClick={closeClassroom} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-500 shadow-[0_0_18px_rgba(244,63,94,.3)]" aria-label="إغلاق الغرفة"><X className="h-6 w-6"/></button>
           </div>
         </header>
 
@@ -1377,77 +1356,59 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const active = activeRoom.code === room;
                   const logo = activeRoom.gameType === "millionaire" || activeRoom.gameType === "millionaire_team" ? "🏆" : activeRoom.gameType === "true_false" ? "✅" : activeRoom.gameType === "gibha_sah" ? "🎯" : "📚";
                   const title = activeRoom.gameTitle || activeRoom.lessonTitle || "غرفة تحدٍ";
-                  return <button key={activeRoom.code} type="button" disabled={active} onClick={() => joinActiveRoom(activeRoom)} className={`w-full rounded-xl border p-2 text-right transition ${active ? "cursor-default border-amber-300/50 bg-amber-400/10" : "border-white/10 bg-white/5 hover:border-cyan-300/50 hover:bg-cyan-400/10"}`} aria-label={active ? `أنت داخل ${title}` : `الانضمام إلى ${title}`}>
-                    <span className="flex items-start gap-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-black/20 text-base">{logo}</span><span className="min-w-0 flex-1"><b className="block line-clamp-2 text-[8px] leading-4 text-white">{title}</b><small className="mt-0.5 flex items-center gap-1 text-[7px] text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>{active ? "الغرفة الحالية" : "اضغط للانضمام"}</small></span></span>
-                    <span className="mt-1 flex items-center justify-between font-mono text-[7px] text-slate-300"><span>#{activeRoom.code}</span><span>{activeRoom.players || 0}/{activeRoom.capacity || "—"}</span></span>
+                  return <button key={activeRoom.code} type="button" disabled={active} onClick={() => joinActiveRoom(activeRoom)} className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2.5 text-right transition ${active ? "cursor-default border-amber-300/50 bg-amber-400/10" : "border-white/10 bg-white/5 hover:border-cyan-300/50 hover:bg-cyan-400/10"}`} aria-label={active ? `أنت داخل ${title}` : `الانضمام إلى ${title}`}>
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/20 text-xl">{logo}</span>
+                    <span className="min-w-0 flex-1"><b className="block line-clamp-2 text-[9px] leading-4 text-white">{title}</b><small className="mt-1 flex items-center gap-1 text-[8px] font-black text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400"/>{active ? "أنت هنا" : "متاح"}</small></span>
                   </button>;
                 })}
               </div>
             </aside>
 
-            <main className="order-3 flex min-h-[55dvh] flex-col overflow-hidden rounded-2xl border border-emerald-200/30 bg-[#fffdf7] p-2 shadow-inner min-[600px]:min-h-0" dir="rtl">
-              {studyWorkspace === "plants" ? <div className="mx-auto grid h-full w-full grid-cols-1 content-start justify-items-center gap-2 overflow-y-auto px-1 min-[900px]:grid-cols-2">
-                {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player, index) => {
+            <main className="order-3 flex min-h-[55dvh] flex-col overflow-hidden bg-[#fffdf7] p-2 min-[600px]:min-h-0" dir="rtl">
+              <div className="mx-auto grid h-full w-full grid-cols-1 content-start justify-items-center gap-x-2 gap-y-5 overflow-y-auto px-1 min-[900px]:grid-cols-2">
+                {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
-                  const points = Math.round((progress / target) * 100);
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
-                  const shareCount = (classroom?.bookletShares || []).filter((share) => share.from === player.id).length;
-                  const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
-                  return <div key={player.id} className={`relative flex h-fit min-h-0 w-[112px] max-w-full flex-col items-center justify-center rounded-xl border p-1 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
-                    {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} volume={0.5} className="!h-[38px] !w-[54px] drop-shadow-md" />
-                    <b className="mt-0.5 max-w-full truncate text-[9px] text-emerald-950">{player.name || "طالب"}</b>
-                    <span className="text-[8px] font-black text-amber-700">{points} نقطة</span>
-                    <small className="mt-0.5 max-w-full truncate text-[7px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
-                    {shareCount > 0 && <button onClick={() => openPlayerShares(player.id)} className="absolute bottom-2 left-2 flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-300 bg-gradient-to-br from-cyan-50 to-emerald-100 px-1 text-emerald-700 shadow-md" aria-label={`${unreadShareCount} مشاركات جديدة من ${player.name || "طالب"}`}><Share2 className="h-4 w-4"/>{unreadShareCount > 0 && <b className="-mr-1 rounded-full bg-rose-500 px-1 text-[8px] text-white">{unreadShareCount}</b>}</button>}
+                  return <div key={player.id} className="flex w-full min-w-0 flex-col items-center justify-center bg-transparent p-0">
+                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.5} className="!h-[88px] !w-[104px]" />
+                    <b className="mt-1 max-w-full truncate text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                   </div>;
                 })}
-              </div> : (() => {
-                const workspace = <div ref={studyWorkspaceRef} className={`${workspaceExpanded ? "fixed inset-0 z-[130] min-h-0 rounded-none border-0" : "relative min-h-44 flex-1 rounded-2xl border border-emerald-200"} overflow-hidden bg-white shadow-inner`}>
-                {studyWorkspace === "board" ? <BlankStudyBoard
-                  strokes={classroom?.strokes || []}
-                  drawingVersion={classroom?.drawingVersion || 0}
-                  canDraw={canDraw}
-                  onShare={(strokes) => send({ type: "classroom_board_share", strokes })}
-                /> : <div className="flex h-full min-h-44 flex-col bg-gradient-to-b from-slate-50 to-emerald-50/60">
-                  <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white/95 p-2" dir="rtl">
-                    <div className="flex min-w-max items-start gap-3">
-                      {teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center">
-                        <span className={`mx-auto block h-14 w-14 overflow-hidden rounded-full border-2 bg-slate-100 shadow-md transition ${selectedTeacherVideo?.id === story.id ? "border-cyan-400 ring-2 ring-cyan-200" : "border-white"}`}><img src={story.storyImage || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-full w-full object-cover"/></span>
-                        <b className="mt-1 block truncate text-[9px] text-slate-900">{story.teacherName || "مدرس المادة"}</b>
-                        <small className="block truncate text-[8px] text-slate-500">{story.channelName || story.teacherName}</small>
-                      </button>) : <p className="px-5 py-4 text-xs text-slate-500">لا توجد فيديوهات مدرسين مرتبطة بهذا الدرس حاليًا.</p>}
-                    </div>
-                  </div>
-                  <div className="min-h-0 flex-1 bg-slate-950">
-                    {selectedTeacherVideo?.youtubeId ? <iframe
-                      key={`${me || "local"}-${selectedTeacherVideo.youtubeId}`}
-                      className="h-full w-full border-0 bg-black"
-                      src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=0&rel=0&playsinline=1`}
-                      title={`شرح ${selectedTeacherVideo.teacherName}`}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    /> : <div className="grid h-full place-items-center p-4 text-center text-slate-300"><div><GraduationCap className="mx-auto mb-2 h-8 w-8 text-cyan-300"/><b className="block text-xs">اختر مدرسًا من الشريط لعرض الفيديو</b><small className="text-[9px] text-slate-500">لن يبدأ أي فيديو تلقائيًا</small></div></div>}
-                  </div>
-                </div>}
-                <button onClick={openStudyFullscreen} className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-violet-600 text-white shadow-lg transition hover:scale-105" aria-label={workspaceExpanded ? "تصغير منطقة العرض" : "تكبير منطقة العرض"} title={workspaceExpanded ? "العودة إلى الغرفة" : "تكبير إلى ملء الشاشة"}>{workspaceExpanded ? <Minimize2 className="h-4 w-4"/> : <Maximize2 className="h-4 w-4"/>}</button>
-              </div>;
-                return workspaceExpanded ? createPortal(workspace, document.body) : workspace;
-              })()}
+              </div>
             </main>
 
-            {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[41px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
-              <div className="flex items-center justify-between border-b border-[#d7c9a4] bg-[#e9e2cf] px-3 py-2">
-                {classroom?.studyMode === "together" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared || sharedQuestionLimitReached} className="flex items-center gap-1 rounded-lg border border-emerald-700/20 bg-gradient-to-br from-white to-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-800 shadow-sm disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : sharedQuestionLimitReached ? "وصلت إلى الحد الأقصى: 20 سؤالًا" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4 text-cyan-600"/>{currentQuestionShared ? "تمت المشاركة" : sharedQuestionLimitReached ? "20/20" : "مشاركة"}</button> : <span className="flex-1" aria-hidden="true" />}
-                <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
-                <button onClick={() => setBookletPanelVisible(false)} className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-3.5 w-3.5"/></button>
+            {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[58px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
+              <div className="flex items-center justify-between gap-2 border-b border-[#d7c9a4] bg-[#e9e2cf] px-2 py-2">
+                <div className="flex shrink-0 items-center gap-1">
+                  <button disabled={!canNavigateBooklet || bookletItemIndex <= 0 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white/70 px-2 text-[9px] font-black text-slate-700 disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-3.5 w-3.5"/>السابق</button>
+                  <div className="relative z-30">
+                    <button disabled={!canChangeLesson || studyWorkspace === "teachers"} onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center rounded-xl border border-cyan-700/20 bg-white/70 text-cyan-800 disabled:opacity-35" aria-label="تبديل الدرس" title={canChangeLesson ? "تبديل الدرس" : "المدرس يتحكم بالتنقل في هذه الغرفة"}><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600"/></button>
+                    {lessonMenuOpen && <div className="absolute right-0 top-11 max-h-[70dvh] w-56 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 text-white shadow-2xl backdrop-blur" dir="rtl">
+                      <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
+                      <div className="grid grid-cols-2 gap-1.5">{lessonChoices.map((lesson, index) => {
+                        const active = lesson.lessonId === currentContent.lessonId || lesson.lessonNumber === Number(currentContent.lesson);
+                        const colors = ["from-cyan-400 to-blue-500", "from-violet-400 to-fuchsia-500", "from-amber-300 to-orange-500", "from-emerald-300 to-teal-500", "from-rose-400 to-pink-500"];
+                        return <button key={lesson.lessonId} onClick={() => selectLesson(lesson)} className={`flex min-h-12 items-center gap-2 rounded-xl border px-2 py-1.5 text-right ${active ? "border-white/70 bg-white/15" : "border-white/10 bg-white/5 hover:bg-white/10"}`} title={lesson.title}><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${colors[index % colors.length]} text-[10px] font-black text-slate-950`}>{lesson.lessonNumber}</span><span className="line-clamp-2 text-[8px] font-bold leading-4">{lesson.title || `الدرس ${lesson.lessonNumber}`}</span></button>;
+                      })}</div>
+                      {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
+                    </div>}
+                  </div>
+                  <button disabled={!canNavigateBooklet || bookletItemIndex >= bookletQuestions.length - 1 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-emerald-700 px-2 text-[9px] font-black text-white disabled:opacity-35" aria-label="السؤال التالي">التالي<ChevronLeft className="h-3.5 w-3.5"/></button>
+                </div>
+                <div className="flex min-w-0 items-center justify-center gap-1">
+                  <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`flex h-9 items-center gap-1 rounded-xl border px-2 text-[9px] font-black transition ${studyWorkspace === "teachers" ? "border-red-300 bg-red-600 text-white" : "border-red-200 bg-white/80 text-red-700"}`} aria-label="فيديوهات مدرسين هذا الدرس" title="فيديوهات مدرسين هذا الدرس"><Presentation className="h-4 w-4"/><span className="hidden min-[900px]:inline">الفيديوهات</span></button>
+                  {classroom?.studyMode === "together" && studyWorkspace !== "teachers" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared || sharedQuestionLimitReached} className="flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-white/80 px-2 text-[8px] font-black text-emerald-800 disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : sharedQuestionLimitReached ? "وصلت إلى الحد الأقصى: 20 سؤالًا" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4 text-cyan-600"/>{currentQuestionShared ? "تمت" : sharedQuestionLimitReached ? "20/20" : "مشاركة"}</button> : null}
+                  <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
+                </div>
+                <button onClick={() => setBookletPanelVisible(false)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-4 w-4"/></button>
               </div>
               <div className="min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3">
-                {bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
+                {studyWorkspace === "teachers" ? <div className="flex h-full min-h-[300px] flex-col overflow-hidden rounded-xl bg-white">
+                  <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white p-2" dir="rtl"><div className="flex min-w-max items-start gap-3">{teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center"><span className={`mx-auto block h-14 w-14 overflow-hidden rounded-full border-2 bg-slate-100 shadow-md ${selectedTeacherVideo?.id === story.id ? "border-red-500 ring-2 ring-red-200" : "border-white"}`}><img src={story.storyImage || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-full w-full object-cover"/></span><b className="mt-1 block truncate text-[9px] text-slate-900">{story.teacherName || "مدرس المادة"}</b></button>) : <p className="px-5 py-4 text-xs text-slate-500">لا توجد فيديوهات مرتبطة بهذا الدرس حاليًا.</p>}</div></div>
+                  <div className="min-h-0 flex-1 bg-slate-950">{selectedTeacherVideo?.youtubeId ? <iframe key={`${me || "local"}-${selectedTeacherVideo.youtubeId}`} className="h-full min-h-[260px] w-full border-0 bg-black" src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=0&rel=0&playsinline=1`} title={`شرح ${selectedTeacherVideo.teacherName}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/> : <div className="grid h-full min-h-[260px] place-items-center p-4 text-center text-slate-300"><div><Presentation className="mx-auto mb-2 h-9 w-9 text-red-400"/><b className="block text-xs">اختر مدرسًا لعرض الفيديو هنا</b></div></div>}</div>
+                </div> : bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
                   <div className="mb-3 flex items-center gap-2">
                     <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
                   </div>
