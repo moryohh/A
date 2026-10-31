@@ -13,6 +13,7 @@ import {
   EyeOff,
   Eraser,
   Hand,
+  Inbox,
   Grid2X2,
   GraduationCap,
   LockKeyhole,
@@ -439,8 +440,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
   const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
   const [teachersLoading, setTeachersLoading] = useState(false);
-  const [openSharedBy, setOpenSharedBy] = useState<string | null>(null);
-  const [seenShareCounts, setSeenShareCounts] = useState<Record<string, number>>({});
+  const [sharedInboxOpen, setSharedInboxOpen] = useState(false);
+  const [selectedSharedId, setSelectedSharedId] = useState<string | null>(null);
+  const [seenSharedIds, setSeenSharedIds] = useState<string[]>([]);
   const pendingQuestionSharesRef = useRef(new Set<string>());
   useEffect(() => { pendingQuestionSharesRef.current.clear(); }, [room]);
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
@@ -1159,7 +1161,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
   const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
-  const openShares = openSharedBy ? (classroom?.bookletShares || []).filter((share) => share.from === openSharedBy) : [];
+  const incomingShares = (classroom?.bookletShares || []).filter((share) => share.from !== me);
+  const selectedSharedQuestion = selectedSharedId ? incomingShares.find((share) => share.id === selectedSharedId) || null : null;
+  const unreadSharedCount = incomingShares.filter((share) => !seenSharedIds.includes(share.id)).length;
   const isTimeFinished = Boolean(classroom?.endsAt && (seconds <= 0 || state?.status === "ended"));
   const teacherControlledStudy = classroom?.studyMode === "teacher";
   const canNavigateBooklet = !teacherControlledStudy || isTeacher;
@@ -1168,10 +1172,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const lessonGoalTarget = Math.max(1, Number(self?.mission?.target || bookletQuestions.length || 1));
   const lessonGoalProgress = Math.min(lessonGoalTarget, Number(self?.mission?.progress || (bookletQuestions.length ? Math.min(bookletItemIndex, bookletQuestions.length) : 0)));
   const lessonGoalRemaining = Math.max(0, lessonGoalTarget - lessonGoalProgress);
-  const openPlayerShares = (playerId: string) => {
-    const total = (classroom?.bookletShares || []).filter((share) => share.from === playerId).length;
-    setSeenShareCounts((current) => ({ ...current, [playerId]: total }));
-    setOpenSharedBy(playerId);
+  const sharedSenderName = (playerId: string) => state?.players.find((player) => player.id === playerId)?.name || "طالب";
+  const openSharedInbox = () => {
+    setSelectedSharedId(null);
+    setSharedInboxOpen(true);
+    setSeenSharedIds((current) => Array.from(new Set([...current, ...incomingShares.map((share) => share.id)])));
+  };
+  const closeSharedInbox = () => {
+    setSelectedSharedId(null);
+    setSharedInboxOpen(false);
   };
   useEffect(() => {
     if (classroom?.studyMode !== "teacher") return;
@@ -1334,6 +1343,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             <button onClick={() => void toggleMic()} className={`grid h-10 w-10 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
             {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
             {!offlineBooklet && <span className="rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-[11px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
+            <button onClick={openSharedInbox} className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50" aria-label={`صندوق الأسئلة المشتركة${unreadSharedCount ? `، ${unreadSharedCount} جديد` : ""}`} title="صندوق الأسئلة المشتركة"><Inbox className="h-5 w-5"/>{unreadSharedCount > 0 && <span className="absolute -left-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[8px] font-black text-white">{Math.min(99, unreadSharedCount)}</span>}</button>
           </div>
 
           <div className="flex min-w-0 items-center justify-center gap-3" dir="rtl">
@@ -1372,7 +1382,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   return <div key={player.id} className="flex w-full min-w-0 flex-col items-center justify-center bg-transparent p-0">
-                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.25} className="!h-[88px] !w-[104px]" />
+                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.5} className="!h-[88px] !w-[104px]" />
                     <b className="mt-1 max-w-full truncate text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                   </div>;
                 })}
@@ -1421,7 +1431,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           </div>
         </div>
         {isTimeFinished && <div className="absolute inset-0 z-40 grid place-items-center bg-slate-950/35 p-4" role="status"><section className="w-full max-w-sm rounded-3xl border border-amber-200/70 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><b className="block text-base text-amber-900">انتهى وقت الدرس</b><p className="mt-2 text-xs leading-6 text-slate-600">توقف التحدي عند انتهاء الوقت. راجع هدف الدرس وما تبقى منه.</p><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><b className="block text-xs text-emerald-900">{lessonGoalText}</b><span className="mt-1 block text-[10px] font-black text-emerald-700">أنجزت {lessonGoalProgress} من {lessonGoalTarget} · المتبقي {lessonGoalRemaining}</span></div></section></div>}
-        {openSharedBy && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/45 p-6" onClick={() => setOpenSharedBy(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[72vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-200 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><b className="text-sm">الأسئلة المشاركة</b><button onClick={() => setOpenSharedBy(null)} className="rounded-full bg-slate-100 p-1" aria-label="إغلاق"><X className="h-4 w-4"/></button></div><div className="space-y-3">{openShares.slice().reverse().map((share) => <article key={share.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3"><small className="font-black text-emerald-700">السؤال {share.index + 1}</small><p className="mt-1 text-sm font-black leading-7">{share.question}</p><div className="mt-2 rounded-xl bg-white p-3 text-xs font-bold leading-6">{share.answer || "لا توجد إجابة مسجلة."}</div></article>)}</div></section></div>}
+        {sharedInboxOpen && <div className="absolute inset-0 z-50 grid place-items-start bg-slate-950/50 p-3 pt-16 sm:place-items-center sm:p-6" onClick={closeSharedInbox} role="presentation"><section onClick={(event) => event.stopPropagation()} className="max-h-[78dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-200 bg-[#fffdf7] p-4 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="flex items-center gap-2 text-sm"><Inbox className="h-5 w-5 text-cyan-700"/>صندوق الأسئلة المشتركة</b><small className="text-[9px] text-slate-500">الأسئلة التي شاركها زملاؤك داخل الغرفة</small></div><button onClick={closeSharedInbox} className="flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-[10px] font-black text-white" aria-label="الخروج من صندوق الأسئلة"><X className="h-4 w-4"/>خروج</button></div>{selectedSharedQuestion ? <article className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-xs text-cyan-800">شارك السؤال: {sharedSenderName(selectedSharedQuestion.from)}</b><button onClick={() => setSelectedSharedId(null)} className="rounded-lg bg-white px-2 py-1 text-[9px] font-black text-slate-600">رجوع للبريد</button></div><small className="font-black text-emerald-700">السؤال {selectedSharedQuestion.index + 1}</small><p className="mt-2 text-base font-black leading-8">{selectedSharedQuestion.question}</p><div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 text-sm font-bold leading-7">{selectedSharedQuestion.answer || "لا توجد إجابة مسجلة."}</div></article> : incomingShares.length ? <div className="space-y-2">{incomingShares.slice().reverse().map((share) => <button key={share.id} onClick={() => setSelectedSharedId(share.id)} className="w-full rounded-2xl border border-cyan-100 bg-white p-3 text-right transition hover:border-cyan-400 hover:bg-cyan-50"><span className="flex items-center justify-between gap-2"><b className="text-[10px] text-cyan-800">{sharedSenderName(share.from)}</b><small className="text-[8px] text-slate-400">السؤال {share.index + 1}</small></span><p className="mt-1 line-clamp-2 text-xs font-bold leading-6 text-slate-700">{share.question}</p></button>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-8 text-center"><Inbox className="mx-auto h-9 w-9 text-slate-300"/><b className="mt-2 block text-xs text-slate-500">لا توجد أسئلة مشتركة بعد</b></div>}</section></div>}
         {achievementsOpen && <div className="absolute inset-0 z-50 flex justify-end bg-slate-950/55" onClick={() => setAchievementsOpen(false)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="h-full w-[min(390px,92vw)] overflow-y-auto rounded-l-3xl border-l border-amber-200/60 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="block text-lg">تحدياتي</b><small className="text-[10px] text-slate-500">تحدياتك الشخصية داخل هذه الغرفة</small></div><button onClick={() => setAchievementsOpen(false)} className="rounded-full bg-slate-100 p-2" aria-label="إغلاق"><X className="h-5 w-5"/></button></div><div className={`mb-3 rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}><div className="flex items-center justify-between gap-2"><b className="text-[10px] text-emerald-900">هدف الدرس</b><span className={`text-[10px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{lessonGoalProgress}/{lessonGoalTarget}</span></div><p className="mt-1 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p><p className={`mt-1 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${lessonGoalRemaining}` : `المتبقي ${lessonGoalRemaining}`}</p></div><div className="space-y-2">{challengeCards.map((challenge) => <div key={challenge.label} className={`flex items-center justify-between rounded-2xl border p-3 ${challenge.complete ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}><span className="flex items-center gap-3"><span className="text-xl">{challenge.icon}</span><b className={`text-xs ${challenge.complete ? "text-emerald-900" : "text-slate-700"}`}>{challenge.label}</b></span><span className={`text-[9px] font-black ${challenge.complete ? "text-emerald-700" : "text-slate-400"}`}>{challenge.complete ? "تم" : "لم يكتمل"}</span></div>)}</div><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center"><PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="mx-auto h-14"/><b className="mt-1 block text-xs text-emerald-900">نمو تركيزك مستمر</b><small className="mt-1 block text-[9px] text-emerald-700">الوقت داخل الغرفة: {elapsedTimerText} · مشاركة كل سؤال مرة واحدة وبحد أقصى 20 سؤالًا</small></div></section></div>}
         {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
       </div>
@@ -1584,7 +1594,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </aside>
               <aside className="order-1 flex min-h-[70dvh] flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:order-2 lg:min-h-0">
                 <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
-                <div className="my-3 flex min-h-32 w-full flex-1 items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound volume={0.25} /></div>
+                <div className="my-3 flex min-h-32 w-full flex-1 items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound volume={0.25} sourceFolder="plant-growth-booklet" /></div>
                 <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
               </aside>
               <section className="order-3 relative min-h-[70dvh] overflow-visible rounded-[1.5rem] border-4 border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] sm:rounded-[2rem] sm:border-[6px] lg:order-3 lg:min-h-0 lg:overflow-auto">

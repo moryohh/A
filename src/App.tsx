@@ -1620,8 +1620,7 @@ function AppContent() {
           initialRoomCode={challengeRoomCode}
           initialContentMode={challengeConfig?.contentMode || 'board'}
           onJoinActiveRoom={(activeRoom) => {
-            setChallengeRoomCode(activeRoom.code);
-            setChallengeConfig({
+            const nextConfig = {
               questions: [],
               lessonTitle: activeRoom.lessonTitle || 'غرفة تحدٍ نشطة',
               gameType: activeRoom.gameType || 'live_classroom',
@@ -1630,6 +1629,14 @@ function AppContent() {
               chapterNumber: activeRoom.chapter,
               lessonNumber: activeRoom.lesson,
               contentMode: activeRoom.contentMode || (activeRoom.gameType === 'live_classroom' ? 'booklet' : undefined),
+            };
+            // Unmount the current room before mounting the selected one. Keeping both
+            // transitions in the same render left the old full-screen portal visible.
+            setIsChallengeHubOpen(false);
+            window.requestAnimationFrame(() => {
+              setChallengeRoomCode(activeRoom.code);
+              setChallengeConfig(nextConfig);
+              setIsChallengeHubOpen(true);
             });
           }}
         />
