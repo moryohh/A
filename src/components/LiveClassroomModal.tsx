@@ -452,6 +452,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
   const [answerText, setAnswerText] = useState("");
+  const [receivedAnswers, setReceivedAnswers] = useState<Record<string, string>>({});
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
   const [exerciseMenu, setExerciseMenu] = useState(false);
@@ -486,6 +487,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
   const self = state?.players.find((player) => player.id === me);
+  const answerFor = (player: Participant) => receivedAnswers[player.id] || player.lastAnswer || "";
   const canDraw = Boolean(isTeacher || self?.drawAllowed);
   const sharedContent = classroom?.content || {
     subject: openLessonContext?.subjectId || category,
@@ -938,19 +940,24 @@ export const LiveClassroomModal: React.FC<Props> = ({
           meRef.current = payload.userId;
           setMe(payload.userId);
         }
-        if (payload.type === "state" && payload.gameType === "live_classroom")
+        if (payload.type === "state" && payload.gameType === "live_classroom") {
           setState(payload);
-        if (payload.type === "classroom_answer" && payload.from)
+          setReceivedAnswers((current) => ({ ...current, ...Object.fromEntries((payload.players || []).filter((player: Participant) => player.lastAnswer).map((player: Participant) => [player.id, player.lastAnswer])) }));
+        }
+        if (payload.type === "classroom_answer" && payload.from) {
+          setReceivedAnswers((current) => ({ ...current, [payload.from]: String(payload.value || "") }));
           setState((current) => current ? { ...current, players: current.players.map((player) => player.id === payload.from ? { ...player, lastAnswer: String(payload.value || "") } : player) } : current);
+        }
         if (payload.type === "audio_signal") void handleAudioSignal(payload);
       } catch {
         /* ignore malformed messages */
       }
     };
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setMicOn(false);
       audioPeersRef.current.forEach((peer) => peer.close());
       audioPeersRef.current.clear();
+      if (event.code === 4001 && event.reason === "host_left") onClose();
     };
     setRoom(code);
   }
@@ -1112,11 +1119,21 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const closeClassroom = () => {
     if (closingRef.current) return;
     closingRef.current = true;
-    socketRef.current?.close();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    audioPeersRef.current.forEach((peer) => peer.close());
-    audioPeersRef.current.clear();
-    void restoreClassroomDisplay().finally(onClose);
+    const finishClose = () => {
+      socketRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+      void restoreClassroomDisplay().finally(onClose);
+    };
+    if (room && API && !offlineBooklet) {
+      void authorization()
+        .then((token) => fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: token } }))
+        .catch(() => undefined)
+        .finally(finishClose);
+      return;
+    }
+    finishClose();
   };
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
@@ -1350,6 +1367,18 @@ export const LiveClassroomModal: React.FC<Props> = ({
       </div>
     );
 
+  if (externalChallengeRoom) return <OnlineChallengeModal
+    onClose={onClose}
+    questions={[]}
+    lessonTitle={externalChallengeRoom.lessonTitle || "غرفة تحدٍ نشطة"}
+    gameType={externalChallengeRoom.gameType as OnlineChallengeGameType}
+    gameTitle={externalChallengeRoom.gameTitle || "التحدّي الجماعي"}
+    subject={externalChallengeRoom.subject}
+    chapterNumber={externalChallengeRoom.chapter}
+    lessonNumber={externalChallengeRoom.lesson}
+    initialRoomCode={String(externalChallengeRoom.code)}
+  />;
+
   if (classroom?.contentMode === "booklet")
     return (
       <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#0b1d24] font-cairo text-white" dir="rtl">
@@ -1454,18 +1483,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
       </div>
     );
 
-  if (externalChallengeRoom) return <OnlineChallengeModal
-    onClose={onClose}
-    questions={[]}
-    lessonTitle={externalChallengeRoom.lessonTitle || "غرفة تحدٍ نشطة"}
-    gameType={externalChallengeRoom.gameType as OnlineChallengeGameType}
-    gameTitle={externalChallengeRoom.gameTitle || "التحدّي الجماعي"}
-    subject={externalChallengeRoom.subject}
-    chapterNumber={externalChallengeRoom.chapter}
-    lessonNumber={externalChallengeRoom.lesson}
-    initialRoomCode={String(externalChallengeRoom.code)}
-  />;
-
   return (
     <div
       className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071126] font-cairo text-white"
@@ -1519,7 +1536,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       {isTeacher && classroom?.contentMode === "board" && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
         <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
         {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
-        <div className="space-y-2">{state?.players.filter(player=>player.id!==me).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}</small></div></div>{player.lastAnswer&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {player.lastAnswer}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح":"تجميد"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>شرح</button></div></div>)}</div>
+        <div className="space-y-2">{state?.players.filter(player=>player.id!==me).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}</small></div></div>{answerFor(player)&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {answerFor(player)}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح":"تجميد"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>شرح</button></div></div>)}</div>
       </div>}
       {isTeacher && classroom?.contentMode === "booklet" && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
@@ -1543,7 +1560,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               {classroom?.presenterId && classroom.presenterId !== me && <button onClick={() => send({ type: "classroom_control", action: "restore_presenter" })} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
               <div className="space-y-2">{state?.players.filter((player) => player.id !== me).map((player) => <div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised ? "border-amber-300 bg-amber-400/10" : "border-white/10 bg-white/5"}`}>
                 <div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</b><small className="text-slate-400">{player.connected ? "متصل" : "غير متصل"}{player.progress ? ` · الخطوة ${player.progress.step || 1} · ${player.progress.solved || 0}/${player.progress.total || 0}` : ""}</small></div>{classroom?.presenterId === player.id && <span className="rounded-full bg-fuchsia-500/20 px-2 py-1 text-[10px] text-fuchsia-200">يشرح الآن</span>}</div>
-                {player.lastAnswer && <div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100"><span className="text-slate-400">آخر إجابة: </span>{player.lastAnswer}</div>}
+                {answerFor(player) && <div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100"><span className="text-slate-400">آخر إجابة: </span>{answerFor(player)}</div>}
                 <div className="mt-2 grid grid-cols-3 gap-1.5">
                   <button onClick={() => send({ type: "classroom_control", action: "select_speaker", targetId: player.id })} className={`rounded-xl p-2 font-black ${player.micAllowed ? "bg-emerald-400 text-slate-950" : "bg-white/10"}`}><Mic className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.micAllowed ? "يتحدث" : "سماح تحدث"}</span></button>
                   <button onClick={() => send({ type: "classroom_control", action: "answer_permission", targetId: player.id, value: player.answerFrozen })} className={`rounded-xl p-2 font-black ${player.answerFrozen ? "bg-sky-400 text-slate-950" : "bg-white/10"}`}><Snowflake className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.answerFrozen ? "فتح الإجابة" : "تجميد"}</span></button>
