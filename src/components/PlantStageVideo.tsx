@@ -4,10 +4,11 @@ type Props = {
   stage: number;
   compact?: boolean;
   sound?: boolean;
+  volume?: number;
   className?: string;
 };
 
-export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, className = '' }) => {
+export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound = false, volume = 1, className = '' }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(!sound);
   const safeStage = Math.min(12, Math.max(1, Math.round(stage)));
@@ -26,6 +27,7 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
     const video = videoRef.current;
     if (!video) return;
     video.muted = !sound;
+    video.volume = Math.max(0, Math.min(1, volume));
     setMuted(!sound);
     video.currentTime = 0;
     const attempt = video.play();
@@ -34,11 +36,12 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
       setMuted(true);
       void video.play().catch(() => undefined);
     });
-  }, [safeStage, sound]);
+  }, [safeStage, sound, volume]);
 
   const enableSound = () => {
     if (!sound || !videoRef.current || !muted) return;
     videoRef.current.muted = false;
+    videoRef.current.volume = Math.max(0, Math.min(1, volume));
     setMuted(false);
     void videoRef.current.play().catch(() => undefined);
   };
