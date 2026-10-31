@@ -1372,7 +1372,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   return <div key={player.id} className="flex w-full min-w-0 flex-col items-center justify-center bg-transparent p-0">
-                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.5} className="!h-[88px] !w-[104px]" />
+                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.25} className="!h-[88px] !w-[104px]" />
                     <b className="mt-1 max-w-full truncate text-[10px] text-emerald-950">{player.name || "طالب"}</b>
                   </div>;
                 })}
@@ -1584,7 +1584,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </aside>
               <aside className="order-1 flex min-h-[70dvh] flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:order-2 lg:min-h-0">
                 <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
-                <div className="my-3 flex min-h-32 w-full flex-1 items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound volume={0.5} /></div>
+                <div className="my-3 flex min-h-32 w-full flex-1 items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound volume={0.25} /></div>
                 <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
               </aside>
               <section className="order-3 relative min-h-[70dvh] overflow-visible rounded-[1.5rem] border-4 border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] sm:rounded-[2rem] sm:border-[6px] lg:order-3 lg:min-h-0 lg:overflow-auto">
