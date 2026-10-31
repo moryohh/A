@@ -1350,7 +1350,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   const unreadShareCount = Math.max(0, shareCount - (seenShareCounts[player.id] || 0));
                   return <div key={player.id} className={`relative flex h-fit min-h-0 w-[132px] max-w-full flex-col items-center justify-center rounded-xl border p-1 ${index === 0 ? "border-amber-300 bg-amber-50 shadow-[0_0_18px_rgba(245,158,11,.18)]" : "border-emerald-200 bg-emerald-50/60"}`}>
                     {index === 0 && <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-amber-950">الأول</span>}
-                    <PlantStageVideo stage={personalStage} compact sound={player.id === me} className="!h-[46px] !w-[64px] drop-shadow-md" />
+                    <PlantStageVideo stage={personalStage} compact sound={false} className="!h-[46px] !w-[64px] drop-shadow-md" />
                     <b className="mt-0.5 max-w-full truncate text-[9px] text-emerald-950">{player.name || "طالب"}</b>
                     <span className="text-[8px] font-black text-amber-700">{points} نقطة</span>
                     <small className="mt-0.5 max-w-full truncate text-[7px] font-bold text-emerald-700">{player.activity || (player.mission?.completed ? "أنجز مهمته" : "يدرس الآن")}</small>
@@ -1606,7 +1606,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </section>
               <aside className="order-3 hidden flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:flex">
                 <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
-                <div className="my-3 flex min-h-32 w-full items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound /></div>
+                <div className="my-3 flex min-h-32 w-full items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound={false} /></div>
                 <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
               </aside>
             </>
