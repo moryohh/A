@@ -489,6 +489,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const isTeacher = classroom?.hostId === me;
   const self = state?.players.find((player) => player.id === me);
   const answerFor = (player: Participant) => receivedAnswers[player.id] || player.lastAnswer || "";
+  const submittedAnswers = (state?.players || []).filter((player) => player.id !== me && Boolean(answerFor(player)));
   const canDraw = Boolean(isTeacher || self?.drawAllowed);
   const sharedContent = classroom?.content || {
     subject: openLessonContext?.subjectId || category,
@@ -1550,6 +1551,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
         </div>
       </header>
+      {isTeacher && classroom?.contentMode === "board" && submittedAnswers.length > 0 && <div className="shrink-0 border-b border-emerald-300/30 bg-emerald-950/95 px-3 py-2 text-white" dir="rtl" aria-live="polite"><b className="mb-1 block text-[10px] text-emerald-200">إجابات الطلاب</b><div className="flex gap-2 overflow-x-auto">{submittedAnswers.map((player) => <div key={player.id} className="min-w-[180px] rounded-xl border border-emerald-300/20 bg-white/10 px-3 py-2"><strong className="block truncate text-[10px] text-cyan-100">{player.name || "طالب"}</strong><span className="block text-xs font-bold">{answerFor(player)}</span></div>)}</div></div>}
       {classroom?.contentMode === "booklet" && <div className="border-b border-amber-200/20 bg-gradient-to-l from-amber-950/95 via-[#17304a] to-emerald-950/95 px-3 py-2">
         <div className="mx-auto flex max-w-6xl items-center gap-2">
           <Target className="h-5 w-5 shrink-0 text-amber-300" />
