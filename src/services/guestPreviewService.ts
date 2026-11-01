@@ -33,8 +33,15 @@ export function loadGuestSession(): GuestSession | null {
 
 export function createGuestSession(): GuestSession {
   if (typeof window === 'undefined') throw new Error('Guest preview requires a browser.');
+  const guestId = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+        const random = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+        const value = character === 'x' ? random : (random & 0x3) | 0x8;
+        return value.toString(16);
+      });
   const session: GuestSession = {
-    id: crypto.randomUUID(),
+    id: guestId,
     name: `ضيف ${Math.floor(1000 + Math.random() * 9000)}`,
     createdAt: new Date().toISOString(),
   };

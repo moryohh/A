@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   Eraser,
+  Flame,
   Hand,
   Inbox,
   Grid2X2,
@@ -28,6 +29,7 @@ import {
   Snowflake,
   Target,
   TreePine,
+  Trophy,
   Trash2,
   Type,
   UnlockKeyhole,
@@ -52,6 +54,23 @@ const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
   /\/$/,
   "",
 );
+const ARABIC_NUMBER_FORMATTER = new Intl.NumberFormat("ar-IQ", {
+  useGrouping: true,
+  maximumFractionDigits: 0,
+});
+const formatArabicNumber = (value: number) => ARABIC_NUMBER_FORMATTER.format(value);
+const remainingChallengeTime = (seconds: number) => {
+  if (seconds <= 0) return "اكتمل";
+  if (seconds >= 3600) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.ceil((seconds % 3600) / 60);
+    if (minutes === 60) return `بقي ${formatArabicNumber(hours + 1)} ساعة`;
+    return minutes
+      ? `بقي ${formatArabicNumber(hours)} س و${formatArabicNumber(minutes)} د`
+      : `بقي ${formatArabicNumber(hours)} ساعة`;
+  }
+  return `بقي ${formatArabicNumber(Math.ceil(seconds / 60))} دقيقة`;
+};
 const MEMBER_SPROUT_IMAGE = "data:image/webp;base64,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";
 const CAPACITIES = [2, 4, 8, 12, 20, 30, 50] as const;
 type Capacity = (typeof CAPACITIES)[number];
@@ -1208,13 +1227,33 @@ export const LiveClassroomModal: React.FC<Props> = ({
       .map((share) => `${share.lessonId || "lesson"}:${share.index}`),
   );
   const sharedQuestionLimitReached = mySharedQuestionKeys.size >= 20;
+  const timedChallenge = (label: string, icon: string, targetSeconds: number, reward: string) => ({
+    label,
+    icon,
+    reward,
+    complete: elapsedSeconds >= targetSeconds,
+    progress: Math.min(100, Math.round((elapsedSeconds / targetSeconds) * 100)),
+    detail: remainingChallengeTime(targetSeconds - elapsedSeconds),
+  });
   const challengeCards = [
-    { label: "قضاء 10 دقائق", icon: "⏱️", complete: elapsedSeconds >= 10 * 60 },
-    { label: "قضاء 30 دقيقة", icon: "⏳", complete: elapsedSeconds >= 30 * 60 },
-    { label: "قضاء ساعة", icon: "🕐", complete: elapsedSeconds >= 60 * 60 },
-    { label: "قضاء ساعتين", icon: "🏆", complete: elapsedSeconds >= 120 * 60 },
-    { label: `مشاركة سؤال (${mySharedQuestionKeys.size}/20)`, icon: "📚", complete: mySharedQuestionKeys.size > 0 },
+    timedChallenge("تركيز ١٠ دقائق", "⏱️", 10 * 60, "براعم البداية"),
+    timedChallenge("تركيز ٣٠ دقيقة", "⏳", 30 * 60, "وسام المثابر"),
+    timedChallenge("ساعة من الإنجاز", "🕐", 60 * 60, "وسام التركيز"),
+    timedChallenge("ساعتان من التميّز", "🏆", 120 * 60, "كأس العزيمة"),
+    {
+      label: "شارك المعرفة",
+      icon: "📚",
+      reward: "وسام المتعاون",
+      complete: mySharedQuestionKeys.size > 0,
+      progress: mySharedQuestionKeys.size > 0 ? 100 : 0,
+      detail: mySharedQuestionKeys.size > 0
+        ? `شاركت ${formatArabicNumber(mySharedQuestionKeys.size)} من ${formatArabicNumber(20)} سؤالًا`
+        : "شارك سؤالًا واحدًا مع زملائك",
+    },
   ];
+  const completedChallengeCount = challengeCards.filter((challenge) => challenge.complete).length;
+  const achievementProgress = Math.round((completedChallengeCount / challengeCards.length) * 100);
+  const nextChallenge = challengeCards.find((challenge) => !challenge.complete) || null;
   const bookletQuestions = useMemo(() => (booklet?.pages || [])
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
@@ -1503,7 +1542,92 @@ export const LiveClassroomModal: React.FC<Props> = ({
         {isTimeFinished && <div className="absolute inset-0 z-40 grid place-items-center bg-slate-950/35 p-4" role="status"><section className="w-full max-w-sm rounded-3xl border border-amber-200/70 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><b className="block text-base text-amber-900">انتهى وقت الدرس</b><p className="mt-2 text-xs leading-6 text-slate-600">توقف التحدي عند انتهاء الوقت. راجع هدف الدرس وما تبقى منه.</p><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><b className="block text-xs text-emerald-900">{lessonGoalText}</b><span className="mt-1 block text-[10px] font-black text-emerald-700">أنجزت {lessonGoalProgress} من {lessonGoalTarget} · المتبقي {lessonGoalRemaining}</span></div></section></div>}
         {roomToJoin && <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/65 p-4" onClick={() => setRoomToJoin(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-cyan-200/50 bg-[#102832] p-5 text-right text-white shadow-2xl" dir="rtl"><b className="block text-base">الانتقال إلى غرفة أخرى</b><p className="mt-2 text-xs leading-6 text-cyan-50">هل تريد مغادرة الغرفة الحالية والانضمام إلى «{roomToJoin.gameTitle || roomToJoin.lessonTitle || `الغرفة #${roomToJoin.code}`}»؟</p><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={confirmJoinActiveRoom} className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black">تأكيد الانضمام</button><button onClick={() => setRoomToJoin(null)} className="rounded-xl bg-white/10 px-4 py-3 text-xs font-black">إلغاء</button></div></section></div>}
         {sharedInboxOpen && <div className="absolute inset-0 z-50 grid place-items-start bg-slate-950/50 p-3 pt-16 sm:place-items-center sm:p-6" onClick={closeSharedInbox} role="presentation"><section onClick={closeSharedInbox} className="max-h-[78dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-200 bg-[#fffdf7] p-4 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="flex items-center gap-2 text-sm"><Inbox className="h-5 w-5 text-cyan-700"/>صندوق الأسئلة المشتركة</b><small className="text-[9px] text-slate-500">الأسئلة التي شاركها زملاؤك داخل الغرفة</small></div><button onClick={(event) => { event.stopPropagation(); closeSharedInbox(); }} className="flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-[10px] font-black text-white" aria-label="الخروج من صندوق الأسئلة"><X className="h-4 w-4"/>خروج</button></div>{selectedSharedQuestion ? <article className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-xs text-cyan-800">شارك السؤال: {sharedSenderName(selectedSharedQuestion.from)}</b><button onClick={(event) => { event.stopPropagation(); setSelectedSharedId(null); }} className="rounded-lg bg-white px-2 py-1 text-[9px] font-black text-slate-600">رجوع للبريد</button></div><small className="font-black text-emerald-700">السؤال {selectedSharedQuestion.index + 1}</small><p className="mt-2 text-base font-black leading-8">{selectedSharedQuestion.question}</p><div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 text-sm font-bold leading-7">{selectedSharedQuestion.answer || "لا توجد إجابة مسجلة."}</div></article> : incomingShares.length ? <div className="space-y-2">{incomingShares.slice().reverse().map((share) => <button key={share.id} onClick={(event) => { event.stopPropagation(); setSelectedSharedId(share.id); }} className="w-full rounded-2xl border border-cyan-100 bg-white p-3 text-right transition hover:border-cyan-400 hover:bg-cyan-50"><span className="flex items-center justify-between gap-2"><b className="text-[10px] text-cyan-800">{sharedSenderName(share.from)}</b><small className="text-[8px] text-slate-400">السؤال {share.index + 1}</small></span><p className="mt-1 line-clamp-2 text-xs font-bold leading-6 text-slate-700">{share.question}</p></button>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-8 text-center"><Inbox className="mx-auto h-9 w-9 text-slate-300"/><b className="mt-2 block text-xs text-slate-500">لا توجد أسئلة مشتركة بعد</b></div>}</section></div>}
-        {achievementsOpen && <div className="absolute inset-0 z-50 flex justify-end bg-slate-950/55" onClick={() => setAchievementsOpen(false)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="h-full w-[min(390px,92vw)] overflow-y-auto rounded-l-3xl border-l border-amber-200/60 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="block text-lg">تحدياتي</b><small className="text-[10px] text-slate-500">تحدياتك الشخصية داخل هذه الغرفة</small></div><button onClick={() => setAchievementsOpen(false)} className="rounded-full bg-slate-100 p-2" aria-label="إغلاق"><X className="h-5 w-5"/></button></div><div className={`mb-3 rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}><div className="flex items-center justify-between gap-2"><b className="text-[10px] text-emerald-900">هدف الدرس</b><span className={`text-[10px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{lessonGoalProgress}/{lessonGoalTarget}</span></div><p className="mt-1 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p><p className={`mt-1 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${lessonGoalRemaining}` : `المتبقي ${lessonGoalRemaining}`}</p></div><div className="space-y-2">{challengeCards.map((challenge) => <div key={challenge.label} className={`flex items-center justify-between rounded-2xl border p-3 ${challenge.complete ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}><span className="flex items-center gap-3"><span className="text-xl">{challenge.icon}</span><b className={`text-xs ${challenge.complete ? "text-emerald-900" : "text-slate-700"}`}>{challenge.label}</b></span><span className={`text-[9px] font-black ${challenge.complete ? "text-emerald-700" : "text-slate-400"}`}>{challenge.complete ? "تم" : "لم يكتمل"}</span></div>)}</div><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center"><PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="mx-auto h-14"/><b className="mt-1 block text-xs text-emerald-900">نمو تركيزك مستمر</b><small className="mt-1 block text-[9px] text-emerald-700">الوقت داخل الغرفة: {elapsedTimerText} · مشاركة كل سؤال مرة واحدة وبحد أقصى 20 سؤالًا</small></div></section></div>}
+        {achievementsOpen && (
+          <div className="absolute inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-[2px]" onClick={() => setAchievementsOpen(false)} role="presentation">
+            <section onClick={(event) => event.stopPropagation()} className="h-full w-[min(410px,94vw)] overflow-y-auto rounded-l-[2rem] border-l border-amber-200/50 bg-[#fffdf7] text-right text-[#24332e] shadow-2xl" dir="rtl">
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#071d2c] via-[#103c3a] to-[#7c5312] px-5 pb-5 pt-4 text-white">
+                <div className="absolute -left-10 -top-12 h-36 w-36 rounded-full bg-amber-300/15 blur-2xl" />
+                <div className="absolute -bottom-14 right-8 h-32 w-32 rounded-full bg-emerald-300/15 blur-2xl" />
+                <div className="relative flex items-start justify-between gap-3">
+                  <div>
+                    <span className="mb-1 flex items-center gap-1 text-[9px] font-black text-amber-200"><Flame className="h-3.5 w-3.5"/>رحلة إنجازك اليوم</span>
+                    <b className="block text-xl">تحدياتي</b>
+                    <small className="text-[10px] text-emerald-100/80">كل دقيقة تركيز تقرّبك من إنجاز جديد</small>
+                  </div>
+                  <button onClick={() => setAchievementsOpen(false)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="إغلاق"><X className="h-5 w-5"/></button>
+                </div>
+
+                <div className="relative mt-5 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-inner backdrop-blur">
+                  <div className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#fbbf24 ${achievementProgress}%, rgba(255,255,255,.14) 0)` }}>
+                    <div className="grid h-[66px] w-[66px] place-items-center rounded-full bg-[#0d2d31] text-center shadow-inner">
+                      <strong className="text-lg text-amber-300">{formatArabicNumber(achievementProgress)}٪</strong>
+                      <span className="-mt-2 text-[8px] text-emerald-100">من الرحلة</span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] font-black text-amber-200">حصيلة إنجازك</span>
+                    <b className="mt-0.5 block text-base">أنجزت {formatArabicNumber(completedChallengeCount)} من {formatArabicNumber(challengeCards.length)} تحديات</b>
+                    {nextChallenge ? (
+                      <div className="mt-2 rounded-xl bg-black/20 px-3 py-2">
+                        <small className="block text-[8px] text-emerald-100/70">الإنجاز الأقرب</small>
+                        <span className="mt-0.5 flex items-center justify-between gap-2 text-[10px] font-black"><span className="truncate">{nextChallenge.icon} {nextChallenge.label}</span><bdi className="shrink-0 text-amber-300">{nextChallenge.detail}</bdi></span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-300/15 px-3 py-2 text-[10px] font-black text-amber-200"><Trophy className="h-4 w-4"/>أكملت جميع تحديات الغرفة!</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className={`rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <b className="flex items-center gap-1.5 text-[10px] text-emerald-900"><Target className="h-4 w-4"/>هدف الدرس</b>
+                    <bdi className={`rounded-full px-2 py-1 text-[9px] font-black ${isTimeFinished ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>{formatArabicNumber(lessonGoalProgress)} من {formatArabicNumber(lessonGoalTarget)}</bdi>
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/5"><div className={`h-full rounded-full transition-all duration-700 ${isTimeFinished ? "bg-rose-500" : "bg-gradient-to-l from-emerald-500 to-teal-400"}`} style={{ width: `${Math.min(100, Math.round((lessonGoalProgress / lessonGoalTarget) * 100))}%` }} /></div>
+                  <p className={`mt-1.5 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${formatArabicNumber(lessonGoalRemaining)}` : `بقي ${formatArabicNumber(lessonGoalRemaining)} لإكمال الهدف`}</p>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <b className="text-xs text-slate-800">مسار الإنجازات</b>
+                    <span className="text-[9px] font-black text-slate-400">{formatArabicNumber(completedChallengeCount)}/{formatArabicNumber(challengeCards.length)}</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {challengeCards.map((challenge) => (
+                      <div key={challenge.label} className={`relative overflow-hidden rounded-2xl border p-3 transition ${challenge.complete ? "border-emerald-300 bg-gradient-to-l from-emerald-50 to-teal-50 shadow-[0_5px_18px_rgba(16,185,129,.10)]" : "border-slate-200 bg-white"}`}>
+                        {challenge.complete && <div className="absolute -left-5 -top-6 h-16 w-16 rounded-full bg-emerald-300/20 blur-xl" />}
+                        <div className="relative flex items-center gap-3">
+                          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xl ${challenge.complete ? "bg-emerald-500/15" : "bg-slate-100"}`}>{challenge.complete ? "✓" : challenge.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <b className={`text-[11px] ${challenge.complete ? "text-emerald-950" : "text-slate-700"}`}>{challenge.label}</b>
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black ${challenge.complete ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-800"}`}>{challenge.complete ? "تم الإنجاز" : challenge.detail}</span>
+                            </div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full transition-all duration-700 ${challenge.complete ? "bg-emerald-500" : "bg-gradient-to-l from-amber-400 to-orange-400"}`} style={{ width: `${challenge.progress}%` }} /></div>
+                            <span className="mt-1.5 flex items-center gap-1 text-[8px] font-bold text-slate-500"><Trophy className="h-3 w-3 text-amber-500"/>{challenge.complete ? `حصلت على: ${challenge.reward}` : `مكافأتك: ${challenge.reward}`}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-amber-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="h-16 w-20 shrink-0"/>
+                    <div>
+                      <b className="block text-xs text-emerald-950">نبتتك تنمو مع تركيزك 🌱</b>
+                      <small className="mt-1 block text-[9px] leading-5 text-emerald-700">قضيت <bdi className="font-black">{elapsedTimerText}</bdi> داخل الغرفة. واصل التعلّم وافتح الإنجاز التالي.</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
         {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
       </div>
     );
