@@ -188,3 +188,25 @@ html,body{overscroll-behavior-y:none}
 @keyframes wrong-pulse{0%{transform:scale(1)}45%{transform:scale(.94);box-shadow:0 0 0 8px #ef44442b}100%{transform:scale(1)}}
 @keyframes correct-pop{0%{transform:scale(1)}42%{transform:scale(1.09);box-shadow:0 0 0 10px #10b9812b}100%{transform:scale(1)}}
 @media(max-width:520px){.choices-card{padding-top:62px}.choice-hearts{top:12px;right:14px}}
+
+/* Keep classroom controls and answer choices fully visible inside the iframe. */
+.classroom-embedded .inline-hint-bubble{padding:12px 42px 12px 14px}
+.classroom-embedded .inline-hint-bubble button{top:6px;right:6px;left:auto;box-shadow:0 4px 12px #7f1d1d66}
+.classroom-embedded .modal-shade{padding:10px;overflow:hidden}
+.classroom-embedded .choices-card{max-height:calc(100% - 4px);overflow-y:auto;overscroll-behavior:contain;padding:20px 24px}
+.classroom-embedded .choices-card h2{margin:8px 0 14px}
+.classroom-embedded .choices-card>p{margin:6px 0 12px}
+.classroom-embedded .choice-grid{gap:8px}
+.classroom-embedded .choice-grid button{min-height:52px;padding:10px 14px}
+
+/* Previous steps touch the board ceiling and use less frame space without shrinking their text. */
+.classroom-embedded .board-recent-steps{top:0;left:0;right:0;grid-auto-columns:calc(50% - 3px);gap:6px;padding:0 4px 2px}
+.classroom-embedded .board-recent-step{min-height:58px;padding:3px 7px 2px;border-radius:0 0 11px 11px;box-shadow:0 4px 12px #1d4ed81f}
+.classroom-embedded .board-recent-step small{margin-bottom:0;line-height:1.25}
+.classroom-embedded .board-recent-step .equation{min-height:30px;line-height:1.05}
+@media(max-width:520px){
+  .classroom-embedded .choices-card{padding:58px 16px 14px}
+  .classroom-embedded .choices-card h2{margin:2px 0 8px}
+  .classroom-embedded .choices-card>p{margin:4px 0 8px}
+  .classroom-embedded .choice-grid button{min-height:48px;padding:8px 10px}
+}
