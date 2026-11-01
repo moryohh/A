@@ -135,6 +135,7 @@ type ActiveRoomPreview = {
   players?: number;
   capacity?: number;
   endsAt?: number;
+  endedAt?: number;
 };
 
 interface Props {
@@ -957,10 +958,30 @@ export const LiveClassroomModal: React.FC<Props> = ({
       setMicOn(false);
       audioPeersRef.current.forEach((peer) => peer.close());
       audioPeersRef.current.clear();
-      if (event.code === 4001 && event.reason === "host_left") onClose();
+      if (!closingRef.current || (event.code === 4001 && event.reason === "host_left")) onClose();
     };
     setRoom(code);
   }
+
+  useEffect(() => {
+    if (!room || offlineBooklet || !API) return;
+    let cancelled = false;
+    const checkRoomEnded = async () => {
+      try {
+        const response = await fetch(`${API}/rooms`);
+        const payload = await response.json();
+        const current = Array.isArray(payload?.rooms)
+          ? payload.rooms.find((item: ActiveRoomPreview) => String(item.code) === String(room))
+          : null;
+        if (!cancelled && current?.endedAt && current.endedAt <= Date.now()) onClose();
+      } catch {
+        // WebSocket close handling remains the primary exit signal.
+      }
+    };
+    void checkRoomEnded();
+    const timer = window.setInterval(checkRoomEnded, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [room, offlineBooklet, onClose]);
 
   function joinActiveRoom(activeRoom: ActiveRoomPreview) {
     if (!activeRoom.code || activeRoom.code === room) return;
@@ -971,6 +992,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (!roomToJoin) return;
     const target = roomToJoin;
     setRoomToJoin(null);
+    // This socket is closing because the same screen is switching rooms, not
+    // because the user left the challenge hub.
+    closingRef.current = true;
     socketRef.current?.close();
     socketRef.current = null;
     if (["millionaire", "millionaire_team", "true_false", "gibha_sah"].includes(String(target.gameType))) {
@@ -1717,7 +1741,19 @@ export const LiveClassroomModal: React.FC<Props> = ({
               />
               <button
                 onClick={() => {
-                  send({ type: "classroom_answer", value: answerText });
+                  const submittedAnswer = answerText.trim();
+                  if (!submittedAnswer) return;
+                  send({ type: "classroom_answer", value: submittedAnswer });
+                  send({
+                    type: "classroom_progress",
+                    progress: {
+                      ...(self?.progress || {}),
+                      step: self?.progress?.step || 1,
+                      solved: self?.progress?.solved || 0,
+                      total: self?.progress?.total || 0,
+                      answer: submittedAnswer,
+                    },
+                  });
                   setAnswerText("");
                 }}
                 className="rounded-xl bg-emerald-500 px-3 text-xs font-black text-slate-950"

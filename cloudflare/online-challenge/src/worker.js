@@ -741,13 +741,14 @@ export class ChallengeRoom {
         this.broadcast({ type: 'classroom_answer', from: sender.userId, value: senderPlayer.lastAnswer, sentAt: Date.now() });
       } else if (payload.type === 'classroom_progress' && senderPlayer && !isTeacher) {
         if (liveGame.answersLocked || senderPlayer.answerFrozen || !payload.progress || typeof payload.progress !== 'object') return;
+        var progressAnswer = String(payload.progress.answer || '').slice(0, 120);
         senderPlayer.progress = {
           step: Math.max(1, Math.min(200, Number(payload.progress.step) || 1)),
           solved: Math.max(0, Math.min(500, Number(payload.progress.solved) || 0)),
           total: Math.max(0, Math.min(500, Number(payload.progress.total) || 0)),
-          answer: String(payload.progress.answer || '').slice(0, 120),
+          answer: progressAnswer,
         };
-        senderPlayer.lastAnswer = senderPlayer.progress.answer;
+        if (progressAnswer) senderPlayer.lastAnswer = progressAnswer;
         senderPlayer.activity = 'يحل الآن';
         senderPlayer.activityAt = Date.now();
       } else if (payload.type === 'classroom_booklet_navigation' && senderPlayer && liveGame.studyMode === 'teacher' && isTeacher) {
