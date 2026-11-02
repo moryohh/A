@@ -527,3 +527,202 @@ a[href]:hover > svg,
   .study-switch-active,
   .study-switch-active .study-switch-icon { animation: none; }
 }
+
+/* Classroom setup uses the coral/teal palette instead of the old navy-only card. */
+.classroom-setup-overlay {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(240,170,166,.24), transparent 30%),
+    radial-gradient(circle at 88% 82%, rgba(99,200,189,.22), transparent 34%),
+    #142629 !important;
+  color: #f1dec0 !important;
+}
+
+.classroom-setup-card {
+  border-color: rgba(99,200,189,.58) !important;
+  background: linear-gradient(155deg, rgba(41,71,68,.98), rgba(27,50,52,.98)) !important;
+  box-shadow: 0 24px 70px rgba(3,17,20,.56), inset 0 1px rgba(240,170,166,.18) !important;
+}
+
+.classroom-setup-card h2 { color: #f1dec0 !important; }
+.classroom-setup-card p,
+.classroom-setup-card span { color: #ceb98f; }
+
+.classroom-setup-section {
+  border-color: rgba(200,168,109,.45) !important;
+  background: #243f3e !important;
+}
+
+.classroom-setup-field {
+  border: 1px solid rgba(99,200,189,.5) !important;
+  background: #355956 !important;
+  color: #f1dec0 !important;
+  box-shadow: inset 0 1px 8px rgba(8,24,26,.26);
+}
+
+.classroom-setup-field:focus {
+  border-color: #f0aaa6 !important;
+  outline: 3px solid rgba(240,170,166,.2);
+}
+
+.classroom-setup-choice {
+  border-color: rgba(200,168,109,.42) !important;
+  background: #2b4947 !important;
+  color: #d8c6a5 !important;
+  transition: transform .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+
+.classroom-setup-choice.is-together {
+  border-color: #63c8bd !important;
+  background: #376e68 !important;
+  color: #f1dec0 !important;
+  box-shadow: 0 0 0 2px rgba(99,200,189,.14), 0 8px 24px rgba(20,74,70,.3);
+}
+
+.classroom-setup-choice.is-teacher {
+  border-color: #f0aaa6 !important;
+  background: #77514f !important;
+  color: #f1dec0 !important;
+  box-shadow: 0 0 0 2px rgba(240,170,166,.14), 0 8px 24px rgba(87,46,45,.3);
+}
+
+.classroom-setup-primary {
+  border: 1px solid rgba(241,222,192,.32);
+  background: linear-gradient(100deg, #f0aaa6, #c8a86d 48%, #63c8bd) !important;
+  color: #142629 !important;
+  box-shadow: 0 10px 28px rgba(99,200,189,.22);
+}
+
+.classroom-setup-join {
+  border: 1px solid rgba(240,170,166,.7);
+  background: #f0aaa6 !important;
+  color: #352628 !important;
+  box-shadow: 0 7px 20px rgba(240,170,166,.2);
+}
+
+.classroom-setup-close {
+  border: 1px solid rgba(240,170,166,.55);
+  background: #714a49 !important;
+  color: #f1dec0 !important;
+}
+
+/* Booklet controls: every action has its own color and a short tactile press. */
+.booklet-toolbar {
+  border-color: rgba(99,200,189,.62) !important;
+  background: linear-gradient(90deg, #1b3234, #294744) !important;
+  color: #f1dec0 !important;
+}
+
+.booklet-toolbar > div > span { color: #ceb98f !important; }
+
+.booklet-action,
+.classroom-pressable {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateZ(0);
+  transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+}
+
+.booklet-action::after,
+.classroom-pressable::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(241,222,192,.6), transparent 68%);
+  opacity: 0;
+  transform: scale(.2);
+  pointer-events: none;
+}
+
+.booklet-action:not(:disabled):active,
+.classroom-pressable:not(:disabled):active {
+  animation: classroom-button-tap .32s ease-out both;
+}
+
+.booklet-action:not(:disabled):active::after,
+.classroom-pressable:not(:disabled):active::after {
+  animation: classroom-button-flash .34s ease-out both;
+}
+
+.booklet-action:not(:disabled):hover,
+.classroom-pressable:not(:disabled):hover {
+  filter: brightness(1.08) saturate(1.08);
+  box-shadow: 0 7px 18px rgba(8,24,26,.26);
+}
+
+.booklet-action:disabled {
+  filter: grayscale(.28);
+  cursor: not-allowed;
+  box-shadow: none !important;
+}
+
+.booklet-action-prev {
+  border-color: #f0aaa6 !important;
+  background: #f0aaa6 !important;
+  color: #42282a !important;
+}
+
+.booklet-action-lesson {
+  border-color: #e0bf7f !important;
+  background: #c8a86d !important;
+  color: #302617 !important;
+}
+
+.booklet-action-next {
+  border-color: #75ddd1 !important;
+  background: #63c8bd !important;
+  color: #123532 !important;
+}
+
+.booklet-action-video {
+  border-color: #f3b0ac !important;
+  background: #b96663 !important;
+  color: #f8dfc2 !important;
+}
+
+.booklet-action-video.is-active {
+  background: #e18580 !important;
+  color: #362224 !important;
+  box-shadow: 0 0 0 2px rgba(240,170,166,.24), 0 0 18px rgba(240,170,166,.34);
+}
+
+.booklet-action-share {
+  border-color: #69cbd1 !important;
+  background: #3ba7b5 !important;
+  color: #102f34 !important;
+}
+
+.booklet-action-hide {
+  border-color: #d6b979 !important;
+  background: #9a7d4d !important;
+  color: #f7e2bd !important;
+}
+
+.booklet-action-answer {
+  border: 1px solid #75ddd1 !important;
+  background: linear-gradient(100deg, #376e68, #63c8bd) !important;
+  color: #f7e2bd !important;
+  box-shadow: 0 5px 14px rgba(55,110,104,.25);
+}
+
+@keyframes classroom-button-tap {
+  0% { transform: scale(1); }
+  42% { transform: translateY(2px) scale(.9); }
+  72% { transform: translateY(-1px) scale(1.045); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes classroom-button-flash {
+  0% { opacity: 0; transform: scale(.2); }
+  40% { opacity: .55; }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booklet-action:not(:disabled):active,
+  .classroom-pressable:not(:disabled):active,
+  .booklet-action:not(:disabled):active::after,
+  .classroom-pressable:not(:disabled):active::after { animation: none; }
+}

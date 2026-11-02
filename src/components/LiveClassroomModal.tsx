@@ -1350,10 +1350,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
   if (!room)
     return (
       <div
-        className="fixed inset-0 z-[100] overflow-y-auto bg-[#071d3a] p-4 font-cairo text-white"
+        className="classroom-setup-overlay fixed inset-0 z-[100] overflow-y-auto bg-[#071d3a] p-4 font-cairo text-white"
         dir="rtl"
       >
-        <div className="mx-auto mt-8 max-w-lg rounded-3xl border border-cyan-400/35 bg-slate-950/80 p-5 shadow-2xl">
+        <div className="classroom-setup-card mx-auto mt-8 max-w-lg rounded-3xl border border-cyan-400/35 bg-slate-950/80 p-5 shadow-2xl">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-black text-cyan-100">
@@ -1367,12 +1367,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   : "شرح الملزمة مباشرة للمدرس والطلاب"}
               </p>
             </div>
-            <button onClick={closeClassroom} className="rounded-full bg-white/10 p-2">
+            <button onClick={closeClassroom} className="classroom-pressable classroom-setup-close rounded-full bg-white/10 p-2">
               <X />
             </button>
           </div>
           <label className="mt-5 block text-xs font-black">عدد الطلاب</label>
-          <div className="mt-2 rounded-2xl border border-cyan-300/20 bg-white/5 p-4">
+          <div className="classroom-setup-section mt-2 rounded-2xl border border-cyan-300/20 bg-white/5 p-4">
             <div className="mb-3 flex items-center justify-between"><span className="text-xs text-slate-300">اسحب لتحديد السعة</span><b className="rounded-xl bg-cyan-400 px-4 py-2 text-xl text-slate-950">{capacity} طالب</b></div>
             <input aria-label="عدد الطلاب" aria-valuetext={`${capacity} طالب`} type="range" min="0" max={CAPACITIES.length - 1} step="1" value={CAPACITIES.indexOf(capacity)} onChange={(event) => setCapacity(CAPACITIES[Number(event.target.value)])} className="w-full accent-cyan-400" />
             <div className="mt-2 flex justify-between text-[10px] font-black text-slate-400" dir="ltr">{CAPACITIES.map((value) => <span key={value}>{value}</span>)}</div>
@@ -1381,7 +1381,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
           <select
             value={durationMinutes}
             onChange={(event) => setDurationMinutes(Number(event.target.value))}
-            className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
+            className="classroom-setup-field mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
           >
             <option value={5}>5 دقائق</option>
             <option value={10}>10 دقائق</option>
@@ -1393,16 +1393,16 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {defaultMode === "booklet" && <>
             <label className="mt-4 block text-xs font-black">نوع الغرفة</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setStudyMode("together")} className={`rounded-2xl border p-3 text-right ${studyMode === "together" ? "border-emerald-300 bg-emerald-400/20 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">ندرس معًا</b><small>مهام شخصية وتركيز جماعي</small></button>
-              <button type="button" onClick={() => setStudyMode("teacher")} className={`rounded-2xl border p-3 text-right ${studyMode === "teacher" ? "border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">مع مدرس</b><small>شرح وتحكم كامل للمضيف</small></button>
+              <button type="button" onClick={() => setStudyMode("together")} className={`classroom-pressable classroom-setup-choice rounded-2xl border p-3 text-right ${studyMode === "together" ? "is-selected is-together border-emerald-300 bg-emerald-400/20 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">ندرس معًا</b><small>مهام شخصية وتركيز جماعي</small></button>
+              <button type="button" onClick={() => setStudyMode("teacher")} className={`classroom-pressable classroom-setup-choice rounded-2xl border p-3 text-right ${studyMode === "teacher" ? "is-selected is-teacher border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">مع مدرس</b><small>شرح وتحكم كامل للمضيف</small></button>
             </div>
             <label className="mt-4 block text-xs font-black">المهمة المشتركة (اختياري)</label>
-            <input value={sharedMissionDraft} maxLength={120} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="مثال: نقرأ الصفحات 1–5 خلال 15 دقيقة" className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3 text-sm" />
+            <input value={sharedMissionDraft} maxLength={120} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="مثال: نقرأ الصفحات 1–5 خلال 15 دقيقة" className="classroom-setup-field mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3 text-sm" />
           </>}
           <button
             disabled={busy}
             onClick={create}
-            className="mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-400 py-4 font-black text-slate-950 disabled:opacity-50"
+            className="classroom-pressable classroom-setup-primary mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-400 py-4 font-black text-slate-950 disabled:opacity-50"
           >
             إنشاء الفصل كمدرس
           </button>
@@ -1418,12 +1418,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 setEntry(event.target.value.replace(/\D/g, "").slice(0, 4))
               }
               placeholder="رمز الفصل"
-              className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-center text-xl tracking-[.35em]"
+              className="classroom-setup-field min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-center text-xl tracking-[.35em]"
             />
             <button
               disabled={busy || entry.length < 4}
               onClick={join}
-              className="rounded-xl bg-blue-600 px-5 py-3 font-black disabled:opacity-40"
+              className="classroom-pressable classroom-setup-join rounded-xl bg-blue-600 px-5 py-3 font-black disabled:opacity-40"
             >
               دخول
             </button>
@@ -1505,11 +1505,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </main>
 
             {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[58px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#61c8bc] bg-[#fff8ea] text-[#23313d] shadow-xl min-[600px]:min-h-0" dir="rtl">
-              <div className="flex items-center justify-between gap-2 border-b border-[#a2e8d7] bg-[#ddf3ff] px-2 py-2">
+              <div className="booklet-toolbar flex items-center justify-between gap-2 border-b border-[#a2e8d7] bg-[#ddf3ff] px-2 py-2">
                 <div className="flex shrink-0 items-center gap-1">
-                  <button disabled={!canNavigateBooklet || bookletItemIndex <= 0 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white/70 px-2 text-[9px] font-black text-slate-700 disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-3.5 w-3.5"/>السابق</button>
+                  <button disabled={!canNavigateBooklet || bookletItemIndex <= 0 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="booklet-action booklet-action-prev flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white/70 px-2 text-[9px] font-black text-slate-700 disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-3.5 w-3.5"/>السابق</button>
                   <div className="relative z-30">
-                    <button disabled={!canChangeLesson || studyWorkspace === "teachers"} onClick={() => setLessonMenuOpen((open) => !open)} className="relative grid h-9 w-9 place-items-center rounded-xl border border-cyan-700/20 bg-white/70 text-cyan-800 disabled:opacity-35" aria-label="تبديل الدرس" title={canChangeLesson ? "تبديل الدرس" : "المدرس يتحكم بالتنقل في هذه الغرفة"}><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600"/></button>
+                    <button disabled={!canChangeLesson || studyWorkspace === "teachers"} onClick={() => setLessonMenuOpen((open) => !open)} className="booklet-action booklet-action-lesson relative grid h-9 w-9 place-items-center rounded-xl border border-cyan-700/20 bg-white/70 text-cyan-800 disabled:opacity-35" aria-label="تبديل الدرس" title={canChangeLesson ? "تبديل الدرس" : "المدرس يتحكم بالتنقل في هذه الغرفة"}><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600"/></button>
                     {lessonMenuOpen && <div className="absolute right-0 top-11 max-h-[70dvh] w-56 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 text-white shadow-2xl backdrop-blur" dir="rtl">
                       <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
                       <div className="grid grid-cols-2 gap-1.5">{lessonChoices.map((lesson, index) => {
@@ -1520,14 +1520,14 @@ export const LiveClassroomModal: React.FC<Props> = ({
                       {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
                     </div>}
                   </div>
-                  <button disabled={!canNavigateBooklet || bookletItemIndex >= bookletQuestions.length - 1 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-emerald-700 px-2 text-[9px] font-black text-white disabled:opacity-35" aria-label="السؤال التالي">التالي<ChevronLeft className="h-3.5 w-3.5"/></button>
+                  <button disabled={!canNavigateBooklet || bookletItemIndex >= bookletQuestions.length - 1 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="booklet-action booklet-action-next flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-emerald-700 px-2 text-[9px] font-black text-white disabled:opacity-35" aria-label="السؤال التالي">التالي<ChevronLeft className="h-3.5 w-3.5"/></button>
                 </div>
                 <div className="flex min-w-0 items-center justify-center gap-1">
-                  <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`flex h-9 items-center gap-1 rounded-xl border px-2 text-[9px] font-black transition ${studyWorkspace === "teachers" ? "border-red-300 bg-red-600 text-white" : "border-red-200 bg-white/80 text-red-700"}`} aria-label="فيديوهات مدرسين هذا الدرس" title="فيديوهات مدرسين هذا الدرس"><Presentation className="h-4 w-4"/><span className="hidden min-[900px]:inline">الفيديوهات</span></button>
-                  {classroom?.studyMode === "together" && studyWorkspace !== "teachers" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared || sharedQuestionLimitReached} className="flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-white/80 px-2 text-[8px] font-black text-emerald-800 disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : sharedQuestionLimitReached ? "وصلت إلى الحد الأقصى: 20 سؤالًا" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4 text-cyan-600"/>{currentQuestionShared ? "تمت" : sharedQuestionLimitReached ? "20/20" : "مشاركة"}</button> : null}
+                  <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`booklet-action booklet-action-video flex h-9 items-center gap-1 rounded-xl border px-2 text-[9px] font-black transition ${studyWorkspace === "teachers" ? "is-active border-red-300 bg-red-600 text-white" : "border-red-200 bg-white/80 text-red-700"}`} aria-label="فيديوهات مدرسين هذا الدرس" title="فيديوهات مدرسين هذا الدرس"><Presentation className="h-4 w-4"/><span className="hidden min-[900px]:inline">الفيديوهات</span></button>
+                  {classroom?.studyMode === "together" && studyWorkspace !== "teachers" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared || sharedQuestionLimitReached} className="booklet-action booklet-action-share flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-white/80 px-2 text-[8px] font-black text-emerald-800 disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : sharedQuestionLimitReached ? "وصلت إلى الحد الأقصى: 20 سؤالًا" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4"/>{currentQuestionShared ? "تمت" : sharedQuestionLimitReached ? "20/20" : "مشاركة"}</button> : null}
                   <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
                 </div>
-                <button onClick={() => setBookletPanelVisible(false)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-4 w-4"/></button>
+                <button onClick={() => setBookletPanelVisible(false)} className="booklet-action booklet-action-hide grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-4 w-4"/></button>
               </div>
               <div className="min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3">
                 {studyWorkspace === "teachers" ? <div className="flex h-full min-h-[300px] flex-col overflow-hidden rounded-xl bg-white">
@@ -1535,7 +1535,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                   <div className="min-h-0 flex-1 bg-slate-950">{selectedTeacherVideo?.youtubeId ? <iframe key={`${me || "local"}-${selectedTeacherVideo.youtubeId}`} className="h-full min-h-[260px] w-full border-0 bg-black" src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=0&rel=0&playsinline=1`} title={`شرح ${selectedTeacherVideo.teacherName}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/> : <div className="grid h-full min-h-[260px] place-items-center p-4 text-center text-slate-300"><div><Presentation className="mx-auto mb-2 h-9 w-9 text-red-400"/><b className="block text-xs">اختر مدرسًا لعرض الفيديو هنا</b></div></div>}</div>
                 </div> : bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
                   <div className="mb-3 flex items-center gap-2">
-                    <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
+                    <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="booklet-action booklet-action-answer rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
                   </div>
                   <span className="mb-2 text-[9px] font-black text-emerald-700">السؤال {bookletItemIndex + 1}</span>
                   <p className="text-base font-black leading-8 min-[1000px]:text-xl min-[1000px]:leading-10">{bookletQuestion.question}</p>
