@@ -39,6 +39,39 @@
   background: linear-gradient(135deg, var(--brand-primary), var(--brand-teal), var(--brand-mint));
 }
 
+/* The electric-coral theme intentionally contains no pure-white surfaces or text. */
+[data-app-theme='amber_work'] body,
+body[data-app-theme='amber_work'] {
+  background: #142629;
+  color: #f1dec0;
+}
+
+[data-app-theme='amber_work'] [class*='bg-white'] {
+  background-color: #294744 !important;
+  background-image: none !important;
+}
+
+[data-app-theme='amber_work'] [class*='text-white'] {
+  color: #f1dec0 !important;
+}
+
+[data-app-theme='amber_work'] [class*='border-white'] {
+  border-color: rgba(99, 200, 189, .38) !important;
+}
+
+[data-app-theme='amber_work'] input,
+[data-app-theme='amber_work'] select,
+[data-app-theme='amber_work'] textarea {
+  background-color: #355956 !important;
+  color: #f1dec0 !important;
+  caret-color: #f0aaa6;
+}
+
+[data-app-theme='amber_work'] input::placeholder,
+[data-app-theme='amber_work'] textarea::placeholder {
+  color: #ceb98f !important;
+}
+
 /* Mobile interaction performance: avoid delayed tap activation and keep nested scrollers responsive. */
 html {
   -webkit-text-size-adjust: 100%;

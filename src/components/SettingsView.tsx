@@ -73,12 +73,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenProfile, onBac
     },
     {
       id: 'amber_work',
-      title: 'النمط الكهربائي الكهرماني الأزرق',
-      description: 'أصفر كهربائي مع أزرق داكن وأزرق متوسط واضح القراءة',
-      badge: 'أصفر وأزرق',
+      title: 'النمط الكهربائي المرجاني',
+      description: 'مرجاني وفيروزي ورملي فوق خلفية فحمية داكنة بلا لون أبيض',
+      badge: 'مرجاني داكن',
       icon: Zap,
-      swatches: ['#FACC15', '#F59E0B', '#2563EB', '#0F172A'],
-      gradient: 'from-[#FFFFFF] via-[#EFF6FF] to-[#DBEAFE]',
+      swatches: ['#F0AAA6', '#63C8BD', '#C8A86D', '#142629'],
+      gradient: 'from-[#142629] via-[#294744] to-[#3C3430]',
     },
     {
       id: 'sky_cyan',

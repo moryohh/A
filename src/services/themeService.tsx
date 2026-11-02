@@ -125,42 +125,42 @@ export const APP_THEMES: Record<AppThemeId, ThemeConfig> = {
     },
   },
 
-  // 3. Electric Amber Blue (Electric Yellow + Dark Blue + Clear Mid Blue)
+  // 3. Electric Coral Teal — derived from the approved classroom/game references.
   amber_work: {
     id: 'amber_work',
-    name: 'النمط الكهربائي الكهرماني الأزرق',
-    subtitle: 'أصفر كهربائي مع أزرق داكن وأزرق متوسط واضح القراءة',
-    isLight: true,
+    name: 'النمط الكهربائي المرجاني',
+    subtitle: 'مرجاني وفيروزي فوق درجات فحمية ورملية، بلا أسطح بيضاء',
+    isLight: false,
     colors: {
-      primary: '#F59E0B',
-      secondary: '#FACC15',
-      accent: '#2563EB',
-      bgMain: '#DBEAFE',
-      bgWrapper: '#F8FBFF',
-      bgCard: '#FFFFFF',
-      bgCardSubtle: '#EFF6FF',
-      border: 'rgba(37,99,235,0.24)',
-      textPrimary: '#0F172A',
-      textSecondary: '#1E3A8A',
-      glow: 'rgba(37, 99, 235, 0.22)',
+      primary: '#F0AAA6',
+      secondary: '#63C8BD',
+      accent: '#C8A86D',
+      bgMain: '#142629',
+      bgWrapper: '#1B3234',
+      bgCard: '#294744',
+      bgCardSubtle: '#355956',
+      border: 'rgba(99,200,189,0.34)',
+      textPrimary: '#F1DEC0',
+      textSecondary: '#CEB98F',
+      glow: 'rgba(240,170,166,0.22)',
     },
     classes: {
-      outerBg: 'bg-[#DBEAFE]',
-      wrapperBg: 'bg-gradient-to-b from-[#FFFFFF] via-[#EFF6FF] to-[#DBEAFE]',
-      headerBg: 'bg-[#F8FBFF]/95',
-      navBg: 'bg-[#F8FBFF]/95',
-      cardBg: 'bg-white shadow-md',
-      cardSubtleBg: 'bg-[#EFF6FF]',
-      cardBorder: 'border-blue-200 shadow-sm',
-      textMain: 'text-slate-900',
-      textMuted: 'text-blue-900/70',
-      accentText: 'text-blue-700',
-      accentBg: 'bg-gradient-to-r from-yellow-400 via-amber-400 to-blue-600 text-slate-950',
-      accentBorder: 'border-blue-400/60',
-      modalBg: 'bg-white text-slate-900',
-      glowBlob1: 'bg-blue-500/15',
-      glowBlob2: 'bg-amber-400/20',
-      pillActive: 'bg-blue-600 text-white',
+      outerBg: 'bg-[#142629]',
+      wrapperBg: 'bg-gradient-to-b from-[#1B3234] via-[#203B3B] to-[#3C3430]',
+      headerBg: 'bg-[#193032]/95',
+      navBg: 'bg-[#193032]/95',
+      cardBg: 'bg-[#294744] shadow-md',
+      cardSubtleBg: 'bg-[#355956]',
+      cardBorder: 'border-[#63C8BD]/35 shadow-sm',
+      textMain: 'text-[#F1DEC0]',
+      textMuted: 'text-[#CEB98F]',
+      accentText: 'text-[#63C8BD]',
+      accentBg: 'bg-gradient-to-r from-[#F0AAA6] via-[#C8A86D] to-[#63C8BD] text-[#142629]',
+      accentBorder: 'border-[#F0AAA6]/55',
+      modalBg: 'bg-[#294744] text-[#F1DEC0]',
+      glowBlob1: 'bg-[#F0AAA6]/16',
+      glowBlob2: 'bg-[#63C8BD]/16',
+      pillActive: 'bg-[#63C8BD] text-[#142629]',
     },
   },
 
@@ -323,6 +323,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const theme = APP_THEMES[currentThemeId] || APP_THEMES.solar_light;
+
+  useEffect(() => {
+    document.documentElement.dataset.appTheme = currentThemeId;
+    document.body.dataset.appTheme = currentThemeId;
+    return () => {
+      delete document.documentElement.dataset.appTheme;
+      delete document.body.dataset.appTheme;
+    };
+  }, [currentThemeId]);
 
   return (
     <ThemeContext.Provider value={{ currentThemeId, theme, setThemeId }}>

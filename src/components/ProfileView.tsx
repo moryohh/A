@@ -324,7 +324,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
     { id: 'solar_light', label: 'أزرق نعناعي', colors: ['#FFFFFF', '#087FE5', '#43D5A0'] },
     { id: 'golden_navy', label: 'ذهبي', colors: ['#FFFDF5', '#D97706'] },
-    { id: 'amber_work', label: 'كهربائي مزرق', colors: ['#FACC15', '#2563EB', '#0F172A'] },
+    { id: 'amber_work', label: 'كهربائي مرجاني', colors: ['#F0AAA6', '#63C8BD', '#142629'] },
     { id: 'sky_cyan', label: 'سماوي', colors: ['#DDF3FF', '#087FE5', '#61C8BC'] },
     { id: 'emerald_nature', label: 'زمردي', colors: ['#F0FDF4', '#059669'] },
     { id: 'night', label: 'ليلي أسود وأخضر', colors: ['#020403', '#22C55E', '#06100A'] },
