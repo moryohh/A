@@ -653,7 +653,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
         if (message.type === "classroom_control") {
           const targetPlayer = next.players.find((player) => player.id === message.targetId);
           if (message.action === "change_content" && message.content) {
+            const previousLesson = String(next.classroom.content?.lessonId || next.classroom.content?.lesson || "");
+            const incomingLesson = String(message.content.lessonId || message.content.lesson || "");
             next.classroom.content = { ...next.classroom.content, ...message.content };
+            if (previousLesson !== incomingLesson) {
+              next.classroom.presenterState = null;
+              next.classroom.presenterId = next.classroom.hostId;
+              next.classroom.answersLocked = true;
+              next.players.forEach((player) => { player.progress = null; player.lastAnswer = ""; player.handRaised = false; });
+            }
           }
           if (message.action === "shared_mission") next.classroom.sharedMission = String(message.value || "").trim().slice(0, 120);
           if (message.action === "mic_permission" && targetPlayer) targetPlayer.micAllowed = Boolean(message.value);
@@ -1291,6 +1299,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
       lessonId: lesson.lessonId,
       lesson: lesson.lessonNumber,
       lessonTitle: lesson.title,
+      exerciseFile: "",
+      exerciseIndex: 0,
+      exerciseNumber: 1,
     };
     setLessonMenuOpen(false);
     setBookletItemIndex(0);
@@ -1685,7 +1696,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       {isTeacher && classroom?.contentMode === "booklet" && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
           {!isMathClassroom && (
-            <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
+            <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title, exerciseFile: "", exerciseIndex: 0, exerciseNumber: 1 } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
           )}
           <div className="grid grid-cols-3 gap-2 rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
           <div className="relative min-w-0">
@@ -1811,7 +1822,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </>
           ) : (
             <iframe
-              key={`${currentContent.exerciseFile || "first"}:${Number(currentContent.exerciseIndex || 0)}`}
+              key={`${currentContent.lessonId || currentContent.lesson || "lesson"}:${currentContent.exerciseFile || "first"}:${Number(currentContent.exerciseIndex || 0)}`}
               ref={boardFrameRef}
               src={boardUrl}
               onLoad={() => {

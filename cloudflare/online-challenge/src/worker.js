@@ -851,10 +851,24 @@ export class ChallengeRoom {
         if (action === 'clear_drawing') { liveGame.strokes = []; liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1; }
         if (action === 'extend_time') liveGame.endsAt = Math.max(Date.now(), Number(liveGame.endsAt) || Date.now()) + Math.max(1, Math.min(60, Number(payload.minutes) || 5)) * 60000;
         if (action === 'change_content' && payload.content && typeof payload.content === 'object') {
+          var previousLesson = String(liveGame.content?.lessonId || liveGame.content?.lesson || '');
+          var incomingLesson = String(payload.content.lessonId || payload.content.lesson || '');
+          var lessonChanged = previousLesson !== incomingLesson;
           liveGame.contentMode = payload.contentMode === 'booklet' ? 'booklet' : 'board';
           liveGame.content = payload.content;
           liveGame.strokes = [];
           liveGame.drawingVersion = Number(liveGame.drawingVersion || 0) + 1;
+          if (lessonChanged) {
+            liveGame.presenterState = null;
+            liveGame.presenterId = liveGame.hostId;
+            liveGame.answersLocked = true;
+            liveGame.players.forEach(function (player) {
+              player.progress = null;
+              player.lastAnswer = '';
+              player.handRaised = false;
+              if (player.id !== liveGame.hostId) player.drawAllowed = false;
+            });
+          }
         }
       } else if (payload.type === 'audio_state') {
         if (!isTeacher && !(senderPlayer && senderPlayer.micAllowed)) return;

@@ -257,7 +257,7 @@ function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom
     if(!classroom||!items.length)return
     window.parent.postMessage({type:'classroom_exercises',items:items.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
     const selected=requestedFile
-      ? items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex))
+      ? items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex)) || items[0]
       : items[0]
     if(selected)onOpen(selected.file,selected.questionIndex)
   },[classroom,items,requestedFile,requestedIndex,onOpen])
@@ -405,7 +405,7 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, hintsLeft, setHintsLeft, helpsLeft, setHelpsLeft, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '', classroomCanAnswer = false }) {
+function Solver({ file, progressScope = '', initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, hintsLeft, setHintsLeft, helpsLeft, setHelpsLeft, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '', classroomCanAnswer = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
   const currentStepRef=useRef(null)
   const questionsPaneRef=useRef(null), boardTouchY=useRef(null)
@@ -435,7 +435,7 @@ function Solver({ file, initialQuestionIndex = 0, exerciseItems = [], onSelectEx
     else if(boardThemeStarted)void player.play().catch(()=>{})
   },[musicMuted,boardThemeStarted])
   useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
-  const classroomProgressKey=`solve-classroom-progress:${file}:${questionIndex}`
+  const classroomProgressKey=`solve-classroom-progress:${progressScope}:${file}:${questionIndex}`
   useEffect(()=>{
     if(resetProgress&&classroomRole==='student'&&!classroomCanAnswer){setAnswers({});return}
     const storage=resetProgress?sessionStorage:localStorage
@@ -614,5 +614,5 @@ export default function App(){
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
     {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,exerciseItems,hintsLeft,setHintsLeft,helpsLeft,setHelpsLeft,hearts,setHearts,musicMuted,classroomRole,classroomCanAnswer}} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
+    {view==='solver'&&<Solver {...{file,exerciseItems,hintsLeft,setHintsLeft,helpsLeft,setHelpsLeft,hearts,setHearts,musicMuted,classroomRole,classroomCanAnswer}} progressScope={quotaKey} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
 }

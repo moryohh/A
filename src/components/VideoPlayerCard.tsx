@@ -414,8 +414,8 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
       {studyView === 'board' && <iframe
-        key={`${lesson.id}-board`}
-        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
+        key={`${openLessonContext?.subjectId || lesson.category || 'subject'}:${openLessonContext?.chapterNumber || 'chapter'}:${openLessonContext?.lessonId || lesson.id || 'lesson'}:${openLessonContext?.lessonNumber || 'number'}-board`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?build=lesson-scope-1&embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}&topicTitle=${encodeURIComponent(openLessonContext?.lessonTitle || lesson.title || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
         className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
         style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
