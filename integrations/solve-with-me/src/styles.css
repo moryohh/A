@@ -67,6 +67,7 @@ html,body{overscroll-behavior-y:none}
 .inline-board-actions .compact-board-tools .tool-hint{background:linear-gradient(145deg,#fbbf24,#f97316);animation-delay:.22s}
 .inline-board-actions .compact-board-tools .tool-help{background:linear-gradient(145deg,#ec4899,#7c3aed);animation-delay:.44s}
 .inline-board-actions .compact-board-tools .tool-calculator:hover,.inline-board-actions .compact-board-tools .tool-hint:hover,.inline-board-actions .compact-board-tools .tool-help:hover{color:#fff;filter:brightness(1.12)}
+.inline-board-actions .compact-board-tools .mini-tool:disabled{cursor:not-allowed;opacity:.38;filter:grayscale(.7);animation:none;box-shadow:none}
 .inline-board-actions .compact-board-tools .tool-hint small,.inline-board-actions .compact-board-tools .tool-help small{position:absolute;right:-5px;top:-6px;display:grid;min-width:14px;height:14px;padding:0 3px;place-items:center;border:1px solid #fff8;border-radius:999px;background:#166534;color:#fff;font-size:8px;font-weight:1000;line-height:1}
 @keyframes tool-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 @media (prefers-reduced-motion:reduce){.inline-board-actions .compact-board-tools .tool-calculator,.inline-board-actions .compact-board-tools .tool-hint,.inline-board-actions .compact-board-tools .tool-help{animation:none}}

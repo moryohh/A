@@ -471,14 +471,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [roomSoundOn, setRoomSoundOn] = useState(true);
-  const [answerText, setAnswerText] = useState("");
   const [receivedAnswers, setReceivedAnswers] = useState<Record<string, string>>({});
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
   const [exerciseMenu, setExerciseMenu] = useState(false);
   const [canvasVersion, setCanvasVersion] = useState(0);
   const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
-  const [classroomApples, setClassroomApples] = useState(100);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [missionOpen, setMissionOpen] = useState(false);
   const [missionText, setMissionText] = useState("");
@@ -507,6 +505,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
   const self = state?.players.find((player) => player.id === me);
+  const visibleStudentCount = (state?.players || []).filter((player) => player.id !== classroom?.hostId && !player.bot).length;
   const answerFor = (player: Participant) => receivedAnswers[player.id] || player.lastAnswer || "";
   const submittedAnswers = (state?.players || []).filter((player) => player.id !== me && Boolean(answerFor(player)));
   const canDraw = Boolean(isTeacher || self?.drawAllowed);
@@ -574,10 +573,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
   useEffect(() => {
     const receiveExercises = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "classroom_resource_state") {
-        setClassroomApples(Math.max(0, Number(event.data.apples) || 0));
-        return;
-      }
       if (event.data?.type === "classroom_select_exercise" && isTeacher) {
         const item = event.data.item;
         if (item?.file && socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({
@@ -1214,7 +1209,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
     setExerciseMenu(false);
   };
   const canAnswer = Boolean(!isTeacher && !classroom?.answersLocked && !self?.answerFrozen);
-  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-presenter-1&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&canAnswer=${canAnswer ? "1" : "0"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-solve-phase-2&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&canAnswer=${canAnswer ? "1" : "0"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
   const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
   const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
   const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
@@ -1651,7 +1646,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             </b>
             <small className="text-cyan-300">
             {offlineBooklet ? "تجربة أوفلاين" : `رمز الفصل: ${room}`} ·{" "}
-              {Math.max(0, (state?.players.length || 1) - 1)}/
+              {visibleStudentCount}/
               {classroom?.capacity || capacity} طالب
             </small>
           </div>
@@ -1664,8 +1659,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
             {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-48 -translate-x-1/2 grid-cols-4 gap-1.5 overflow-y-auto rounded-2xl border border-emerald-300/35 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`rounded-xl px-2 py-2 text-xs font-black ${index===activeExercisePosition?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-emerald-600"}`}>{index+1}</button>)}</div>}
           </div>
           <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
-          <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`grid h-9 w-9 place-items-center rounded-xl border ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"فتح الإجابات":"تجميد الإجابات"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}</button>
-          <span className="flex h-9 items-center gap-1 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-2 text-[11px] font-black text-emerald-100"><Apple className="h-4 w-4 fill-emerald-300"/>{classroomApples}</span>
+          <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`flex h-9 items-center gap-1 rounded-xl border px-2 text-[10px] font-black ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"ابدؤوا الحل":"إنهاء المحاولة"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}<span>{classroom?.answersLocked?"ابدؤوا الحل":"إنهاء الحل"}</span></button>
         </div>}
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">
@@ -1684,9 +1678,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
         </div>
       </div>}
       {isTeacher && classroom?.contentMode === "board" && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
-        <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
+        <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">متابعة الطلاب</b><small className="text-slate-400">راقب التقدم واختر من يعرض حله</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
         {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
-        <div className="space-y-2">{state?.players.filter(player=>player.id!==me).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}</small></div></div>{answerFor(player)&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {answerFor(player)}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح":"تجميد"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>شرح</button></div></div>)}</div>
+        <div className="space-y-2">{state?.players.filter(player=>player.id!==me&&!player.bot).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}{player.progress?` · الخطوة ${player.progress.step||1} · ${player.progress.solved||0}/${player.progress.total||0}`:" · لم يبدأ الحل"}</small></div>{classroom?.presenterId===player.id&&<span className="rounded-full bg-fuchsia-500/20 px-2 py-1 text-[9px] text-fuchsia-200">يعرض حله الآن</span>}</div>{answerFor(player)&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {answerFor(player)}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>سماح تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح الحل":"إيقاف مؤقت"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>عرض حله</button></div></div>)}</div>
       </div>}
       {isTeacher && classroom?.contentMode === "booklet" && (
         <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
@@ -1834,7 +1828,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isTeacher && classroom?.answersLocked && (
             <div className="pointer-events-none fixed inset-x-4 bottom-24 z-30 mx-auto max-w-sm rounded-3xl border border-cyan-200/70 bg-cyan-100/90 p-4 text-center text-cyan-950 shadow-[0_0_35px_rgba(125,211,252,.8)] backdrop-blur">
               <Snowflake className="mx-auto mb-1 animate-pulse" />
-              <b>الإجابات مجمّدة حتى يسمح المدرس</b>
+              <b>المدرس يشرح الآن</b>
+              <small className="mt-1 block font-bold">ستفتح محاولتك الخاصة عند بدء الحل</small>
             </div>
           )}
         </div>
@@ -1854,45 +1849,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
               className={`mr-auto flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-black ${self?.handRaised ? "bg-amber-400 text-slate-950" : "bg-white/10"}`}
             >
               <Hand className="h-4 w-4" />
-              {self?.handRaised ? "تم رفع اليد" : "رفع اليد"}
+              {self?.handRaised ? "تم إرسال طلبك" : "أرغب بشرح حلي"}
             </button>
           )}
-          {!isTeacher && !classroom?.answersLocked && (
-            <div className="flex min-w-0 flex-1 gap-1">
-              <input
-                value={answerText}
-                onChange={(event) => setAnswerText(event.target.value)}
-                placeholder="اكتب إجابتك"
-                className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm text-white"
-              />
-              <button
-                onClick={() => {
-                  const submittedAnswer = answerText.trim();
-                  if (!submittedAnswer) return;
-                  send({ type: "classroom_answer", value: submittedAnswer });
-                  send({
-                    type: "classroom_progress",
-                    progress: {
-                      ...(self?.progress || {}),
-                      step: self?.progress?.step || 1,
-                      solved: self?.progress?.solved || 0,
-                      total: self?.progress?.total || 0,
-                      answer: submittedAnswer,
-                    },
-                  });
-                  setAnswerText("");
-                }}
-                className="rounded-xl bg-emerald-500 px-3 text-xs font-black text-slate-950"
-              >
-                إرسال
-              </button>
-            </div>
-          )}
+          {!isTeacher && classroom?.contentMode === "board" && !classroom?.answersLocked && <span className="rounded-xl bg-emerald-400/15 px-3 py-2 text-[11px] font-black text-emerald-200">حلّ داخل الصبورة؛ تقدمك يصل للمدرس تلقائيًا</span>}
         </div>
         {isTeacher && (
           <div className="mt-2 flex gap-2 overflow-x-auto">
             {state?.players
-              .filter((player) => player.id !== me)
+              .filter((player) => player.id !== me && !player.bot)
               .map((player) => (
                 <div
                   key={player.id}
