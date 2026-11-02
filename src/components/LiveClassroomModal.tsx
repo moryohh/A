@@ -1350,7 +1350,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   if (!room)
     return (
       <div
-        className="fixed inset-0 z-[100] overflow-y-auto bg-[#061126] p-4 font-cairo text-white"
+        className="fixed inset-0 z-[100] overflow-y-auto bg-[#071d3a] p-4 font-cairo text-white"
         dir="rtl"
       >
         <div className="mx-auto mt-8 max-w-lg rounded-3xl border border-cyan-400/35 bg-slate-950/80 p-5 shadow-2xl">
@@ -1451,8 +1451,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   if (classroom?.contentMode === "booklet")
     return (
-      <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#0b1d24] font-cairo text-white" dir="rtl">
-        <header className="grid min-h-14 shrink-0 grid-cols-[auto_minmax(150px,1fr)_auto] items-center gap-2 border-b border-white/10 bg-[#102832] px-2 py-1.5 shadow-lg sm:px-3" dir="ltr">
+      <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071d3a] font-cairo text-white" dir="rtl">
+        <header className="grid min-h-14 shrink-0 grid-cols-[auto_minmax(150px,1fr)_auto] items-center gap-2 border-b border-white/10 bg-[#0b2d6b] px-2 py-1.5 shadow-lg sm:px-3" dir="ltr">
           <div className="flex min-w-0 items-center gap-1" dir="rtl">
             <button onClick={() => setRoomSoundOn((enabled) => !enabled)} className={`grid h-10 w-10 place-items-center rounded-xl border ${roomSoundOn ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-400"}`} aria-label={roomSoundOn ? "كتم سماعة الغرفة" : "تشغيل سماعة الغرفة"}>{roomSoundOn ? <Volume2 className="h-4 w-4"/> : <VolumeX className="h-4 w-4"/>}</button>
             <button onClick={() => void toggleMic()} className={`grid h-10 w-10 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
@@ -1474,7 +1474,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
         <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
           <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,14vw,210px)_minmax(360px,1fr)_clamp(145px,19vw,280px)]" : "min-[600px]:grid-cols-[clamp(105px,14vw,210px)_minmax(360px,1fr)]"}`}>
             {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
-            <aside className="relative max-h-48 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#102832] p-2 min-[600px]:max-h-none" dir="rtl">
+            <aside className="relative max-h-48 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b2d4b] p-2 min-[600px]:max-h-none" dir="rtl">
               <div className="mb-2 flex items-center justify-between gap-1"><b className="text-[10px] text-cyan-100">الغرف النشطة</b><span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]"/></div>
               <div className="space-y-2 overflow-y-auto overscroll-contain">
                 {(activeRoomsPreview.length ? activeRoomsPreview : [{ code: room, status: "playing", gameType: "live_classroom", gameTitle: "الملزمة — غرفة دراسة" }]).map((activeRoom) => {
@@ -1489,7 +1489,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
             </aside>
 
-            <main className="order-3 flex min-h-[55dvh] flex-col overflow-hidden bg-[#fffdf7] p-2 min-[600px]:min-h-0" dir="rtl">
+            <main className="order-3 flex min-h-[55dvh] flex-col overflow-hidden bg-[#fff8ea] p-2 min-[600px]:min-h-0" dir="rtl">
               <div className="mx-auto grid h-full w-full grid-cols-1 content-start justify-items-center gap-x-2 gap-y-5 overflow-y-auto px-1 min-[900px]:grid-cols-2">
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player) => {
                   const progress = player.mission?.progress || 0;
@@ -1504,8 +1504,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
             </main>
 
-            {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[58px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#815536] bg-[#f4f0e4] text-[#24332e] shadow-xl min-[600px]:min-h-0" dir="rtl">
-              <div className="flex items-center justify-between gap-2 border-b border-[#d7c9a4] bg-[#e9e2cf] px-2 py-2">
+            {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[58px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#61c8bc] bg-[#fff8ea] text-[#23313d] shadow-xl min-[600px]:min-h-0" dir="rtl">
+              <div className="flex items-center justify-between gap-2 border-b border-[#a2e8d7] bg-[#ddf3ff] px-2 py-2">
                 <div className="flex shrink-0 items-center gap-1">
                   <button disabled={!canNavigateBooklet || bookletItemIndex <= 0 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white/70 px-2 text-[9px] font-black text-slate-700 disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-3.5 w-3.5"/>السابق</button>
                   <div className="relative z-30">
@@ -1640,10 +1640,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   return (
     <div
-      className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071126] font-cairo text-white"
+      className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071d3a] font-cairo text-white"
       dir="rtl"
     >
-      <header className={`flex shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-[#091a36] to-[#10184a] px-2 py-2 shadow-lg sm:px-3 ${classroom?.contentMode === "board" ? "flex-nowrap" : "flex-wrap"}`}>
+      <header className={`flex shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-[#071d3a] to-[#0b2d6b] px-2 py-2 shadow-lg sm:px-3 ${classroom?.contentMode === "board" ? "flex-nowrap" : "flex-wrap"}`}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             onClick={closeClassroom}

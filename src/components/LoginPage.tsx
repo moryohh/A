@@ -153,16 +153,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-stretch justify-center p-0 sm:min-h-screen sm:items-center sm:p-4 text-right select-none animate-in fade-in duration-300">
+    <div
+      className="min-h-[100dvh] w-full flex items-stretch justify-center p-0 sm:min-h-screen sm:items-center sm:p-4 text-right select-none animate-in fade-in duration-300"
+      style={{
+        background: theme.isLight
+          ? 'radial-gradient(circle at 15% 10%, rgba(67,213,160,.32), transparent 28%), radial-gradient(circle at 88% 90%, rgba(8,127,229,.26), transparent 32%), linear-gradient(145deg, #DDF3FF 0%, #F5FBFF 48%, #A2E8D7 145%)'
+          : theme.colors.bgMain,
+      }}
+    >
       <div
         className={`relative min-h-[100dvh] w-full max-w-none overflow-hidden rounded-none border-x-0 p-5 shadow-2xl transition-all duration-300 sm:min-h-0 sm:max-w-md sm:rounded-3xl sm:border sm:p-6 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
         style={{
-          boxShadow: `0 12px 40px ${theme.colors.glow}`,
+          boxShadow: `0 20px 60px ${theme.colors.glow}`,
+          backgroundImage: theme.isLight
+            ? 'linear-gradient(160deg, rgba(255,255,255,.98), rgba(245,251,255,.94))'
+            : undefined,
         }}
       >
         {/* Top Decorative Glow Line */}
         <div
-          className="absolute top-0 inset-x-0 h-1.5 opacity-0 transition-colors"
+          className="absolute top-0 inset-x-0 h-1.5 opacity-100 transition-colors"
           style={{
             background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.secondary}, ${theme.colors.accent})`,
           }}
@@ -331,7 +341,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={handleGuestPreview}
-                  className="w-full rounded-2xl border border-amber-300/50 bg-amber-400/15 px-4 py-3.5 text-xs font-black text-amber-200 shadow-md transition-all hover:bg-amber-400/25 active:scale-[0.98]"
+                  className="w-full rounded-2xl border border-[#61C8BC]/60 bg-[#43D5A0]/15 px-4 py-3.5 text-xs font-black text-[#08705A] shadow-md transition-all hover:bg-[#43D5A0]/25 active:scale-[0.98]"
                 >
                   دخول كضيف لتجربة اللعب الجماعي
                 </button>

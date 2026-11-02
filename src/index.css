@@ -1,9 +1,20 @@
 @import "tailwindcss";
 
+:root {
+  --brand-primary: #087fe5;
+  --brand-navy: #071d3a;
+  --brand-mint: #43d5a0;
+  --brand-teal: #61c8bc;
+  --brand-sky-soft: #ddf3ff;
+  --brand-paper: #fff8ea;
+  --brand-coral: #f4b7b3;
+  --brand-ink: #23313d;
+}
+
 @layer base {
   body {
     font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
-    background-color: #050505;
+    background-color: var(--brand-navy);
     color: #ffffff;
   }
 }
@@ -19,13 +30,13 @@
   scrollbar-width: none;  /* Firefox */
 }
 
-/* Custom glow and ring utilities matching electric sky blue accent (#00A3FF) */
+/* Shared blue/mint identity sampled from the approved visual references. */
 .ring-sky-gradient {
-  background: linear-gradient(135deg, #00A3FF, #38bdf8, #818cf8);
+  background: linear-gradient(135deg, var(--brand-primary), #2da8f3, var(--brand-mint));
 }
 
 .story-border-gradient {
-  background: linear-gradient(135deg, #00A3FF, #38bdf8, #7dd3fc);
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-teal), var(--brand-mint));
 }
 
 /* Mobile interaction performance: avoid delayed tap activation and keep nested scrollers responsive. */
