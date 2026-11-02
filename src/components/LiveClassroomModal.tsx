@@ -1229,7 +1229,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
   const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
   const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
-  const timedTreeStage = Math.min(12, Math.floor(elapsedSeconds / 30));
+  const timedTreeStage = Math.min(12, Math.floor(elapsedSeconds / 60));
   const currentLessonShareId = String(currentContent.lessonId || currentContent.lesson || "lesson");
   const currentQuestionShareKey = `${currentLessonShareId}:${bookletItemIndex}`;
   const mySharedQuestionKeys = new Set(
@@ -1502,7 +1502,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
                 {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player) => {
                   const progress = player.mission?.progress || 0;
                   const target = Math.max(1, player.mission?.target || 1);
-                  const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 30000);
+                  const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 60000);
                   const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
                   return <div key={player.id} className="flex w-full min-w-0 flex-col items-center justify-center bg-transparent p-0">
                     <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.5} className="!h-[88px] !w-[104px]" />

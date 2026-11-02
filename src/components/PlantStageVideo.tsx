@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+const readyPlantStages = new Set<string>();
+
 type Props = {
   stage: number;
   compact?: boolean;
@@ -16,16 +18,36 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
   const gainRef = useRef<GainNode | null>(null);
   const [muted, setMuted] = useState(!sound);
   const safeStage = Math.min(12, Math.max(1, Math.round(stage)));
-  const regularSize = 54 + (Math.min(safeStage, 9) - 1) * 4;
+  const [visibleStage, setVisibleStage] = useState(safeStage);
+  const [pendingStage, setPendingStage] = useState<number | null>(null);
+  const stageSource = (stageNumber: number) => `${import.meta.env.BASE_URL}assets/${sourceFolder}/stage-${String(stageNumber).padStart(2, '0')}.mp4`;
+  const regularSize = 54 + (Math.min(visibleStage, 9) - 1) * 4;
   const progressiveSize = compact
-    ? safeStage === 10
+    ? visibleStage === 10
       ? Math.round(regularSize * 1.1)
-      : safeStage >= 11
+      : visibleStage >= 11
         ? Math.round(regularSize * 1.1 * 1.15)
         : regularSize
     : undefined;
   const compactSize = progressiveSize === undefined ? undefined : Math.min(progressiveSize, 78);
-  const visualScale = safeStage === 10 ? 1.1 : safeStage >= 11 ? 1.265 : 1;
+  const visualScale = visibleStage === 10 ? 1.1 : visibleStage >= 11 ? 1.265 : 1;
+
+  useEffect(() => {
+    if (safeStage === visibleStage) {
+      setPendingStage(null);
+      return;
+    }
+    // Freeze the last good frame until the requested stage has a decodable
+    // frame. This prevents a transparent flash on slower Android devices.
+    videoRef.current?.pause();
+    const requestedSource = stageSource(safeStage);
+    if (readyPlantStages.has(requestedSource)) {
+      setVisibleStage(safeStage);
+      setPendingStage(null);
+    } else {
+      setPendingStage(safeStage);
+    }
+  }, [safeStage, sourceFolder, visibleStage]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -67,7 +89,9 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
       void audioContextRef.current?.close().catch(() => undefined);
       audioContextRef.current = null;
     };
-  }, [safeStage, sound, volume]);
+  }, [visibleStage, sound, volume, sourceFolder]);
+
+  const preloadStage = pendingStage ?? (visibleStage < 12 ? visibleStage + 1 : null);
 
   const enableSound = () => {
     if (!sound || !videoRef.current || !muted) return;
@@ -86,17 +110,38 @@ export const PlantStageVideo: React.FC<Props> = ({ stage, compact = false, sound
       onPointerDown={enableSound}
     >
       <video
-        key={safeStage}
+        key={`${sourceFolder}-${visibleStage}`}
         ref={videoRef}
-        src={`${import.meta.env.BASE_URL}assets/${sourceFolder}/stage-${String(safeStage).padStart(2, '0')}.mp4`}
+        src={stageSource(visibleStage)}
         className={`h-full w-full transition-transform duration-700 ${bare ? 'object-contain mix-blend-multiply' : 'object-cover'}`}
         style={{ transform: `scale(${visualScale})` }}
         autoPlay
         playsInline
-        preload="metadata"
+        preload="auto"
         muted={muted}
-        aria-label={`مرحلة نمو النبات ${safeStage}`}
+        onLoadedData={() => readyPlantStages.add(stageSource(visibleStage))}
+        aria-label={`مرحلة نمو النبات ${visibleStage}`}
       />
+      {preloadStage && preloadStage !== visibleStage && (
+        <video
+          key={`preload-${sourceFolder}-${preloadStage}`}
+          src={stageSource(preloadStage)}
+          className="pointer-events-none absolute h-px w-px opacity-0"
+          preload="auto"
+          playsInline
+          muted
+          aria-hidden="true"
+          onCanPlay={(event) => {
+            const loadedStage = preloadStage;
+            readyPlantStages.add(stageSource(loadedStage));
+            event.currentTarget.pause();
+            if (loadedStage === safeStage) {
+              setVisibleStage(loadedStage);
+              setPendingStage(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
