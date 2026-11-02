@@ -500,7 +500,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const workspaceFullscreenRef = useRef(false);
   const historyEntryRef = useRef(false);
   const previousOrientationRef = useRef<"portrait" | "landscape">("portrait");
-  const preserveDisplayOnUnmountRef = useRef(false);
+  const closeClassroomRef = useRef<() => void>(() => undefined);
 
   const classroom = state?.classroom;
   const isTeacher = classroom?.hostId === me;
@@ -779,7 +779,7 @@ export const LiveClassroomModal: React.FC<Props> = ({
       remoteAudiosRef.current.forEach((audio) => { audio.srcObject = null; });
       remoteAudiosRef.current.clear();
       pendingIceRef.current.clear();
-      if (!preserveDisplayOnUnmountRef.current) void restoreClassroomDisplay();
+      void restoreClassroomDisplay();
     },
     [],
   );
@@ -1114,7 +1114,11 @@ export const LiveClassroomModal: React.FC<Props> = ({
     if (!room) return;
     const handleFullscreenExit = () => {
       if (document.fullscreenElement || closingRef.current) return;
-      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+      // On many Android browsers the system Back button exits fullscreen
+      // before it emits popstate. Treat that fullscreen exit as leaving the
+      // classroom, otherwise the landscape-only lesson remains open in
+      // portrait orientation.
+      closeClassroomRef.current();
     };
     document.addEventListener("fullscreenchange", handleFullscreenExit);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
@@ -1136,7 +1140,10 @@ export const LiveClassroomModal: React.FC<Props> = ({
         closeStudyFullscreen();
         return;
       }
-      preserveDisplayOnUnmountRef.current = true;
+      // Let the classroom finish its own cleanup and restore portrait only
+      // after the landscape view has been removed.
+      event.preventDefault();
+      closeClassroomRef.current();
     };
     window.addEventListener("duha-live-classroom-back", handleClassroomBack);
     return () => window.removeEventListener("duha-live-classroom-back", handleClassroomBack);
@@ -1174,14 +1181,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
       void restoreClassroomDisplay().finally(onClose);
     };
     if (room && API && !offlineBooklet) {
+      // Inform the server without keeping the landscape UI open while the
+      // request is in flight. This is especially important for hardware Back.
       void authorization()
-        .then((token) => fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: token } }))
-        .catch(() => undefined)
-        .finally(finishClose);
-      return;
+        .then((token) => fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: token }, keepalive: true }))
+        .catch(() => undefined);
     }
     finishClose();
   };
+  closeClassroomRef.current = closeClassroom;
   async function toggleMic() {
     if (!isTeacher && !self?.micAllowed) return;
     if (micOn) {
