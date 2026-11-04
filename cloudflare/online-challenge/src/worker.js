@@ -502,9 +502,15 @@ export class ChallengeRoom {
     if (!this.env || !registryBinding(this.env) || !game || !game.roomCode) return;
     try {
       var registry = registryBinding(this.env);
+      // Classroom capacity is reserved for real connected people. Scheduled
+      // classroom bots must never make a room look full in the public list,
+      // and a departed member must free their seat immediately.
+      var listedPlayers = game.gameType === 'live_classroom'
+        ? this.humanPlayers(game).filter(function (player) { return this.connected(player.id); }, this).length
+        : game.players.length;
       await registry.get(registry.idFromName('active-rooms')).fetch(new Request('https://registry/internal/update', {
         method: 'POST',
-        body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: game.players.length, endsAt: game.endsAt, contentMode: game.contentMode, activePlayers: game.players.filter(function (player) { return !this.isBot(player) && this.connected(player.id); }, this).slice(0, 5).map(function (player) { var profile = player.profile || {}; return { name: profile.name || 'طالب', avatar: profile.avatar || '', level: profile.level || 1, activity: player.activity || 'يدرس الآن' }; }) }),
+        body: JSON.stringify({ roomId: this.ctx.id && this.ctx.id.toString ? this.ctx.id.toString() : null, roomCode: game.roomCode, status: status, players: listedPlayers, endsAt: game.endsAt, contentMode: game.contentMode, activePlayers: game.players.filter(function (player) { return !this.isBot(player) && this.connected(player.id); }, this).slice(0, 5).map(function (player) { var profile = player.profile || {}; return { name: profile.name || 'طالب', avatar: profile.avatar || '', level: profile.level || 1, activity: player.activity || 'يدرس الآن' }; }) }),
       }));
     } catch (_) { /* Registry status is helpful, but must never stop the match. */ }
   }
