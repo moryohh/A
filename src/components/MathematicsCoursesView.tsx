@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, ChevronLeft, Clock, Loader2, Play, RefreshCw, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronLeft, Clock, Loader2, Play, Presentation, RefreshCw, Users } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { fetchMathematicsTopics, fetchMathematicsLectures, MATH_CHAPTER_TITLES, MathTopicIndex, MathLecture } from '../services/mathematicsCoursesService';
 import { appSfx } from '../utils/appSfx';
 
-export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
+export function MathematicsCoursesView({ onBack, onOpenGames }: { onBack: () => void; onOpenGames?: (topic: MathTopicIndex) => void }) {
   const { theme } = useAppTheme();
   const [topics, setTopics] = useState<MathTopicIndex[]>([]);
   const [teacherId, setTeacherId] = useState<string | null>(null);
@@ -97,6 +97,14 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
         <BookOpen size={22} style={{ color: theme.colors.primary }} /><div className="flex-1 min-w-0"><h2 className="font-bold text-sm leading-relaxed">{item.title}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{item.videoCount} محاضرة</p></div><ChevronLeft size={18} />
       </button>)}</div>}
       {topic && <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => { appSfx.panelOpen(); onOpenGames?.(topic); }}
+          className="flex w-full items-center justify-between rounded-2xl border border-cyan-300/45 bg-gradient-to-l from-cyan-500/25 via-blue-700/20 to-emerald-500/20 p-4 text-right text-white shadow-[0_10px_30px_rgba(14,165,233,.18)] transition active:scale-[.98]"
+        >
+          <span><b className="block text-sm">الملزمة وحل معي</b><small className="mt-1 block text-[10px] text-cyan-100/80">افتح أدوات الدرس والدراسة الأونلاين</small></span>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300/15 text-cyan-100"><Presentation size={27}/></span>
+        </button>
         {lecture && <div className={`rounded-2xl overflow-hidden border ${theme.classes.cardBorder} ${theme.classes.cardBg}`}>
           <iframe key={lecture.id} className="aspect-video w-full bg-black" src={`https://www.youtube.com/embed/${lecture.youtubeId}?autoplay=1&rel=0&playsinline=1`} title={lecture.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
         </div>}
