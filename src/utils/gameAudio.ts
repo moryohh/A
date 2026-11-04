@@ -66,7 +66,9 @@ class GameAudioEngine {
         this.externalPlayers.set(key, player);
       }
       if (loop) {
-        volume = Math.min(volume, 0.08);
+        // General study/game themes stay deliberately quiet, but Millionaire's
+        // suspense bed is part of the game itself and must remain audible.
+        if (key !== 'millionaire-thinking') volume = Math.min(volume, 0.08);
         this.externalPlayers.forEach((other, otherKey) => {
           if (other !== player && (otherKey === 'game-session-theme' || otherKey === 'online-game-session-theme' || otherKey === 'exam-session-theme' || otherKey === 'millionaire-thinking')) other.pause();
         });
