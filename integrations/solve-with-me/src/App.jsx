@@ -215,6 +215,16 @@ const belongsToSelectedTopic = (topicName, problem) => {
   return /معادل|تربيعي|جذر/.test(title)
 }
 
+const stableLessonOffset = (lessonId, length) => {
+  if (!lessonId || !length) return 0
+  let hash = 2166136261
+  for (const character of String(lessonId)) {
+    hash ^= character.codePointAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) % length
+}
+
 const CONTENT_INDEX_API='https://duha-content-index.rafos72171.workers.dev'
 const CONTENT_R2_API='https://duha-content-r2.rafos72171.workers.dev'
 const boardFileCache=new Map()
@@ -242,7 +252,7 @@ async function loadBoardFile(file){
   return promise
 }
 
-function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0 }) {
+function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0, requestedLessonId = '' }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
@@ -255,12 +265,14 @@ function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom
   },[topic])
   useEffect(()=>{
     if(!classroom||!items.length)return
-    window.parent.postMessage({type:'classroom_exercises',items:items.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
+    const offset=requestedFile?0:stableLessonOffset(requestedLessonId,items.length)
+    const orderedItems=offset?[...items.slice(offset),...items.slice(0,offset)]:items
+    window.parent.postMessage({type:'classroom_exercises',items:orderedItems.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
     const selected=requestedFile
       ? items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex)) || items[0]
-      : items[0]
+      : orderedItems[0]
     if(selected)onOpen(selected.file,selected.questionIndex)
-  },[classroom,items,requestedFile,requestedIndex,onOpen])
+  },[classroom,items,requestedFile,requestedIndex,requestedLessonId,onOpen])
   return <main className="page exercises-page">{!embedded&&<div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>}
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
@@ -563,6 +575,7 @@ export default function App(){
   const params=useMemo(()=>new URLSearchParams(window.location.search),[])
   const requestedSubject=String(params.get('subject')||'').toLowerCase()
   const requestedTopic=String(params.get('topicTitle')||'').trim()
+  const requestedLessonId=String(params.get('lessonId')||'').trim()
   const requestedExerciseFile=String(params.get('exerciseFile')||'').trim()
   const requestedExerciseIndex=Number(params.get('exerciseIndex')||0)
   const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
@@ -584,14 +597,15 @@ export default function App(){
       setChapter(matched);setView(embeddedScience?'missing':'topics')
       const lesson=Number(params.get('lesson'))
       const isMath=selected.id==='math'
-      const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').split(/[^\u0600-\u06ff\w]+/).filter(token=>token.length>2&&!['ال','الفصل','استخدام','باستخدام','شرح','معادلة','محاضرة'].includes(token))
+      const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').split(/[^\u0600-\u06ff\w]+/).map(token=>token.replace(/^و(?=.{3})/,'').replace(/^ال(?=.{3})/,'')).filter(token=>token.length>2&&!['فصل','استخدام','باستخدام','شرح','معادله','محاضره','صيغه','مسائل','وزاريات'].includes(token))
       const requestedTokens=new Set(topicTokens(requestedTopic))
       const titleMatchedTopic=requestedTokens.size
         ? matched.topics.map(t=>{
             const tokens=topicTokens(t.name)
             const score=tokens.filter(token=>requestedTokens.has(token)).length
-            return {topic:t,score,ratio:score/Math.max(tokens.length,1)}
-          }).sort((a,b)=>b.ratio-a.ratio||b.score-a.score||topicTokens(a.topic.name).length-topicTokens(b.topic.name).length)[0]
+            const relevance=(2*score)/Math.max(tokens.length+requestedTokens.size,1)
+            return {topic:t,score,relevance}
+          }).sort((a,b)=>b.relevance-a.relevance||b.score-a.score||topicTokens(a.topic.name).length-topicTokens(b.topic.name).length)[0]
         : null
       const found=titleMatchedTopic?.score>0
         ? titleMatchedTopic.topic
@@ -613,6 +627,6 @@ export default function App(){
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} requestedLessonId={requestedLessonId} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
     {view==='solver'&&<Solver {...{file,exerciseItems,hintsLeft,setHintsLeft,helpsLeft,setHelpsLeft,hearts,setHearts,musicMuted,classroomRole,classroomCanAnswer}} progressScope={quotaKey} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
 }
