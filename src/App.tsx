@@ -1343,7 +1343,29 @@ function AppContent() {
 
           {/* 2. Intermediate Subject Learning Path (خارطة المادة والتقدم) */}
           {activeTab === 'home' && homeSubView === 'learning_path' && selectedSubject && (
-            selectedSubject.id === 'mathematics' ? <MathematicsCoursesView onBack={() => setHomeSubView('main_home')} /> :
+            selectedSubject.id === 'mathematics' ? <MathematicsCoursesView
+              onBack={() => setHomeSubView('main_home')}
+              onOpenGames={(mathTopic) => {
+                setLesson((current) => ({
+                  ...current,
+                  id: mathTopic.topicId,
+                  title: mathTopic.title,
+                  subtitle: `الفصل ${mathTopic.chapterNumber} — ${mathTopic.teacherName}`,
+                  category: 'mathematics',
+                  teacherName: mathTopic.teacherName,
+                }));
+                setOpenLessonContext({
+                  subjectId: 'mathematics',
+                  chapterNumber: mathTopic.chapterNumber,
+                  lessonNumber: mathTopic.sortOrder + 1,
+                  lessonId: mathTopic.topicId,
+                  lessonKey: buildLessonKey('mathematics', mathTopic.chapterNumber, mathTopic.sortOrder + 1),
+                  title: mathTopic.title,
+                  lessonTitle: mathTopic.title,
+                });
+                openGames();
+              }}
+            /> :
             <SubjectLearningPathView
               subject={selectedSubject}
               learningPosition={learningPosition}
