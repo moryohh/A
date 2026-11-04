@@ -51,6 +51,14 @@ body[data-app-theme='amber_work'] {
   background-image: none !important;
 }
 
+/* Preserve readable labels after light cards are recoloured as dark surfaces. */
+[data-app-theme='amber_work'] [class*='bg-white'][class*='text-slate-'],
+[data-app-theme='amber_work'] [class*='bg-white'][class*='text-gray-'],
+[data-app-theme='amber_work'] [class*='bg-white'] [class*='text-slate-'],
+[data-app-theme='amber_work'] [class*='bg-white'] [class*='text-gray-'] {
+  color: #f1dec0 !important;
+}
+
 [data-app-theme='amber_work'] [class*='text-white'] {
   color: #f1dec0 !important;
 }
