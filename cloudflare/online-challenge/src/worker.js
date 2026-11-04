@@ -253,6 +253,29 @@ export class ChallengeRoom {
   isBot(player) { return Boolean(player && typeof player.id === 'string' && (player.id === BOT_ID || player.id.startsWith(TEAM_BOT_PREFIX) || player.id.startsWith(CLASSROOM_BOT_PREFIX))); }
   humanPlayers(game) { return game.players.filter(function (player) { return !this.isBot(player); }, this); }
   hasConnectedHuman(game) { return this.humanPlayers(game).some(function (player) { return this.connected(player.id); }, this); }
+  transferClassroomHost(game, departedUserId) {
+    game.players = game.players.filter(function (player) { return player.id !== departedUserId; });
+    var remainingHumans = this.humanPlayers(game);
+    if (!remainingHumans.length) {
+      game.players = [];
+      game.emptyDeadline = Date.now() + 60000;
+      return null;
+    }
+    var nextHost = remainingHumans[Math.floor(Math.random() * remainingHumans.length)];
+    game.hostId = nextHost.id;
+    game.presenterId = nextHost.id;
+    game.presenterState = null;
+    nextHost.micAllowed = true;
+    nextHost.drawAllowed = true;
+    nextHost.answerFrozen = false;
+    nextHost.activity = 'تسلّم إدارة الغرفة';
+    nextHost.activityAt = Date.now();
+    game.players.forEach(function (player) {
+      if (player.id !== nextHost.id) player.drawAllowed = false;
+    });
+    delete game.emptyDeadline;
+    return nextHost;
+  }
   assignCharacter(game, player) {
     if (!player || player.character) return player && player.character;
     var used = game.players.map(function (item) { return item.character; }).filter(Boolean);
@@ -597,14 +620,22 @@ export class ChallengeRoom {
       if (!leaveBody || typeof leaveBody.userId !== 'string') return json({ error: 'invalid_user' }, 400, '');
       if (game.gameType === 'live_classroom') {
         if (leaveBody.userId === game.hostId) {
-          game.status = 'closed';
-          game.endedReason = 'host_left';
-          game.leftPlayerId = leaveBody.userId;
+          if (game.studyMode === 'teacher') {
+            game.status = 'closed';
+            game.endedReason = 'host_left';
+            game.leftPlayerId = leaveBody.userId;
+            await this.ctx.storage.put('game', game);
+            await this.updateRegistry('ended', game);
+            this.broadcast({ type: 'room_closed', reason: 'host_left' });
+            this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
+            return json({ ok: true, closed: true }, 200, '');
+          }
+          var successor = this.transferClassroomHost(game, leaveBody.userId);
           await this.ctx.storage.put('game', game);
-          await this.updateRegistry('ended', game);
-          this.broadcast({ type: 'room_closed', reason: 'host_left' });
-          this.sockets().forEach(function (socket) { try { socket.close(4001, 'host_left'); } catch (_) {} });
-          return json({ ok: true, closed: true }, 200, '');
+          this.broadcast(this.view(game));
+          await this.updateRegistry('playing', game);
+          await this.scheduleNextAlarm(game);
+          return json({ ok: true, closed: false, transferredTo: successor && successor.id, emptyGraceSeconds: successor ? 0 : 60 }, 200, '');
         }
         game.players = game.players.filter(function (player) { return player.id !== leaveBody.userId; });
         var remainingHumans = this.humanPlayers(game);
@@ -1090,13 +1121,21 @@ export class ChallengeRoom {
     if (!userId || !game.players.some(function (player) { return player.id === userId; }) || this.connected(userId, socket)) return;
     if (game.gameType === 'live_classroom') {
       if (userId === game.hostId) {
-        game.status = 'closed';
-        game.endedReason = 'host_left';
-        game.leftPlayerId = userId;
+        if (game.studyMode === 'teacher') {
+          game.status = 'closed';
+          game.endedReason = 'host_left';
+          game.leftPlayerId = userId;
+          await this.ctx.storage.put('game', game);
+          await this.updateRegistry('ended', game);
+          this.broadcast({ type: 'room_closed', reason: 'host_left' });
+          this.sockets().forEach(function (openSocket) { try { openSocket.close(4001, 'host_left'); } catch (_) {} });
+          return;
+        }
+        this.transferClassroomHost(game, userId);
         await this.ctx.storage.put('game', game);
-        await this.updateRegistry('ended', game);
-        this.broadcast({ type: 'room_closed', reason: 'host_left' });
-        this.sockets().forEach(function (openSocket) { try { openSocket.close(4001, 'host_left'); } catch (_) {} });
+        this.broadcast(this.view(game));
+        await this.updateRegistry('playing', game);
+        await this.scheduleNextAlarm(game);
         return;
       }
       game.players = game.players.filter(function (player) { return player.id !== userId; });
