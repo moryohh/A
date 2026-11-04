@@ -95,10 +95,23 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     sendSocket({ type: 'audio_signal', targetId, signal });
   }
 
+  function iceServers(): RTCIceServer[] {
+    const servers: RTCIceServer[] = [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    ];
+    const turnUrl = String(import.meta.env.VITE_TURN_URL || '').trim();
+    if (turnUrl) servers.push({
+      urls: turnUrl,
+      username: String(import.meta.env.VITE_TURN_USERNAME || ''),
+      credential: String(import.meta.env.VITE_TURN_CREDENTIAL || ''),
+    });
+    return servers;
+  }
+
   function ensurePeer(peerId: string) {
     const existing = peersRef.current.get(peerId);
     if (existing) return existing;
-    const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const peer = new RTCPeerConnection({ iceServers: iceServers(), iceCandidatePoolSize: 4 });
     peersRef.current.set(peerId, peer);
     localStreamRef.current?.getTracks().forEach(track => peer.addTrack(track, localStreamRef.current as MediaStream));
     peer.onicecandidate = event => { if (event.candidate) sendAudioSignal(peerId, { candidate: event.candidate.toJSON() }); };
@@ -116,6 +129,12 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       if (audio.srcObject !== incoming) audio.srcObject = incoming;
       audio.muted = !remoteAudioEnabledRef.current;
       if (audio.paused) playVoice(audio);
+    };
+    peer.oniceconnectionstatechange = () => {
+      if (peer.iceConnectionState === 'failed') {
+        peer.restartIce();
+        if (audioEnabled) void negotiatePeer(peerId).catch(() => undefined);
+      }
     };
     peer.onconnectionstatechange = () => {
       if (!['failed', 'closed'].includes(peer.connectionState)) return;
@@ -562,11 +581,12 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     {renderTrueFalseTurnCard(opponent?.name || 'المنافس', opponent, Boolean(opponent && !myTurn))}
   </div>;
   useEffect(() => {
-    const themed = (isTrueFalse || isGibhaSah) && room && state?.status !== 'finished';
+    const millionaireWaiting = isMillionaire && room && state?.status === 'waiting';
+    const themed = ((isTrueFalse || isGibhaSah) && room && state?.status !== 'finished') || millionaireWaiting;
     if (themed) gameAudio.playOnlineGameSessionTheme();
     else gameAudio.stopOnlineGameSessionTheme();
     return () => gameAudio.stopOnlineGameSessionTheme();
-  }, [isTrueFalse, isGibhaSah, room, state?.status]);
+  }, [isTrueFalse, isGibhaSah, isMillionaire, room, state?.status]);
 
   useEffect(() => {
     setTurnSeconds(Math.max(0, Math.ceil(((state?.questionDeadline || Date.now() + (isMillionaire ? 60000 : isTrueFalse ? 20000 : 25000)) - Date.now()) / 1000)));
@@ -590,7 +610,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     // Every player receives the same authoritative room state, so the game music
     // must follow that shared state instead of running only on the captain's client.
     const active = isMillionaire && connected && state?.status === 'playing' && !roundResult;
-    if (active) gameAudio.playExternal('millionaire-thinking', millionaireAudio.thinking, 0.65, true);
+    if (active) gameAudio.playExternal('millionaire-thinking', millionaireAudio.thinking, 0.42, true);
     else gameAudio.stopExternal('millionaire-thinking');
     return () => gameAudio.stopExternal('millionaire-thinking');
   }, [isMillionaire, connected, state?.status, state?.round, roundResult]);
@@ -713,7 +733,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     <div className="mx-auto min-h-full w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-[#2049a4] bg-[radial-gradient(circle_at_center,#0b1b51,#03091e_72%)] shadow-[0_0_40px_rgba(32,73,164,.6)]">
       <header className="flex items-center justify-between border-b border-blue-500/30 bg-[#03091e] p-4">
         <div className="flex items-center gap-3"><div className="rounded-full border-2 border-amber-400 p-2 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,.4)]"><Trophy className="h-6 w-6" /></div><div>{isMillionaireTeam ? <p className="text-xs text-slate-300">{lessonTitle}</p> : <><h2 className="font-black text-amber-300">من سيربح المليون؟</h2><p className="text-xs text-slate-300">{lessonTitle}</p></>}</div></div>
-        <button onClick={() => void closeModal()} aria-label="الخروج من التحدي" className="rounded-full bg-blue-950 p-2"><X className="h-6 w-6" /></button>
+        <div className="flex items-center gap-2"><button type="button" onClick={toggleMusic} aria-label={musicMuted ? 'تشغيل أصوات اللعبة' : 'كتم أصوات اللعبة'} className={`rounded-full border p-2 ${musicMuted ? 'border-rose-400/60 bg-rose-500/15 text-rose-300' : 'border-amber-300/50 bg-amber-400/10 text-amber-200'}`}>{musicMuted ? <VolumeX className="h-5 w-5" /> : <Music2 className="h-5 w-5" />}</button><button onClick={() => void closeModal()} aria-label="الخروج من التحدي" className="rounded-full bg-blue-950 p-2"><X className="h-6 w-6" /></button></div>
       </header>
       {isMillionaireTeam ? <div className="relative grid grid-cols-[1fr_auto_1fr] items-end gap-2 overflow-hidden border-b border-blue-400/20 bg-blue-950/35 px-3 pb-3 pt-16 text-center">
         {(['A', 'B'] as const).map((team, index) => <div key={`lamp-${team}`} aria-label={`مصباح فريق ${team}`} className={`pointer-events-none absolute top-1 z-10 flex w-1/2 justify-center transition-all duration-700 ${index === 0 ? 'right-0' : 'left-0'} ${state.activeTeam === team ? 'opacity-100' : 'opacity-25 grayscale'}`}>
@@ -751,7 +771,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
             const selectable = isMillionaireTeam ? (myTurn || canRecommend) : myTurn;
             return <button key={index} disabled={hiddenByFifty || !connected || !selectable || pendingAnswer || Boolean(roundResult) || state.status !== 'playing'} onClick={() => canRecommend ? sendSocket({ type: 'recommend', option: index }) : answer(index)} className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border-2 px-4 text-right text-sm font-bold transition ${hiddenByFifty ? 'invisible' : resultStyle} ${teamRecommendation?.option === index ? 'ring-2 ring-violet-300' : ''} disabled:cursor-default`}><b className="shrink-0 text-amber-300">{['أ:', 'ب:', 'ج:', 'د:'][index] || `${index + 1}:`}</b><ScientificText value={option} />{canRecommend && <span className="mr-auto shrink-0 text-xs text-violet-200">أرسل توصية</span>}{teamRecommendation?.option === index && <span className="mr-auto shrink-0 text-xs text-violet-200">توصية زميلك</span>}{chosen && <span className="mr-auto shrink-0 text-xs text-amber-200">{answeredByMe ? 'اختيارك' : 'اختيار القائد'}</span>}</button>;
           })}</div>
-          {roundResult && resultRevealed && <div className={`rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-300' : 'border-rose-400/60 bg-rose-500/15 text-rose-200'}`}>{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✨' : 'إجابة خاطئة ✗'}{isMillionaireTeam && Number.isInteger(roundResult.botSelected) && <p className="mt-2 text-xs text-slate-100">اختار الفريق المنافس {['أ','ب','ج','د'][roundResult.botSelected ?? 0]}: {roundResult.botCorrect ? 'صحيح' : 'خطأ'} {roundResult.stealAwarded && '— حصل فريقك على نقطة إضافية! ⚡'}</p>}<p className="mt-1 text-xs text-slate-200">{isMillionaireTeam ? 'ينتقل الدور إلى القائد التالي' : `${answeredByMe ? 'شاهد منافسك اختيارك' : 'شاهدت اختيار المنافس'} — الدور التالي بعد عرض النتيجة`}</p></div>}
+          {roundResult && resultRevealed && <div className={`relative overflow-hidden rounded-2xl border p-4 text-center font-black ${roundResult.selected === roundResult.answer ? 'animate-pulse border-emerald-300 bg-emerald-500/20 text-emerald-200 shadow-[0_0_34px_rgba(16,185,129,.55)]' : 'border-rose-300 bg-rose-500/20 text-rose-100 shadow-[0_0_30px_rgba(244,63,94,.45)]'}`}>{roundResult.selected === roundResult.answer && <><Sparkles className="absolute right-3 top-3 h-6 w-6 animate-spin text-amber-300"/><Sparkles className="absolute bottom-3 left-3 h-5 w-5 animate-pulse text-cyan-200"/></>}<span className="text-lg">{roundResult.selected === roundResult.answer ? 'إجابة صحيحة! ✨' : 'إجابة خاطئة ✗'}</span>{isMillionaireTeam && Number.isInteger(roundResult.botSelected) && <p className="mt-2 text-xs text-slate-100">اختار الفريق المنافس {['أ','ب','ج','د'][roundResult.botSelected ?? 0]}: {roundResult.botCorrect ? 'صحيح' : 'خطأ'} {roundResult.stealAwarded && '— حصل فريقك على نقطة إضافية! ⚡'}</p>}<p className="mt-1 text-xs text-slate-200">{isMillionaireTeam ? 'ينتقل الدور إلى القائد التالي' : `${answeredByMe ? 'شاهد منافسك اختيارك' : 'شاهدت اختيار المنافس'} — الدور التالي بعد عرض النتيجة`}</p></div>}
         </>}
         {state.status === 'finished' && !roundResult && <div className="rounded-3xl border border-amber-400/50 bg-amber-500/10 p-8 text-center"><Trophy className="mx-auto h-14 w-14 text-amber-300"/><p className="mt-3 text-2xl font-black">{isMillionaireTeam ? !state.winner ? 'تعادل الفريقان!' : state.winner === myTeam ? 'فاز فريقكم! 🎉' : 'فاز الفريق المنافس' : state.tie ? 'تعادلتم!' : state.winner === me ? 'أنت الفائز! 🎉' : `${opponent?.name || 'المنافس'} فاز`}</p><p className="mt-2 text-sm">{isMillionaireTeam ? `فريقك ${state.teamScores?.[myTeam] || 0} — المنافسون ${state.teamScores?.[myTeam === 'A' ? 'B' : 'A'] || 0}` : `إجابات صحيحة: أنت ${self?.score || 0} — المنافس ${opponent?.score || 0}`}</p><button onClick={() => void closeModal()} className="mt-5 rounded-xl bg-blue-600 px-8 py-3 font-black">العودة</button></div>}
       </main>
