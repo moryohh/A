@@ -476,6 +476,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
   const [speakerMenu, setSpeakerMenu] = useState(false);
   const [exerciseMenu, setExerciseMenu] = useState(false);
+  const [membersMenuOpen, setMembersMenuOpen] = useState(false);
+  const [membersNotice, setMembersNotice] = useState(0);
   const [canvasVersion, setCanvasVersion] = useState(0);
   const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -497,6 +499,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
   const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
+  const membersMenuRef = useRef<HTMLDivElement | null>(null);
+  const previousMembersCountRef = useRef<number | null>(null);
   const closingRef = useRef(false);
   const workspaceFullscreenRef = useRef(false);
   const historyEntryRef = useRef(false);
@@ -507,8 +511,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const isTeacher = classroom?.hostId === me;
   const self = state?.players.find((player) => player.id === me);
   const visibleStudentCount = (state?.players || []).filter((player) => player.id !== classroom?.hostId && !player.bot).length;
+  const activeMembers = (state?.players || []).filter((player) => player.connected && !player.bot);
   const answerFor = (player: Participant) => receivedAnswers[player.id] || player.lastAnswer || "";
-  const submittedAnswers = (state?.players || []).filter((player) => player.id !== me && Boolean(answerFor(player)));
   const canDraw = Boolean(isTeacher || self?.drawAllowed);
   const sharedContent = classroom?.content || {
     subject: openLessonContext?.subjectId || category,
@@ -534,6 +538,12 @@ export const LiveClassroomModal: React.FC<Props> = ({
 
   useEffect(() => { meRef.current = me; }, [me]);
   useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => {
+    const previousCount = previousMembersCountRef.current;
+    previousMembersCountRef.current = activeMembers.length;
+    if (previousCount !== null && activeMembers.length > previousCount && !membersMenuOpen)
+      setMembersNotice(activeMembers.length);
+  }, [activeMembers.length, membersMenuOpen]);
   useEffect(() => {
     setPersonalContent(null);
     setBookletItemIndex(0);
@@ -1190,6 +1200,8 @@ export const LiveClassroomModal: React.FC<Props> = ({
     const close = (event: PointerEvent) => {
       if (!exerciseMenuRef.current?.contains(event.target as Node))
         setExerciseMenu(false);
+      if (!membersMenuRef.current?.contains(event.target as Node))
+        setMembersMenuOpen(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -1723,6 +1735,31 @@ export const LiveClassroomModal: React.FC<Props> = ({
           <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
           <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`flex h-9 items-center gap-1 rounded-xl border px-2 text-[10px] font-black ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"ابدؤوا الحل":"إنهاء المحاولة"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}<span>{classroom?.answersLocked?"ابدؤوا الحل":"إنهاء الحل"}</span></button>
         </div>}
+        {!offlineBooklet && <div className="relative shrink-0" ref={membersMenuRef}>
+          <button
+            onClick={() => { setMembersMenuOpen((value) => !value); setMembersNotice(0); }}
+            className={`relative grid h-10 w-10 place-items-center rounded-2xl border text-cyan-50 transition active:scale-95 ${membersNotice > 0 ? "border-amber-200 bg-amber-400/25 shadow-[0_0_22px_rgba(250,204,21,.8)] animate-pulse" : "border-cyan-200/35 bg-cyan-400/15"}`}
+            aria-label={`أعضاء الدرس: ${activeMembers.length}`}
+            aria-expanded={membersMenuOpen}
+          >
+            <GraduationCap className="h-6 w-6"/>
+            <span className={`absolute -left-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] font-black ${membersNotice > 0 ? "bg-amber-400 text-slate-950" : "bg-cyan-500 text-white"}`}>{activeMembers.length}</span>
+          </button>
+          {membersMenuOpen && <div className="absolute left-1/2 top-[calc(100%+8px)] z-[170] w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-cyan-300/30 bg-slate-950/95 text-white shadow-2xl backdrop-blur" dir="rtl">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+              <div><b className="block text-xs text-cyan-100">أعضاء الدرس</b><small className="text-[9px] text-slate-400">{activeMembers.length} متصل الآن</small></div>
+              <button onClick={() => setMembersMenuOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-white/10" aria-label="إغلاق قائمة الأعضاء"><X className="h-4 w-4"/></button>
+            </div>
+            <div className="max-h-[52dvh] space-y-1.5 overflow-y-auto p-2">
+              {activeMembers.map((player) => <div key={player.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2">
+                {player.avatar ? <img src={player.avatar} alt="" className="h-9 w-9 rounded-full object-cover"/> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-600"><GraduationCap className="h-5 w-5"/></span>}
+                <div className="min-w-0 flex-1"><b className="block truncate text-[11px]">{player.name || "طالب"}{player.id === me ? " (أنت)" : ""}</b><small className="text-[9px] text-cyan-200">المستوى {player.level || 1}{player.id === classroom?.hostId ? " · المدرس" : " · طالب"}</small></div>
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.9)]" title="متصل"/>
+              </div>)}
+              {activeMembers.length === 0 && <p className="py-5 text-center text-xs text-slate-400">لا يوجد أعضاء متصلون</p>}
+            </div>
+          </div>}
+        </div>}
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">
             <Clock3 className="h-4 w-4" />
@@ -1731,7 +1768,6 @@ export const LiveClassroomModal: React.FC<Props> = ({
           {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
         </div>
       </header>
-      {isTeacher && classroom?.contentMode === "board" && submittedAnswers.length > 0 && <div className="shrink-0 border-b border-emerald-300/30 bg-emerald-950/95 px-3 py-2 text-white" dir="rtl" aria-live="polite"><b className="mb-1 block text-[10px] text-emerald-200">إجابات الطلاب</b><div className="flex gap-2 overflow-x-auto">{submittedAnswers.map((player) => <div key={player.id} className="min-w-[180px] rounded-xl border border-emerald-300/20 bg-white/10 px-3 py-2"><strong className="block truncate text-[10px] text-cyan-100">{player.name || "طالب"}</strong><span className="block text-xs font-bold">{answerFor(player)}</span></div>)}</div></div>}
       {classroom?.contentMode === "booklet" && <div className="border-b border-amber-200/20 bg-gradient-to-l from-amber-950/95 via-[#17304a] to-emerald-950/95 px-3 py-2">
         <div className="mx-auto flex max-w-6xl items-center gap-2">
           <Target className="h-5 w-5 shrink-0 text-amber-300" />
