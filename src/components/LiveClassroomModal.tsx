@@ -87,6 +87,7 @@ type Stroke = {
 };
 type Participant = {
   id: string;
+  score?: number;
   bot?: boolean;
   name?: string;
   avatar?: string;
@@ -1011,10 +1012,17 @@ export const LiveClassroomModal: React.FC<Props> = ({
     setRoomToJoin(activeRoom);
   }
 
-  function confirmJoinActiveRoom() {
+  async function confirmJoinActiveRoom() {
     if (!roomToJoin) return;
     const target = roomToJoin;
     setRoomToJoin(null);
+    if (room && API && !offlineBooklet) {
+      try {
+        await fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: await authorization() }, keepalive: true });
+      } catch {
+        // Closing the old socket still lets the room runtime finish cleanup.
+      }
+    }
     // This socket is closing because the same screen is switching rooms, not
     // because the user left the challenge hub.
     closingRef.current = true;
@@ -1024,7 +1032,24 @@ export const LiveClassroomModal: React.FC<Props> = ({
       setExternalChallengeRoom(target);
       return;
     }
-    onJoinActiveRoom?.(target);
+    if (onJoinActiveRoom) {
+      onJoinActiveRoom(target);
+      return;
+    }
+    setRoom("");
+    setState(null);
+    setReceivedAnswers({});
+    closingRef.current = false;
+    setBusy(true);
+    setError("");
+    try {
+      await connect(String(target.code));
+      void enterClassroomLandscape();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "تعذر الانتقال إلى الغرفة.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function create() {
@@ -1265,6 +1290,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
   const completedChallengeCount = challengeCards.filter((challenge) => challenge.complete).length;
   const achievementProgress = Math.round((completedChallengeCount / challengeCards.length) * 100);
   const nextChallenge = challengeCards.find((challenge) => !challenge.complete) || null;
+  const challengeLeaderboard = (state?.players || [])
+    .filter((player) => !player.bot)
+    .map((player) => ({
+      ...player,
+      challengePoints: Math.max(0, Number(player.score) || 0)
+        + Math.max(0, Number(player.mission?.progress) || 0) * 10
+        + (player.mission?.completed ? 50 : 0),
+    }))
+    .sort((a, b) => b.challengePoints - a.challengePoints || (a.joinedAt || 0) - (b.joinedAt || 0));
   const bookletQuestions = useMemo(() => (booklet?.pages || [])
     .flatMap((page) => page.items || [])
     .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
@@ -1594,6 +1628,15 @@ export const LiveClassroomModal: React.FC<Props> = ({
               </div>
 
               <div className="space-y-4 p-4 sm:p-5">
+                <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <b className="flex items-center gap-1.5 text-xs text-amber-950"><Trophy className="h-4 w-4 text-amber-500"/>متصدر تحديات الغرفة</b>
+                    <span className="text-[9px] font-black text-amber-700">{formatArabicNumber(challengeLeaderboard.length)} مشارك</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {challengeLeaderboard.slice(0, 5).map((player, index) => <div key={player.id} className={`flex items-center gap-2 rounded-2xl border px-3 py-2 ${index === 0 ? "border-amber-300 bg-amber-100/80" : "border-slate-200 bg-white"}`}><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-black ${index === 0 ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"}`}>{index + 1}</span><div className="min-w-0 flex-1"><b className="block truncate text-[10px] text-slate-800">{player.name || (player.id === me ? "أنت" : "طالب")}</b><small className="text-[8px] text-slate-500">{player.mission?.text || "بانتظار بدء التحدي"}</small></div><strong className="shrink-0 text-xs text-amber-700">{formatArabicNumber(player.challengePoints)} نقطة</strong></div>)}
+                  </div>
+                </div>
                 <div className={`rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}>
                   <div className="flex items-center justify-between gap-2">
                     <b className="flex items-center gap-1.5 text-[10px] text-emerald-900"><Target className="h-4 w-4"/>هدف الدرس</b>
@@ -1845,10 +1888,9 @@ export const LiveClassroomModal: React.FC<Props> = ({
             />
           )}
           {!isTeacher && classroom?.answersLocked && (
-            <div className="pointer-events-none fixed inset-x-4 bottom-24 z-30 mx-auto max-w-sm rounded-3xl border border-cyan-200/70 bg-cyan-100/90 p-4 text-center text-cyan-950 shadow-[0_0_35px_rgba(125,211,252,.8)] backdrop-blur">
-              <Snowflake className="mx-auto mb-1 animate-pulse" />
-              <b>المدرس يشرح الآن</b>
-              <small className="mt-1 block font-bold">ستفتح محاولتك الخاصة عند بدء الحل</small>
+            <div className="pointer-events-none absolute left-2 top-2 z-30 flex max-w-[min(86vw,310px)] items-center gap-2 rounded-xl border border-cyan-200/70 bg-cyan-50/90 px-3 py-2 text-right text-cyan-950 shadow-lg backdrop-blur" dir="rtl">
+              <Snowflake className="h-4 w-4 shrink-0 animate-pulse text-cyan-700" />
+              <span className="truncate text-[10px] font-black">المدرس يشرح الآن · ستفتح محاولتك عند بدء الحل</span>
             </div>
           )}
         </div>
