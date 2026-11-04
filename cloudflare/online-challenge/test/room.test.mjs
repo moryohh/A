@@ -119,6 +119,40 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });
 
+test('classroom registry frees a seat after a member leaves and ignores classroom bots', async () => {
+  const updates = [];
+  const teacherSocket = { deserializeAttachment: () => ({ userId: 'teacher' }), send: () => undefined };
+  const studentSocket = { deserializeAttachment: () => ({ userId: 'student' }), send: () => undefined };
+  const registry = {
+    idFromName: value => value,
+    get: () => ({ fetch: async request => {
+      updates.push(await request.json());
+      return new Response('{}', { status: 200 });
+    } }),
+  };
+  const room = new ChallengeRoom({
+    id: { toString: () => 'room-object-id' },
+    storage: { get: async () => undefined, put: async () => undefined },
+    getWebSockets: () => [teacherSocket, studentSocket],
+  }, { REGISTRY: registry });
+  const game = {
+    gameType: 'live_classroom', roomCode: '4545', status: 'playing', capacity: 4,
+    players: [
+      { id: 'teacher', profile: { name: 'Teacher' } },
+      { id: 'student', profile: { name: 'Student' } },
+      { id: 'bot:classroom:helper', profile: { name: 'Bot' } },
+    ],
+  };
+
+  await room.updateRegistry('playing', game);
+  assert.equal(updates.at(-1).players, 2);
+
+  game.players = game.players.filter(player => player.id !== 'student');
+  room.ctx.getWebSockets = () => [teacherSocket];
+  await room.updateRegistry('playing', game);
+  assert.equal(updates.at(-1).players, 1);
+});
+
 test('together classroom transfers ownership when its student host leaves', async () => {
   const data = new Map();
   const alarms = [];
