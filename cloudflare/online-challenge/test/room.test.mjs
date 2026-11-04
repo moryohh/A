@@ -119,6 +119,67 @@ test('live classroom supports 50 students and teacher-controlled permissions', a
   assert.equal(room.view(data.get('game')).classroom.contentMode, 'booklet');
 });
 
+test('together classroom transfers ownership when its student host leaves', async () => {
+  const data = new Map();
+  const alarms = [];
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async value => alarms.push(value),
+    },
+    getWebSockets: () => [],
+  });
+  await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({
+      hostId: 'student-host', gameType: 'live_classroom', roomCode: '5151', studyMode: 'together',
+      contentMode: 'booklet', questions: [{ question: 'دراسة', options: ['أ', 'ب'], correctAnswer: 0 }],
+    }),
+  }));
+  const game = data.get('game');
+  game.players.push({ id: 'student-2', score: 0, answer: null, micAllowed: false, drawAllowed: false });
+  data.set('game', game);
+  const response = await room.fetch(new Request('https://room/internal/leave', {
+    method: 'POST', body: JSON.stringify({ userId: 'student-host' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(data.get('game').status, 'playing');
+  assert.equal(data.get('game').hostId, 'student-2');
+  assert.equal(data.get('game').presenterId, 'student-2');
+  assert.equal(data.get('game').players[0].micAllowed, true);
+  assert.equal(data.get('game').players[0].drawAllowed, true);
+});
+
+test('empty together classroom remains available for one minute before closing', async () => {
+  const data = new Map();
+  const alarms = [];
+  const room = new ChallengeRoom({
+    storage: {
+      get: async key => data.get(key),
+      put: async (key, value) => data.set(key, structuredClone(value)),
+      setAlarm: async value => alarms.push(value),
+    },
+    getWebSockets: () => [],
+  });
+  await room.fetch(new Request('https://room/internal/init', {
+    method: 'POST', body: JSON.stringify({
+      hostId: 'only-student', gameType: 'live_classroom', roomCode: '5252', studyMode: 'together',
+      contentMode: 'booklet', questions: [{ question: 'دراسة', options: ['أ', 'ب'], correctAnswer: 0 }],
+    }),
+  }));
+  const before = Date.now();
+  await room.fetch(new Request('https://room/internal/leave', {
+    method: 'POST', body: JSON.stringify({ userId: 'only-student' }),
+  }));
+  const game = data.get('game');
+  assert.equal(game.status, 'playing');
+  assert.equal(game.players.length, 0);
+  assert.ok(game.emptyDeadline >= before + 59000);
+  assert.ok(game.emptyDeadline <= before + 61000);
+  assert.ok(alarms.length > 0);
+  assert.ok(alarms.at(-1) <= game.emptyDeadline);
+});
+
 test('live classroom schedules the requested two bot waves', async () => {
   const data = new Map();
   const alarms = [];
