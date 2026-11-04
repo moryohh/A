@@ -818,7 +818,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
       isOpen && gameState === 'playing' && isYourTurn && !showPrizeProgressionModal;
 
     if (shouldPlayThinkingAudio) {
-      gameAudio.playExternal('millionaire-thinking', MILLIONAIRE_THINKING_AUDIO_URL, 0.65, true);
+      gameAudio.playExternal('millionaire-thinking', MILLIONAIRE_THINKING_AUDIO_URL, 0.42, true);
     } else {
       gameAudio.stopExternal('millionaire-thinking');
     }
