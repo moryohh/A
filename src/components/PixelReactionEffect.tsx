@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { clearFrame, composite, createFrame, createFx } from 'pixelfx';
-import * as criticalHit from 'pixelfx/fx/impacts/crit-hit';
-import * as arcaneOrb from 'pixelfx/fx/arcane/arcane-orb';
-import * as confetti from 'pixelfx/fx/ui/confetti';
+import * as fireball from 'pixelfx/fx/fire/fireball';
+import * as lightningStrike from 'pixelfx/fx/lightning/lightning-strike';
+import * as bigExplosion from 'pixelfx/fx/explosions/big-explosion';
 
 export type TargetReactionKind = 'angry' | 'think' | 'laugh';
 
-const EFFECTS = { angry: criticalHit, think: arcaneOrb, laugh: confetti } as const;
-const LABELS: Record<TargetReactionKind, string> = { angry: 'تأثير غضب', think: 'تأثير تفكير', laugh: 'تأثير ضحك' };
+const EFFECTS = { angry: fireball, think: lightningStrike, laugh: bigExplosion } as const;
+const LABELS: Record<TargetReactionKind, string> = { angry: 'هجوم بكرة نار', think: 'صاعقة برق', laugh: 'انفجار قنبلة' };
 
 export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind; nonce: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -27,15 +27,13 @@ export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind;
     const image = ctx.createImageData(width, height);
     const fx = createFx(EFFECTS[kind], {
       x: width / 2,
-      y: kind === 'laugh' ? height - 12 : height * 0.62,
+      y: kind === 'laugh' ? height * 0.72 : height * 0.58,
       seed: Math.max(1, nonce % 997),
-      ...(kind === 'angry' ? { palette: ['#3b0711', '#8b1022', '#ef233c', '#ff6b22', '#ffd166', '#ffffff'] } : {}),
-      ...(kind === 'think' ? { palette: ['#140c38', '#35207d', '#6c4cff', '#44d7ff', '#b9f7ff', '#ffffff'] } : {}),
     });
     let raf = 0;
     let previous = performance.now();
     let elapsed = 0;
-    const duration = reducedMotion ? 0.4 : kind === 'laugh' ? 3.35 : 1.35;
+    const duration = reducedMotion ? 0.4 : kind === 'laugh' ? 2.15 : kind === 'think' ? 1.8 : 2.0;
 
     const render = (now: number) => {
       const dt = Math.min(0.034, Math.max(0, (now - previous) / 1000));
