@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { clearFrame, composite, createFrame, createFx } from 'pixelfx';
-import * as fireball from 'pixelfx/fx/fire/fireball';
-import * as lightningStrike from 'pixelfx/fx/lightning/lightning-strike';
+import * as fireTornado from 'pixelfx/fx/fire/fire-tornado';
+import * as zapHit from 'pixelfx/fx/lightning/zap-hit';
 import * as bigExplosion from 'pixelfx/fx/explosions/big-explosion';
 
 export type TargetReactionKind = 'angry' | 'think' | 'laugh';
 
-const EFFECTS = { angry: fireball, think: lightningStrike, laugh: bigExplosion } as const;
+const EFFECTS = { angry: fireTornado, think: zapHit, laugh: bigExplosion } as const;
 const LABELS: Record<TargetReactionKind, string> = { angry: 'هجوم بكرة نار', think: 'صاعقة برق', laugh: 'انفجار قنبلة' };
 
 export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind; nonce: number }) {
@@ -27,13 +27,13 @@ export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind;
     const image = ctx.createImageData(width, height);
     const fx = createFx(EFFECTS[kind], {
       x: width / 2,
-      y: kind === 'laugh' ? height * 0.72 : height * 0.58,
+      y: kind === 'laugh' ? height * 0.72 : kind === 'angry' ? height * 0.88 : height * 0.52,
       seed: Math.max(1, nonce % 997),
     });
     let raf = 0;
     let previous = performance.now();
     let elapsed = 0;
-    const duration = reducedMotion ? 0.4 : kind === 'laugh' ? 2.15 : kind === 'think' ? 1.8 : 2.0;
+    const duration = reducedMotion ? 0.4 : kind === 'laugh' ? 2.15 : kind === 'think' ? 1.05 : 2.4;
 
     const render = (now: number) => {
       const dt = Math.min(0.034, Math.max(0, (now - previous) / 1000));
