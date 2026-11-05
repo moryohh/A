@@ -594,6 +594,48 @@ test('millionaire team fills four seats after five seconds and alternates 2v2 te
   assert.equal(messages.some(message => message.type === 'round_result' && message.answeredTeam === 'A'), true);
 });
 
+test('millionaire team ends as soon as one team loses its last life', async () => {
+  const messages = [];
+  const room = new ChallengeRoom({
+    storage: { get: async () => null, put: async () => {}, setAlarm: async () => {}, deleteAlarm: async () => {} },
+    getWebSockets: () => [{ deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) }],
+  }, {});
+  const game = {
+    gameType: 'millionaire_team', status: 'playing', round: 2, questionIndex: 2, activeTeam: 'A', turn: 'host',
+    questions: Array.from({ length: 20 }, (_, index) => ({ question: `Q${index}`, options: ['a', 'b', 'c', 'd'], correctAnswer: 0 })),
+    players: [{ id: 'host', team: 'A', score: 0, answer: null }, { id: 'mate', team: 'A', score: 0, answer: null }, { id: 'rival', team: 'B', score: 2, answer: null }],
+    teamLives: { A: 1, B: 3 }, teamScores: { A: 0, B: 2 }, captainCursor: { A: 1, B: 0 }, recommendations: {},
+  };
+  await room.finishTeamRound(game, 1, 'host', false);
+  assert.equal(game.status, 'finished');
+  assert.equal(game.winner, 'B');
+  assert.equal(game.teamLives.A, 0);
+});
+
+test('millionaire team sync heartbeat recovers an overdue bot turn', async () => {
+  const data = new Map();
+  const messages = [];
+  const hostSocket = { deserializeAttachment: () => ({ userId: 'host' }), send: message => messages.push(JSON.parse(message)) };
+  const room = new ChallengeRoom({
+    storage: { get: async key => data.get(key), put: async (key, value) => data.set(key, structuredClone(value)), setAlarm: async () => {}, deleteAlarm: async () => {} },
+    getWebSockets: () => [hostSocket],
+  }, {});
+  data.set('game', {
+    gameType: 'millionaire_team', roomCode: '7777', status: 'playing', round: 0, questionIndex: 0, activeTeam: 'B', turn: 'bot:team:B:captain', hostId: 'host',
+    questions: [{ question: 'Recovered?', options: ['yes', 'no', 'c', 'd'], correctAnswer: 0 }],
+    players: [{ id: 'host', team: 'A', score: 0, answer: null }, { id: 'bot:team:B:captain', team: 'B', score: 0, answer: null, profile: {} }, { id: 'bot:team:B:mate', team: 'B', score: 0, answer: null, profile: {} }],
+    teamLives: { A: 3, B: 3 }, teamScores: { A: 0, B: 0 }, captainCursor: { A: 0, B: 1 }, recommendations: {}, lifelines: { fifty: false, audience: false, phone: false }, botDiscussionAt: Date.now() - 1,
+  });
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'sync' }));
+  const afterDiscussion = data.get('game');
+  assert.ok(afterDiscussion.botAnswerAt > Date.now());
+  afterDiscussion.botAnswerAt = Date.now() - 1;
+  data.set('game', afterDiscussion);
+  await room.webSocketMessage(hostSocket, JSON.stringify({ type: 'sync' }));
+  assert.equal(data.get('game').status, 'finished');
+  assert.equal(messages.some(message => message.type === 'round_result'), true);
+});
+
 test('gibha sah fills four seats and rotates the turn through all players', async () => {
   const data = new Map();
   let alarmAt = null;
