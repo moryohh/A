@@ -493,6 +493,15 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       setReactionFx({ kind, from: meRef.current, nonce });
       window.setTimeout(() => setReactionFx(current => current?.nonce === nonce ? null : current), 4000);
       gameAudio.playClick(620);
+    } else if (targetId && kind !== 'rocket') {
+      const nonce = Date.now();
+      // Targeted reactions must also render optimistically for the sender.
+      // The room server broadcasts them to the other players but may not echo
+      // the same reaction back to the socket that sent it.
+      setReactionFx({ kind, from: meRef.current, targetId, nonce });
+      const visibleFor = kind === 'laugh' ? 3400 : kind === 'angry' ? 2400 : 1800;
+      window.setTimeout(() => setReactionFx(current => current?.nonce === nonce ? null : current), visibleFor);
+      gameAudio.playClick(kind === 'angry' ? 180 : kind === 'think' ? 760 : 620);
     }
     setReactionUsed(true);
     setTargetingReaction(null);
