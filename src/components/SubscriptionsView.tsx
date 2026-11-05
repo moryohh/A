@@ -32,6 +32,7 @@ import { getSubjectIndex } from '../services/lessonsService';
 import { fetchSolveWithMeTopics } from '../services/solveWithMeCatalog';
 import { fetchLessonGamesData, fetchMillionaireTeamQuestions } from '../services/gamesService';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
+import { appSfx } from '../utils/appSfx';
 
 const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah' | 'live_classroom';
@@ -151,6 +152,19 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [challengeMessage, setChallengeMessage] = useState('');
+  const [animatedControl, setAnimatedControl] = useState<'section' | 'subject' | 'chapter' | 'game' | 'lesson' | 'create' | 'room' | null>(null);
+  const animationTimerRef = React.useRef<number | null>(null);
+
+  const animateControl = (control: typeof animatedControl, sound: () => void) => {
+    sound();
+    setAnimatedControl(control);
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+    animationTimerRef.current = window.setTimeout(() => setAnimatedControl(null), 420);
+  };
+
+  React.useEffect(() => () => {
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+  }, []);
 
   const selectedChallengeSubject = GRADE_6_SUBJECTS.find((subject) => subject.id === challengeSubject);
   const visibleRooms = activeRooms.filter((room) => {
@@ -211,6 +225,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
   const createRandomChallenge = async () => {
     if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
+    animateControl('create', () => appSfx.challenge());
     setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
     try {
       const selectedLesson = challengeLessons.find((lesson) => lesson.id === classroomLessonId)
@@ -253,6 +268,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [applicationMessage, setApplicationMessage] = useState('');
 
   const openCourseDialog = (course: MockCourse) => {
+    appSfx.panelOpen();
     setSelectedCourse(course);
     setReminderState('idle');
     setReminderMessage('');
@@ -261,6 +277,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   };
 
   const closeCourseDialog = () => {
+    appSfx.panelClose();
     setSelectedCourse(null);
     setReminderState('idle');
     setReminderMessage('');
@@ -279,6 +296,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     const hasRequiredLevel = currentLevel >= requiredLevel;
 
     if (!hasRequiredRating || !hasRequiredLevel) {
+      appSfx.attention();
       const reasons = [
         !hasRequiredRating ? 'تقييمك الحالي ليس ذهبيًا.' : '',
         !hasRequiredLevel ? `مستواك الحالي ${currentLevel}، ويجب أن يصل إلى ${requiredLevel}.` : '',
@@ -289,6 +307,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     }
 
     setApplicationState('success');
+    appSfx.success();
     setApplicationMessage('تم استيفاء شروط التقديم مبدئيًا. تبدأ الدورة في 1/12.');
   };
 
@@ -299,8 +318,10 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     try {
       const response = await registerCourseReminder(selectedCourse.id);
       setReminderState('success');
+      appSfx.notification();
       setReminderMessage(response.message || 'تم تسجيل تذكيرك بنجاح');
     } catch (error: any) {
+      appSfx.attention();
       setReminderState('error');
       setReminderMessage(error?.message || 'تعذر تسجيل التذكير حاليًا');
     }
@@ -311,11 +332,11 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       {challengeTargetName && <div className="rounded-2xl border border-violet-300/50 bg-violet-500/15 p-3 text-center text-sm font-black text-violet-100"><Swords className="ml-2 inline h-5 w-5" />اختر لعبة لإنشاء غرفة وإرسال دعوتها إلى {challengeTargetName}</div>}
       <section className={`rounded-3xl border p-2 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="دوراتي والتحدي">
-          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => setActiveSection('challenge')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'challenge' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'challenge' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
-            <Swords className="h-5 w-5" /> التحدّي
+          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => { animateControl('section', () => appSfx.challenge()); setActiveSection('challenge'); }} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition-all duration-300 active:scale-95 ${animatedControl === 'section' && activeSection !== 'challenge' ? 'motion-safe:animate-pulse' : ''} ${activeSection === 'challenge' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'challenge' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
+            <Swords className={`h-5 w-5 transition-transform duration-300 ${activeSection === 'challenge' ? 'scale-110 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite]' : ''}`} /> التحدّي
           </button>
-          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => setActiveSection('courses')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'courses' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'courses' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
-            <BookOpen className="h-5 w-5" /> دوراتي
+          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => { animateControl('section', () => appSfx.bookletSelect()); setActiveSection('courses'); }} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition-all duration-300 active:scale-95 ${animatedControl === 'section' && activeSection !== 'courses' ? 'motion-safe:animate-pulse' : ''} ${activeSection === 'courses' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'courses' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
+            <BookOpen className={`h-5 w-5 transition-transform duration-300 ${activeSection === 'courses' ? 'scale-110 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite]' : ''}`} /> دوراتي
           </button>
         </div>
       </section>
@@ -336,19 +357,19 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
             <p className="mt-1 text-[10px] font-bold" style={{ color: theme.colors.textSecondary }}>{challengeSubject === 'mathematics' ? 'اختر الفصل والموضوع ثم ابدأ درس حل معي' : 'اختر المادة والفصل واللعبة ثم ابدأ التحدّي'}</p>
           </div>
           <div className="relative space-y-2.5 rounded-3xl border p-2.5 shadow-inner backdrop-blur-sm" style={{ backgroundColor: `${theme.colors.bgCard}88`, borderColor: theme.colors.border }}>
-            <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
-              <BookOpen className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.primary }} />
-              <select value={challengeSubject} onChange={(event) => { const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
+            <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'subject' ? 'scale-[1.015] ring-2 ring-sky-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <BookOpen className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'subject' ? 'scale-125 -rotate-6' : ''}`} style={{ color: theme.colors.primary }} />
+              <select value={challengeSubject} onChange={(event) => { animateControl('subject', () => appSfx.subjectSelect()); const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'subject' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.primary }} />
             </label>
-            <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
-              <GraduationCap className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.accent }} />
-              <select value={challengeChapter} onChange={(event) => setChallengeChapter(event.target.value)} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none disabled:opacity-45" style={{ color: theme.colors.textPrimary }}><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.accent }} />
+            <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'chapter' ? 'scale-[1.015] ring-2 ring-emerald-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <GraduationCap className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'chapter' ? 'scale-125 rotate-6' : ''}`} style={{ color: theme.colors.accent }} />
+              <select value={challengeChapter} onChange={(event) => { animateControl('chapter', () => appSfx.chapterSelect()); setChallengeChapter(event.target.value); }} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none disabled:opacity-45" style={{ color: theme.colors.textPrimary }}><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'chapter' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.accent }} />
             </label>
-            {challengeSubject && challengeSubject !== 'mathematics' && <label className="relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition focus-within:ring-2" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
-              <Gamepad2 className="mr-3 h-5 w-5 shrink-0" style={{ color: theme.colors.secondary }} />
-              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
+            {challengeSubject && challengeSubject !== 'mathematics' && <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'game' ? 'scale-[1.015] ring-2 ring-violet-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <Gamepad2 className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'game' ? 'scale-125 -rotate-12' : ''}`} style={{ color: theme.colors.secondary }} />
+              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { animateControl('game', () => appSfx.gameSwitch()); const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
                 <option value="">اختر نوع اللعبة / النشاط</option>
                 {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
                 {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
@@ -356,24 +377,24 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                 <option value="millionaire_team">من سيربح المليون — جماعي 2 ضد 2</option>
                 <option value="gibha_sah">جبتها صح</option>
               </select>
-              <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.secondary }} />
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'game' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.secondary }} />
             </label>}
             {challengeSubject && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
               <div className="rounded-2xl border p-2.5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
                 <p className="mb-2 text-center text-[11px] font-black" style={{ color: theme.colors.textSecondary }}>تحديد موضوع</p>
-                <label className="mb-2 flex items-center overflow-hidden rounded-xl border" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
-                  <GraduationCap className="mr-2 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
-                  <select value={classroomLessonId} onChange={(event) => setClassroomLessonId(event.target.value)} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
+                <label className={`mb-2 flex items-center overflow-hidden rounded-xl border transition-all duration-300 ${animatedControl === 'lesson' ? 'scale-[1.015] ring-2 ring-cyan-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+                  <GraduationCap className={`mr-2 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'lesson' ? 'scale-125 rotate-6' : ''}`} style={{ color: theme.colors.primary }} />
+                  <select value={classroomLessonId} onChange={(event) => { animateControl('lesson', () => appSfx.lessonSelect()); setClassroomLessonId(event.target.value); }} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
                     <option value="">تحديد موضوع</option>
                     {challengeLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
                   </select>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0" style={{ color: theme.colors.primary }} />
+                  <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'lesson' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.primary }} />
                 </label>
               </div>
             )}
-            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45" style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
-              <span className="pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420px]" />
-              <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className={`group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${animatedControl === 'create' ? 'scale-[1.02] ring-4 ring-white/35 motion-safe:animate-pulse' : ''}`} style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
+              <span className={`pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/30 blur-md transition-transform duration-700 ${animatedControl === 'create' ? 'translate-x-[520px]' : 'group-hover:translate-x-[420px]'}`} />
+              <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : animatedControl === 'create' ? 'scale-125 rotate-180 transition-transform duration-500' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
               {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'ابدأ غرفة الملزمة الأونلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
             </button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
