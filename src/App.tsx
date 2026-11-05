@@ -76,7 +76,7 @@ import {
   updateUserProfileData,
   fetchCommunityMemberProfile,
 } from './services/communityService';
-import { fetchUnreadMessageCount, markAllMessagesRead } from './services/messengerService';
+import { fetchUnreadMessageCount, markAllMessagesRead, sendDirectMessage } from './services/messengerService';
 import { getSupabaseClient } from './lib/supabase';
 import { guestToUserProfile, isGuestPreviewEnabled, isGuestProfile, loadGuestSession, clearGuestSession } from './services/guestPreviewService';
 import { getLevelSnapshot } from './services/pointsService';
@@ -229,6 +229,7 @@ function AppContent() {
   const [messengerContact, setMessengerContact] = useState<CommunityMember | null>(null);
   const [communityProfileMember, setCommunityProfileMember] = useState<CommunityMember | null>(null);
   const [communityAccountActionsMember, setCommunityAccountActionsMember] = useState<CommunityMember | null>(null);
+  const [challengeInviteTarget, setChallengeInviteTarget] = useState<CommunityMember | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [activeExamResult, setActiveExamResult] = useState<NotificationExamResult | null>(null);
 
@@ -373,6 +374,29 @@ function AppContent() {
   const [challengeRoomCode, setChallengeRoomCode] = useState<string | undefined>();
   const [challengeConfig, setChallengeConfig] = useState<any | null>(null);
   const [isDailyExamOpen, setIsDailyExamOpen] = useState(false);
+
+  const startPlayerChallenge = (member: CommunityMember) => {
+    setCommunityAccountActionsMember(null);
+    setCommunityProfileMember(null);
+    setChallengeInviteTarget(member);
+    setActiveTab('subscriptions');
+    setHomeSubView('main_home');
+    showToast(`اختر اللعبة التي تريد تحدّي ${member.name} بها`);
+  };
+
+  const sendChallengeInvite = async (roomCode: string) => {
+    if (!challengeInviteTarget || !currentUser) return;
+    const target = challengeInviteTarget;
+    try {
+      await sendDirectMessage(currentUser, target, `⚔️ دعوة تحدٍّ من ${currentUser.name}\nاللعبة: ${challengeConfig?.gameTitle || 'تحدٍ جماعي'}\nرمز الغرفة: ${roomCode}\nافتح قسم دوراتي وأدخل الرمز للانضمام.`);
+      appSfx.success();
+      showToast(`أُرسلت دعوة التحدّي إلى ${target.name}`);
+      setChallengeInviteTarget(null);
+    } catch (error) {
+      appSfx.attention();
+      showToast(error instanceof Error ? error.message : 'تعذر إرسال دعوة التحدّي');
+    }
+  };
 
   React.useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('classroom')?.trim();
@@ -1409,6 +1433,7 @@ function AppContent() {
 
           {activeTab === 'subscriptions' && (
             <SubscriptionsView
+              challengeTargetName={challengeInviteTarget?.name}
               onSelectLesson={(selectedLesson) => {
                 setLesson(selectedLesson);
                 setActiveTab('home');
@@ -1549,6 +1574,7 @@ function AppContent() {
           setCommunityAccountActionsMember(null);
           openMessenger(member);
         }}
+        onChallenge={startPlayerChallenge}
       />
 
       <CommunityProfileModal
@@ -1557,6 +1583,7 @@ function AppContent() {
         currentUserId={currentUser?.id}
         onClose={() => setCommunityProfileMember(null)}
         onMessage={(member) => openMessenger(member)}
+        onChallenge={startPlayerChallenge}
       />
 
       <MessengerModal
@@ -1675,6 +1702,7 @@ function AppContent() {
           chapterNumber={challengeConfig?.chapterNumber}
           lessonNumber={challengeConfig?.lessonNumber}
           initialRoomCode={challengeRoomCode}
+          onRoomCreated={sendChallengeInvite}
         />
       )}
 

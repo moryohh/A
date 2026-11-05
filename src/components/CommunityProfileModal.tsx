@@ -1,8 +1,9 @@
 import React from 'react';
-import { Award, BookOpen, Flame, MessageCircle, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Award, BookOpen, Flame, MessageCircle, ShieldCheck, Sparkles, Swords, X } from 'lucide-react';
 import { CommunityMember, CommunityPost } from '../types';
 import { useAppTheme } from '../services/themeService';
 import { CommunityAvatar } from './CommunityAvatar';
+import { appSfx } from '../utils/appSfx';
 
 interface CommunityProfileModalProps {
   member: CommunityMember | null;
@@ -10,6 +11,7 @@ interface CommunityProfileModalProps {
   currentUserId?: string;
   onClose: () => void;
   onMessage: (member: CommunityMember) => void;
+  onChallenge: (member: CommunityMember) => void;
 }
 
 export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
@@ -18,6 +20,7 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
   currentUserId,
   onClose,
   onMessage,
+  onChallenge,
 }) => {
   const { theme } = useAppTheme();
   if (!member) return null;
@@ -40,7 +43,7 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
       <div className={`flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border sm:rounded-3xl ${theme.classes.cardBorder} ${theme.classes.wrapperBg}`}>
         <div className={`flex items-center justify-between border-b p-3 ${theme.classes.cardBorder} ${theme.classes.headerBg}`}>
           <h2 className={`text-base font-black ${theme.classes.textMain}`}>الملف الشخصي</h2>
-          <button type="button" onClick={onClose} className={`flex h-10 w-10 items-center justify-center rounded-full border active:scale-95 ${theme.classes.cardBorder} ${theme.classes.cardSubtleBg}`} aria-label="إغلاق الملف الشخصي">
+          <button type="button" onClick={() => { appSfx.panelClose(); onClose(); }} className={`flex h-10 w-10 items-center justify-center rounded-full border active:scale-95 ${theme.classes.cardBorder} ${theme.classes.cardSubtleBg}`} aria-label="إغلاق الملف الشخصي">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -51,11 +54,10 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
             <h3 className={`mt-3 text-xl font-black ${theme.classes.textMain}`}>{member.name}</h3>
             <p className={`mt-1 text-xs ${theme.classes.textMuted}`}>{memberPosts.length} منشور في المجتمع</p>
             {isPrivateFallback && <p className="mt-2 text-[10px] font-bold text-amber-500">معاينة عامة محدودة للحساب</p>}
-            {canMessage && (
-              <button type="button" onClick={() => onMessage(member)} className="mx-auto mt-4 flex items-center justify-center gap-2 rounded-2xl bg-sky-500 px-7 py-3 text-sm font-black text-white shadow-lg transition active:scale-95">
-                <MessageCircle className="h-5 w-5" />مراسلة
-              </button>
-            )}
+            {canMessage && <div className="mx-auto mt-4 grid max-w-xs grid-cols-2 gap-2">
+              <button type="button" onClick={() => { appSfx.tap(); onMessage(member); }} className="flex items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-95"><MessageCircle className="h-5 w-5" />مراسلة</button>
+              <button type="button" onClick={() => { appSfx.challenge(); onChallenge(member); }} className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-95"><Swords className="h-5 w-5" />تحدّي</button>
+            </div>}
             <div className={`mt-4 rounded-2xl border p-3 text-right ${theme.classes.cardSubtleBg} ${theme.classes.cardBorder}`}>
                 <div className={`flex items-center justify-between text-sm font-black ${theme.classes.textMain}`}>
                   <span>المستوى {level}</span>

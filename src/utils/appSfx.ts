@@ -1,124 +1,123 @@
-type LegacyGameSfxName = 'gameSelect' | 'gameSwitch';
-type Tonely = typeof import('tonely')['tonely'];
+type AppSfxName =
+  | 'back'
+  | 'tap'
+  | 'toggle'
+  | 'notification'
+  | 'success'
+  | 'attention'
+  | 'panelOpen'
+  | 'panelClose'
+  | 'subjectSelect'
+  | 'chapterSelect'
+  | 'lessonSelect'
+  | 'boardSelect'
+  | 'bookletSelect'
+  | 'swipeUp'
+  | 'swipeDown'
+  | 'challenge'
+  | 'cardFlip'
+  | 'next'
+  | 'previous'
+  | 'gameSelect'
+  | 'gameSwitch';
 
-// The interactive-game entry sounds deliberately remain on the original
-// recorded assets. Tonely is only used for the surrounding platform UI.
-const LEGACY_GAME_SOURCES: Record<LegacyGameSfxName, string> = {
+const KENNEY = `${import.meta.env.BASE_URL}audio/kenney-ui`;
+
+const SOURCES: Record<AppSfxName, string> = {
+  back: `${KENNEY}/back.mp3`,
+  tap: `${KENNEY}/tap.mp3`,
+  toggle: `${KENNEY}/select.mp3`,
+  notification: `${KENNEY}/notification.mp3`,
+  success: `${KENNEY}/success.mp3`,
+  attention: `${KENNEY}/attention.mp3`,
+  panelOpen: `${KENNEY}/panel-open.mp3`,
+  panelClose: `${KENNEY}/panel-close.mp3`,
+  subjectSelect: `${KENNEY}/select.mp3`,
+  chapterSelect: `${KENNEY}/chapter.mp3`,
+  lessonSelect: `${KENNEY}/lesson.mp3`,
+  boardSelect: `${KENNEY}/board.mp3`,
+  bookletSelect: `${KENNEY}/booklet.mp3`,
+  swipeUp: `${KENNEY}/swipe-up.mp3`,
+  swipeDown: `${KENNEY}/swipe-down.mp3`,
+  challenge: `${KENNEY}/challenge.mp3`,
+  cardFlip: `${KENNEY}/card-flip.mp3`,
+  next: `${KENNEY}/next.mp3`,
+  previous: `${KENNEY}/previous.mp3`,
+  // Interactive-game entry cues stay on the previously approved assets.
   gameSelect: `${import.meta.env.BASE_URL}audio/ui/success.mp3`,
   gameSwitch: `${import.meta.env.BASE_URL}audio/ui/toggle.mp3`,
 };
 
-const LEGACY_GAME_VOLUMES: Record<LegacyGameSfxName, number> = {
+const VOLUMES: Record<AppSfxName, number> = {
+  back: 0.3,
+  tap: 0.24,
+  toggle: 0.24,
+  notification: 0.32,
+  success: 0.34,
+  attention: 0.3,
+  panelOpen: 0.28,
+  panelClose: 0.27,
+  subjectSelect: 0.28,
+  chapterSelect: 0.29,
+  lessonSelect: 0.3,
+  boardSelect: 0.27,
+  bookletSelect: 0.27,
+  swipeUp: 0.25,
+  swipeDown: 0.25,
+  challenge: 0.35,
+  cardFlip: 0.28,
+  next: 0.25,
+  previous: 0.25,
   gameSelect: 0.17,
   gameSwitch: 0.12,
 };
 
 class AppSfxEngine {
-  private legacyGamePlayers = new Map<LegacyGameSfxName, HTMLAudioElement>();
-  private lastPlayedAt = new Map<string, number>();
-  private tonelyPromise: Promise<Tonely> | null = null;
+  private players = new Map<AppSfxName, HTMLAudioElement>();
+  private lastPlayedAt = new Map<AppSfxName, number>();
 
-  private getTonely() {
-    if (!this.tonelyPromise) {
-      // Keep the procedural engine in its own tiny on-demand chunk so the PWA
-      // shell and its service-worker precache stay below Cloudflare's limit.
-      this.tonelyPromise = import('tonely').then(({ tonely }) => {
-        tonely.setTheme('playful');
-        tonely.setVolume(0.55);
-        return tonely;
-      });
-    }
-    return this.tonelyPromise;
-  }
-
-  private playTonely(callback: (engine: Tonely) => Promise<boolean>) {
-    void this.getTonely().then(callback).catch(() => undefined);
-  }
-
-  private canPlay(name: string, minimumGapMs: number) {
-    const now = performance.now();
-    if (now - (this.lastPlayedAt.get(name) ?? 0) < minimumGapMs) return false;
-    this.lastPlayedAt.set(name, now);
-    return true;
-  }
-
-  private playLegacyGame(name: LegacyGameSfxName, minimumGapMs: number) {
-    if (!this.canPlay(name, minimumGapMs)) return;
-    let player = this.legacyGamePlayers.get(name);
+  private getPlayer(name: AppSfxName) {
+    let player = this.players.get(name);
     if (!player) {
-      player = new Audio(LEGACY_GAME_SOURCES[name]);
+      player = new Audio(SOURCES[name]);
       player.preload = 'auto';
-      player.volume = LEGACY_GAME_VOLUMES[name];
-      this.legacyGamePlayers.set(name, player);
+      player.volume = VOLUMES[name];
+      this.players.set(name, player);
     }
+    return player;
+  }
+
+  play(name: AppSfxName, minimumGapMs = 90) {
+    const now = performance.now();
+    if (now - (this.lastPlayedAt.get(name) ?? 0) < minimumGapMs) return;
+    this.lastPlayedAt.set(name, now);
+    const player = this.getPlayer(name);
     player.pause();
     player.currentTime = 0;
     void player.play().catch(() => undefined);
   }
 
-  navigation() {
-    if (this.canPlay('navigation', 180)) this.playTonely((engine) => engine.click({ theme: 'minimal', volume: 0.26, pitch: 0.76 }));
-  }
-
-  tap() {
-    if (this.canPlay('tap', 90)) this.playTonely((engine) => engine.click({ theme: 'minimal', volume: 0.22 }));
-  }
-
-  toggle(active = true) {
-    if (this.canPlay('toggle', 120)) this.playTonely((engine) => engine.toggle(active, { theme: 'minimal', volume: 0.28 }));
-  }
-
-  notification() {
-    if (this.canPlay('notification', 350)) this.playTonely((engine) => engine.info({ theme: 'glass', volume: 0.3 }));
-  }
-
-  success() {
-    if (this.canPlay('success', 350)) this.playTonely((engine) => engine.success({ theme: 'playful', volume: 0.32 }));
-  }
-
-  attention() {
-    if (this.canPlay('attention', 350)) this.playTonely((engine) => engine.warning({ theme: 'modern', volume: 0.3 }));
-  }
-
-  panelOpen() {
-    if (this.canPlay('panelOpen', 220)) this.playTonely((engine) => engine.pop({ theme: 'playful', volume: 0.28 }));
-  }
-
-  panelClose() {
-    if (this.canPlay('panelClose', 220)) this.playTonely((engine) => engine.pop({ theme: 'minimal', volume: 0.24, pitch: 0.72 }));
-  }
-
-  subjectSelect() {
-    if (this.canPlay('subjectSelect', 180)) this.playTonely((engine) => engine.bubble({ theme: 'playful', volume: 0.3, pitch: 0.92 }));
-  }
-
-  chapterSelect() {
-    if (this.canPlay('chapterSelect', 180)) this.playTonely((engine) => engine.pop({ theme: 'playful', volume: 0.28, pitch: 1.02 }));
-  }
-
-  lessonSelect() {
-    if (this.canPlay('lessonSelect', 220)) this.playTonely((engine) => engine.glass({ theme: 'glass', volume: 0.24, pitch: 0.9 }));
-  }
-
-  // Preserve the original entry cues around the interactive-game menu.
-  gameSelect() { this.playLegacyGame('gameSelect', 220); }
-  gameSwitch() { this.playLegacyGame('gameSwitch', 140); }
-
-  boardSelect() {
-    if (this.canPlay('boardSelect', 180)) this.playTonely((engine) => engine.click({ theme: 'modern', volume: 0.26, pitch: 0.88 }));
-  }
-
-  bookletSelect() {
-    if (this.canPlay('bookletSelect', 180)) this.playTonely((engine) => engine.bubble({ theme: 'minimal', volume: 0.26, pitch: 0.82 }));
-  }
-
-  swipeUp() {
-    if (this.canPlay('swipeUp', 420)) this.playTonely((engine) => engine.pop({ theme: 'minimal', volume: 0.2, pitch: 1.2, playbackRate: 1.2 }));
-  }
-
-  swipeDown() {
-    if (this.canPlay('swipeDown', 420)) this.playTonely((engine) => engine.pop({ theme: 'minimal', volume: 0.2, pitch: 0.68, playbackRate: 0.9 }));
-  }
+  navigation() { this.play('back', 160); }
+  tap() { this.play('tap'); }
+  toggle() { this.play('toggle', 120); }
+  notification() { this.play('notification', 300); }
+  success() { this.play('success', 300); }
+  attention() { this.play('attention', 300); }
+  panelOpen() { this.play('panelOpen', 180); }
+  panelClose() { this.play('panelClose', 180); }
+  subjectSelect() { this.play('subjectSelect', 160); }
+  chapterSelect() { this.play('chapterSelect', 160); }
+  lessonSelect() { this.play('lessonSelect', 180); }
+  gameSelect() { this.play('gameSelect', 220); }
+  gameSwitch() { this.play('gameSwitch', 140); }
+  boardSelect() { this.play('boardSelect', 160); }
+  bookletSelect() { this.play('bookletSelect', 160); }
+  swipeUp() { this.play('swipeUp', 360); }
+  swipeDown() { this.play('swipeDown', 360); }
+  challenge() { this.play('challenge', 300); }
+  cardFlip() { this.play('cardFlip', 160); }
+  next() { this.play('next', 120); }
+  previous() { this.play('previous', 120); }
 }
 
 export const appSfx = new AppSfxEngine();

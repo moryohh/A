@@ -17,9 +17,9 @@ type RoundResult = { question?: { question: string; options: string[] }; answer?
 type ChatMessage = { id: string; from: string; text: string; sentAt: number };
 type ReactionPath = { startX: number; startY: number; endX: number; endY: number };
 
-interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; }
+interface Props { onClose: () => void; questions: OnlineChallengeQuestion[]; lessonTitle: string; gameType: OnlineChallengeGameType; gameTitle: string; subject?: string; chapterNumber?: number; lessonNumber?: number; initialRoomCode?: string; onRoomCreated?: (roomCode: string) => void | Promise<void>; }
 
-export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1, initialRoomCode }) => {
+export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, lessonTitle, gameType, gameTitle, subject = 'المادة التعليمية', chapterNumber = 1, lessonNumber = 1, initialRoomCode, onRoomCreated }) => {
   const [room, setRoom] = useState('');
   const [entry, setEntry] = useState('');
   const [state, setState] = useState<State | null>(null);
@@ -27,6 +27,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
+  const finalOutcomeSoundRef = useRef('');
   const [connected, setConnected] = useState(false);
   const [pendingAnswer, setPendingAnswer] = useState(false);
   const [resultRevealed, setResultRevealed] = useState(false);
@@ -462,6 +463,7 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
       const response = await fetch(`${API}/rooms`, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ gameType, questions: selected, subject, chapter: chapterNumber, lesson: lessonNumber, lessonTitle, gameTitle }) });
       if (!response.ok) throw new Error('تعذر إنشاء غرفة التحدّي.');
       const { roomCode } = await response.json();
+      await onRoomCreated?.(roomCode);
       await connect(roomCode);
     } catch (e) { setError(e instanceof Error ? e.message : 'حدث خطأ.'); }
     finally { setBusy(false); }
@@ -535,8 +537,15 @@ export const OnlineTrueFalseOctober19: React.FC<Props> = ({ onClose, questions, 
   useEffect(() => { setReactionUsed(false); setRocketTargeting(false); }, [state?.round, state?.turn]);
 
   useEffect(() => {
-    if ((isTrueFalse || isGibhaSah) && state?.status === 'finished' && state.winner === me && !roundResult) gameAudio.playVictoryFanfare();
-  }, [isTrueFalse, isGibhaSah, state?.status, state?.winner, me, roundResult]);
+    if (state?.status !== 'finished' || roundResult || state.tie) return;
+    const outcomeKey = `${room}:${state.winner}:${me}`;
+    if (finalOutcomeSoundRef.current === outcomeKey) return;
+    finalOutcomeSoundRef.current = outcomeKey;
+    const won = isMillionaireTeam ? state.winner === self?.team : state.winner === me;
+    if (won) {
+      if (isTrueFalse || isGibhaSah) gameAudio.playVictoryFanfare();
+    } else gameAudio.playGameLoss();
+  }, [isTrueFalse, isGibhaSah, isMillionaireTeam, state?.status, state?.winner, state?.tie, self?.team, me, room, roundResult]);
   useEffect(() => {
     // Every player receives the same authoritative room state, so the game music
     // must follow that shared state instead of running only on the captain's client.

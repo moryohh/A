@@ -46,6 +46,7 @@ interface SubscriptionsViewProps {
   onOpenChallenge?: () => void;
   onJoinChallenge?: (room: ActiveRoom) => void;
   onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; lessonId?: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' }) => void;
+  challengeTargetName?: string;
 }
 
 const STATUS_STYLES: Record<CourseStatus, { text: string; background: string; border: string }> = {
@@ -137,7 +138,7 @@ const getStatusMessage = (course: MockCourse) => {
   };
 };
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge, onJoinChallenge, onCreateChallenge }) => {
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge, onJoinChallenge, onCreateChallenge, challengeTargetName }) => {
   const { theme } = useAppTheme();
   const [activeSection, setActiveSection] = useState<'challenge' | 'courses'>('challenge');
   const [challengeSubject, setChallengeSubject] = useState('');
@@ -307,6 +308,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
   return (
     <div className="space-y-4 p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] text-right select-none sm:p-4 animate-in fade-in duration-200">
+      {challengeTargetName && <div className="rounded-2xl border border-violet-300/50 bg-violet-500/15 p-3 text-center text-sm font-black text-violet-100"><Swords className="ml-2 inline h-5 w-5" />اختر لعبة لإنشاء غرفة وإرسال دعوتها إلى {challengeTargetName}</div>}
       <section className={`rounded-3xl border p-2 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="دوراتي والتحدي">
           <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => setActiveSection('challenge')} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition ${activeSection === 'challenge' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'challenge' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>

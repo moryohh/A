@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw, X } from 'lucide-react';
 import { FlashCard } from '../services/gamesService';
 import { ScientificText } from './ScientificText';
+import { appSfx } from '../utils/appSfx';
 
 interface FlashCardGameModalProps {
   isOpen: boolean;
@@ -26,12 +27,22 @@ export const FlashCardGameModal: React.FC<FlashCardGameModalProps> = ({ isOpen, 
   if (!card) return null;
 
   const next = () => {
+    appSfx.next();
     setFlipped(false);
     setIndex((value) => (value + 1) % cards.length);
   };
   const previous = () => {
+    appSfx.previous();
     setFlipped(false);
     setIndex((value) => (value - 1 + cards.length) % cards.length);
+  };
+  const flip = () => {
+    appSfx.cardFlip();
+    setFlipped((value) => !value);
+  };
+  const close = () => {
+    appSfx.panelClose();
+    onClose();
   };
 
   return (
@@ -42,7 +53,7 @@ export const FlashCardGameModal: React.FC<FlashCardGameModalProps> = ({ isOpen, 
             <h2 className="text-xl font-black text-cyan-200">فلاش كارد</h2>
             <p className="mt-1 text-xs text-slate-400">بطاقات من ملف منهج: {lessonTitle}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full bg-white/10 p-2 text-slate-300 transition hover:bg-white/20" aria-label="إغلاق">
+          <button type="button" onClick={close} className="rounded-full bg-white/10 p-2 text-slate-300 transition hover:bg-white/20" aria-label="إغلاق">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -50,7 +61,7 @@ export const FlashCardGameModal: React.FC<FlashCardGameModalProps> = ({ isOpen, 
         <p className="mb-3 text-center text-xs font-bold text-cyan-300">البطاقة {index + 1} من {cards.length}</p>
         <button
           type="button"
-          onClick={() => setFlipped((value) => !value)}
+          onClick={flip}
           className="group relative block h-72 w-full [perspective:1200px] focus:outline-none"
           aria-label={flipped ? 'إظهار السؤال' : 'إظهار الجواب'}
         >
@@ -73,7 +84,7 @@ export const FlashCardGameModal: React.FC<FlashCardGameModalProps> = ({ isOpen, 
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <button type="button" onClick={previous} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 py-3 text-sm font-black transition hover:bg-white/20"><ArrowRight className="h-4 w-4" /> السابقة</button>
-          <button type="button" onClick={() => setFlipped((value) => !value)} className="flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300"><RotateCcw className="h-4 w-4" /> قلب البطاقة</button>
+          <button type="button" onClick={flip} className="flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300"><RotateCcw className="h-4 w-4" /> قلب البطاقة</button>
           <button type="button" onClick={next} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 py-3 text-sm font-black transition hover:bg-white/20">التالية <ArrowLeft className="h-4 w-4" /></button>
         </div>
       </div>
