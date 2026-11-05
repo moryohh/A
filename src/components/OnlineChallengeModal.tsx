@@ -596,6 +596,14 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, [isTrueFalse, isMillionaire, connected, state?.status, state?.round, state?.turn, state?.questionDeadline, roundResult]);
 
   useEffect(() => {
+    if (!isMillionaireTeam || !connected || state?.status !== 'playing') return;
+    const sync = () => sendSocket({ type: 'sync', round: stateRef.current?.round });
+    sync();
+    const timer = window.setInterval(sync, 3000);
+    return () => window.clearInterval(timer);
+  }, [isMillionaireTeam, connected, state?.status]);
+
+  useEffect(() => {
     if (isGibhaSah) gameAudio.setGameSessionThemeRate(turnSeconds <= 5 ? 1.28 : 1);
     return () => gameAudio.setGameSessionThemeRate(1);
   }, [isGibhaSah, turnSeconds]);
