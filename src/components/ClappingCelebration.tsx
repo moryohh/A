@@ -89,3 +89,48 @@ export const ClappingCelebration: React.FC<ClappingCelebrationProps> = ({
     </div>
   );
 };
+
+
+export const ClappingWeatherCelebration: React.FC<{ className?: string }> = ({ className = '' }) => {
+  const snow = Array.from({ length: 30 }, (_, index) => ({
+    left: (index * 37 + 11) % 100,
+    delay: (index % 10) * 0.11,
+    duration: 2.2 + (index % 7) * 0.18,
+    size: 4 + (index % 4) * 2,
+  }));
+  const rain = Array.from({ length: 22 }, (_, index) => ({
+    left: (index * 43 + 7) % 100,
+    delay: (index % 8) * 0.13,
+    duration: 0.72 + (index % 5) * 0.12,
+  }));
+
+  return (
+    <div className={`relative h-full w-full overflow-hidden ${className}`} role="status" aria-label="تصفيق مع مطر وثلج احتفالي">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(103,232,249,.22),transparent_48%)] motion-safe:animate-[clapWeatherGlow_4s_ease-out_both]" />
+      {rain.map((drop, index) => (
+        <span
+          key={`rain-${index}`}
+          className="absolute -top-8 h-8 w-[2px] rounded-full bg-gradient-to-b from-transparent via-cyan-200 to-white/90 shadow-[0_0_8px_rgba(103,232,249,.85)]"
+          style={{ left: `${drop.left}%`, animation: `clapRain ${drop.duration}s linear ${drop.delay}s infinite` }}
+        />
+      ))}
+      {snow.map((flake, index) => (
+        <span
+          key={`snow-${index}`}
+          className="absolute -top-4 rounded-full bg-white shadow-[0_0_9px_rgba(255,255,255,.95)]"
+          style={{ left: `${flake.left}%`, width: flake.size, height: flake.size, animation: `clapSnow ${flake.duration}s ease-in ${flake.delay}s infinite` }}
+        />
+      ))}
+      <div className="absolute inset-0 grid place-items-center">
+        <span className="absolute h-40 w-40 rounded-full border-2 border-cyan-200/70 motion-safe:animate-[clapWeatherRing_1.35s_ease-out_infinite]" />
+        <ClappingHandsAnimation pingPong className="h-32 w-32 drop-shadow-[0_0_22px_rgba(255,255,255,.8)]" />
+      </div>
+      <style>{`
+        @keyframes clapRain{0%{opacity:0;transform:translate3d(0,-12%,0) rotate(8deg)}12%{opacity:.9}85%{opacity:.75}100%{opacity:0;transform:translate3d(-22px,118vh,0) rotate(8deg)}}
+        @keyframes clapSnow{0%{opacity:0;transform:translate3d(0,-10%,0) rotate(0deg)}15%{opacity:1}85%{opacity:.95}100%{opacity:0;transform:translate3d(28px,110vh,0) rotate(300deg)}}
+        @keyframes clapWeatherRing{0%{opacity:.9;transform:scale(.45)}100%{opacity:0;transform:scale(1.45)}}
+        @keyframes clapWeatherGlow{0%{opacity:0}15%{opacity:1}78%{opacity:1}100%{opacity:0}}
+      `}</style>
+    </div>
+  );
+};
