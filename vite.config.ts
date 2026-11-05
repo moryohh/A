@@ -42,6 +42,7 @@ export default defineConfig(() => {
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           globIgnores: ['solve-with-me/**'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         },
         devOptions: {enabled: false},
       }),
