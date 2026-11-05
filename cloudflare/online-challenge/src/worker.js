@@ -446,14 +446,51 @@ export class ChallengeRoom {
     game.round = currentIndex + 1;
     game.questionIndex = game.round;
     var nextTeam = team === 'A' ? 'B' : 'A';
-    if ((game.teamLives.A <= 0 && game.teamLives.B <= 0) || game.questionIndex >= game.questions.length) {
+    if (game.teamLives.A <= 0 || game.teamLives.B <= 0 || game.questionIndex >= game.questions.length) {
       game.status = 'finished';
-      game.winner = game.teamScores.A > game.teamScores.B ? 'A' : game.teamScores.B > game.teamScores.A ? 'B' : null;
+      game.winner = game.teamLives.A <= 0 && game.teamLives.B > 0
+        ? 'B'
+        : game.teamLives.B <= 0 && game.teamLives.A > 0
+          ? 'A'
+          : game.teamScores.A > game.teamScores.B ? 'A' : game.teamScores.B > game.teamScores.A ? 'B' : null;
     } else {
       if (game.teamLives[nextTeam] <= 0) nextTeam = team;
       this.beginTeamTurn(game, nextTeam);
     }
     this.broadcast({ type: 'round_result', question: { question: question.question, options: question.options }, answer: question.correctAnswer, selected: selected, scores: game.players.map(function (item) { return { id: item.id, score: item.score }; }), answeredBy: answeredBy, answeredTeam: team, timedOut: Boolean(timedOut) });
+  }
+  async advanceMillionaireTeamTimers(game, now) {
+    if (!game || game.gameType !== 'millionaire_team' || game.status !== 'playing') return false;
+    var changed = false;
+    if (game.botDiscussionAt && now >= game.botDiscussionAt) {
+      var discussionQuestion = game.questions[game.questionIndex];
+      var discussionCaptain = game.players.find(function (player) { return player.id === game.turn; });
+      var discussionMate = this.teamPlayers(game, game.activeTeam).find(function (player) { return this.isBot(player) && player.id !== game.turn; }, this);
+      if (discussionMate && discussionQuestion) {
+        var recommendation = this.chooseBotAnswer(game);
+        game.recommendations[discussionMate.id] = recommendation;
+        this.sendToTeam(game, game.activeTeam, { type: 'team_recommendation', from: discussionMate.id, option: recommendation, team: game.activeTeam, bot: true });
+      }
+      delete game.botDiscussionAt;
+      if (discussionCaptain && this.isBot(discussionCaptain)) game.botAnswerAt = now + randomDelay(7000, 23000);
+      else game.questionDeadline = now + 60000;
+      changed = true;
+    }
+    if (game.questionDeadline && now >= game.questionDeadline) {
+      delete game.questionDeadline;
+      await this.finishTeamRound(game, -1, game.turn, true);
+      changed = true;
+    }
+    if (game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
+      var teamBot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
+      delete game.botAnswerAt;
+      if (teamBot) {
+        var teamBotSelected = this.chooseBotAnswer(game);
+        await this.finishTeamRound(game, teamBotSelected, teamBot.id, false);
+        changed = true;
+      }
+    }
+    return changed;
   }
   async scheduleBotAnswer(game) {
     var bot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
@@ -545,7 +582,7 @@ export class ChallengeRoom {
       teamLives: game.teamLives,
       teamScores: game.teamScores,
       discussionPhase: game.botDiscussionAt ? 'thinking' : game.botAnswerAt ? 'recommended' : null,
-      questionDeadline: game.questionDeadline || null,
+      questionDeadline: game.questionDeadline || game.botAnswerAt || game.botDiscussionAt || null,
       lifelines: game.lifelines || null,
       classroom: game.gameType === 'live_classroom' ? {
         hostId: game.hostId,
@@ -962,6 +999,16 @@ export class ChallengeRoom {
       }, this);
       return;
     }
+    if (payload && payload.type === 'sync' && liveGame && liveGame.gameType === 'millionaire_team') {
+      var teamTimersChanged = await this.advanceMillionaireTeamTimers(liveGame, Date.now());
+      await this.ctx.storage.put('game', liveGame);
+      if (teamTimersChanged) {
+        if (liveGame.status === 'finished') await this.updateRegistry('ended', liveGame);
+        this.broadcast(this.view(liveGame));
+      } else this.send(socket, this.view(liveGame));
+      await this.scheduleNextAlarm(liveGame);
+      return;
+    }
     if (payload && payload.type === 'recommend' && sender && Number.isInteger(payload.option) && liveGame && liveGame.gameType === 'millionaire_team' && liveGame.status === 'playing') {
       var recommender = liveGame.players.find(function (player) { return player.id === sender.userId; });
       var recommendQuestion = liveGame.questions[liveGame.questionIndex];
@@ -1266,24 +1313,8 @@ export class ChallengeRoom {
       this.broadcast({ type: 'bot_joined', replacedUserId: null });
       this.broadcast(this.view(game));
     }
-    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.botDiscussionAt && now >= game.botDiscussionAt) {
-      var discussionQuestion = game.questions[game.questionIndex];
-      var discussionCaptain = game.players.find(function (player) { return player.id === game.turn; });
-      var discussionMate = this.teamPlayers(game, game.activeTeam).find(function (player) { return this.isBot(player) && player.id !== game.turn; }, this);
-      if (discussionMate && discussionQuestion) {
-        var recommendation = this.chooseBotAnswer(game);
-        game.recommendations[discussionMate.id] = recommendation;
-        this.sendToTeam(game, game.activeTeam, { type: 'team_recommendation', from: discussionMate.id, option: recommendation, team: game.activeTeam, bot: true });
-      }
-      delete game.botDiscussionAt;
-      // The complete visible thinking time is 10–30 seconds: 3–7 seconds
-      // of team discussion followed by 7–23 seconds before the captain answers.
-      if (discussionCaptain && this.isBot(discussionCaptain)) game.botAnswerAt = now + randomDelay(7000, 23000);
-      else game.questionDeadline = now + 60000;
-      this.broadcast(this.view(game));
-    }
-    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.questionDeadline && now >= game.questionDeadline) {
-      await this.finishTeamRound(game, -1, game.turn, true);
+    var teamTimersChanged = await this.advanceMillionaireTeamTimers(game, now);
+    if (teamTimersChanged) {
       if (game.status === 'finished') await this.updateRegistry('ended', game);
       this.broadcast(this.view(game));
     }
@@ -1322,16 +1353,6 @@ export class ChallengeRoom {
         delete game.disconnectDeadline;
         await this.updateRegistry('ended', game);
       }
-    }
-    if (game.gameType === 'millionaire_team' && game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
-      var teamBot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
-      if (teamBot) {
-        var teamBotSelected = this.chooseBotAnswer(game);
-        await this.finishTeamRound(game, teamBotSelected, teamBot.id, false);
-        if (game.status === 'finished') await this.updateRegistry('ended', game);
-        this.broadcast(this.view(game));
-      }
-      delete game.botAnswerAt;
     }
     if (game.gameType !== 'millionaire_team' && game.status === 'playing' && game.botAnswerAt && now >= game.botAnswerAt) {
       var bot = game.players.find(function (player) { return player.id === game.turn && this.isBot(player); }, this);
