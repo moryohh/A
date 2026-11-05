@@ -25,6 +25,7 @@
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pixelfx": "https://github.com/patch-gg/pixelfx/archive/a84159688af3ca37a4be05a0d422b94451b2e24e.tar.gz",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-katex": "^3.1.0"

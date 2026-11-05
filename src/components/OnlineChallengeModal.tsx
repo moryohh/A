@@ -10,6 +10,7 @@ import { ScientificText } from './ScientificText';
 import { TrueFalseAuthenticIcon } from './GameIcons';
 import { OnlineTrueFalseCharacter, onlineTrueFalseCharacterVideo, onlineTrueFalseResultDuration, preloadOnlineTrueFalseCharacters, type OnlineTrueFalseCharacterState, type OnlineTrueFalseCharacterVariant } from './OnlineTrueFalseCharacter';
 import { ClappingCelebration, ClappingHandsAnimation } from './ClappingCelebration';
+import { PixelReactionEffect, type TargetReactionKind } from './PixelReactionEffect';
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
 export type OnlineChallengeGameType = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah';
 export type OnlineChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
@@ -55,8 +56,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [musicMuted, setMusicMuted] = useState(() => gameAudio.getMuted());
   const [reactionUsed, setReactionUsed] = useState(false);
   const [clapAnimationKey, setClapAnimationKey] = useState(0);
-  const [rocketTargeting, setRocketTargeting] = useState(false);
-  const [laughTargeting, setLaughTargeting] = useState(false);
+  const [targetingReaction, setTargetingReaction] = useState<'rocket' | TargetReactionKind | null>(null);
   const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number; path?: ReactionPath } | null>(null);
   const gibhaBoardRef = useRef<HTMLDivElement | null>(null);
   const suppressCloseMessageRef = useRef(false);
@@ -378,7 +378,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           window.setTimeout(() => gameAudio.playGibhaWrong(), 1480);
         }
         else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
-        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.kind === 'laugh' && payload.targetId ? 1900 : 1100);
+        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.targetId && payload.kind === 'laugh' ? 3400 : payload.targetId ? 1500 : 1100);
       }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
@@ -481,8 +481,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
 
   function sendReaction(kind: 'clap' | 'laugh' | 'think' | 'angry' | 'rocket', targetId?: string) {
     if (reactionUsed || !connected) return;
-    if (kind === 'rocket' && !targetId) { setRocketTargeting(true); return; }
-    if (kind === 'laugh' && !targetId) { setLaughTargeting(true); return; }
+    if ((kind === 'rocket' || kind === 'laugh' || kind === 'think' || kind === 'angry') && !targetId) { setTargetingReaction(kind); return; }
     sendSocket({ type: 'reaction', kind, targetId });
     if (kind === 'clap') {
       const nonce = Date.now();
@@ -494,8 +493,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       gameAudio.playClick(620);
     }
     setReactionUsed(true);
-    setRocketTargeting(false);
-    setLaughTargeting(false);
+    setTargetingReaction(null);
   }
 
   function toggleMusic() {
@@ -611,7 +609,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   }, [isGibhaSah, turnSeconds]);
 
   useEffect(() => { setLifelineResult(null); setTeamRecommendation(null); setGibhaPowerResult(null); }, [state?.round]);
-  useEffect(() => { setReactionUsed(false); setRocketTargeting(false); }, [state?.round, state?.turn]);
+  useEffect(() => { setReactionUsed(false); setTargetingReaction(null); }, [state?.round, state?.turn]);
 
   useEffect(() => {
     if (state?.status !== 'finished' || roundResult || state.tie) return;
@@ -678,15 +676,15 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
     const avatarSide = seat % 2 === 0 ? 'right-3' : 'left-3';
     const bubbleSide = seat % 2 === 0 ? 'right-[4.7rem]' : 'left-[4.7rem]';
     const bubbleTail = seat % 2 === 0 ? 'after:-right-2 after:border-l-cyan-100' : 'after:-left-2 after:border-r-cyan-100';
-    const isTargetable = Boolean(player && player.id !== me && (rocketTargeting || laughTargeting));
+    const isTargetable = Boolean(player && player.id !== me && targetingReaction);
     const targetedReaction = reactionFx?.targetId === player?.id ? reactionFx.kind : null;
     const showCorrectClaps = Boolean(player && roundResult?.answeredBy === player.id && roundResult.correct);
-    return <div key={player?.id || `seat-${seat}`} onClick={() => { if (!isTargetable || !player) return; sendReaction(rocketTargeting ? 'rocket' : 'laugh', player.id); }} className={`relative min-h-[6.6rem] min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${isTargetable ? 'cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${targetedReaction === 'rocket' ? 'gibha-rocket-target' : ''}`}>
+    return <div key={player?.id || `seat-${seat}`} onClick={() => { if (!isTargetable || !player || !targetingReaction) return; sendReaction(targetingReaction, player.id); }} className={`relative min-h-[6.6rem] min-w-0 rounded-2xl border px-2 pb-2 pt-7 text-center transition-all duration-500 ${isTargetable ? 'gibha-target-ready cursor-crosshair ring-2 ring-rose-400' : ''} ${activeMe ? 'border-emerald-200 bg-emerald-400/20 shadow-[0_0_45px_rgba(52,211,153,.95)]' : active ? 'border-yellow-200 bg-yellow-400/20 shadow-[0_0_42px_rgba(250,204,21,.9)]' : 'border-cyan-400/25 bg-cyan-500/5'} ${targetedReaction === 'rocket' ? 'gibha-rocket-target' : targetedReaction ? `gibha-${targetedReaction}-target` : ''}`}>
       <div className={`pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-15 grayscale'}`}><span className={`relative z-10 block rotate-180 text-4xl ${activeMe ? 'animate-pulse drop-shadow-[0_0_26px_rgba(52,211,153,1)] [filter:hue-rotate(70deg)_brightness(1.5)]' : active ? 'animate-pulse drop-shadow-[0_0_25px_rgba(250,204,21,1)] brightness-150' : ''}`}>💡</span>{active && <span className={`absolute left-1/2 top-8 h-16 w-24 -translate-x-1/2 bg-gradient-to-b to-transparent blur-[2px] [clip-path:polygon(42%_0,58%_0,100%_100%,0_100%)] ${activeMe ? 'from-emerald-100/90' : 'from-yellow-100/85'}`}/>}</div>
       <div data-gibha-avatar={player?.id || ''} className={`absolute top-8 z-10 h-14 w-14 overflow-hidden rounded-full border-2 border-cyan-200 bg-slate-800 shadow-[0_0_14px_rgba(34,211,238,.45)] ${avatarSide}`}>{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-3 h-7 w-7 text-cyan-200"/>}</div>
       {showCorrectClaps && <div className="pointer-events-none absolute inset-1 z-30" aria-label="تصفيق للإجابة الصحيحة">{['left-0 top-0','right-0 top-0','left-0 bottom-0','right-0 bottom-0'].map((position, index) => <ClappingHandsAnimation key={`${player.id}-${position}-${roundResult?.question}`} pingPong className={`absolute ${position} h-10 w-10 ${index % 2 ? '-rotate-12' : 'rotate-12'}`} />)}</div>}
       <div className={`${seat % 2 === 0 ? 'pr-[4.25rem]' : 'pl-[4.25rem]'}`}><strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/10 px-2 py-0.5 font-black text-amber-200">{player ? <><span aria-hidden="true">⭐</span><span>{player.score}</span></> : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}</div>
-      {targetedReaction === 'laugh' && <div key={reactionFx?.nonce} className={`gibha-laugh-orbit pointer-events-none absolute z-40 h-14 w-14 ${avatarSide} top-8`} aria-hidden="true"><span>😂</span><span>🤣</span><span>😂</span><span>🤣</span></div>}
+      {(targetedReaction === 'laugh' || targetedReaction === 'think' || targetedReaction === 'angry') && reactionFx && <div key={reactionFx.nonce} className={`pointer-events-none absolute -top-5 z-40 h-36 w-44 overflow-visible ${seat % 2 === 0 ? '-right-8' : '-left-8'}`}><PixelReactionEffect kind={targetedReaction} nonce={reactionFx.nonce} /></div>}
       {showMessage && <div key={playerMessageBubble?.nonce} className={`gibha-message-bubble absolute top-2 z-30 max-w-[calc(100%_-_5.4rem)] rounded-2xl border border-cyan-200/80 bg-cyan-50 px-3 py-2 text-right text-[11px] font-bold leading-5 text-slate-900 shadow-[0_8px_25px_rgba(34,211,238,.35)] after:absolute after:top-7 after:border-y-[7px] after:border-y-transparent ${bubbleSide} ${bubbleTail}`}><span className="mb-0.5 block text-[9px] font-black text-cyan-700">{label}</span><span className="line-clamp-3">{playerMessageBubble?.text}</span></div>}
       {player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className={`absolute bottom-1 z-20 rounded-full bg-black/45 p-1 ${seat % 2 === 0 ? 'right-2' : 'left-2'}`} aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}
     </div>;
@@ -724,7 +722,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="flex gap-1"><button onClick={() => { setChatOpen(true); setUnreadChat(0); }} className="relative rounded-full bg-cyan-500/15 p-2 text-cyan-200"><MessageCircle className="h-4 w-4"/>{unreadChat > 0 && <b className="absolute -left-1 -top-1 rounded-full bg-red-500 px-1 text-[9px]">{unreadChat}</b>}</button><button disabled={audioBusy} onClick={() => void toggleMicrophone()} className={`rounded-full p-2 ${audioEnabled ? 'bg-emerald-500' : 'bg-white/10'}`}>{audioEnabled ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button><button onClick={toggleMusic} className="rounded-full bg-white/10 p-2">{musicMuted ? <Music className="h-4 w-4 text-rose-300"/> : <Music2 className="h-4 w-4 text-amber-200"/>}</button></div>
             <div className={`grid h-11 w-11 place-items-center rounded-full border-2 font-mono text-lg font-black ${!roundResult && turnSeconds <= 5 ? 'animate-pulse border-rose-400 text-rose-300' : 'border-emerald-300 text-emerald-200'}`}>{roundResult ? '••' : String(turnSeconds).padStart(2, '0')}</div>
-            <div className="flex justify-end gap-1">{([{kind:'clap',icon:'👏'},{kind:'laugh',icon:'😂'},{kind:'think',icon:'🤔'},{kind:'angry',icon:'😡'},{kind:'rocket',icon:'🚀'}] as const).map(item => <button key={item.kind} disabled={reactionUsed} onClick={() => sendReaction(item.kind)} aria-label={item.kind === 'clap' ? 'تصفيق' : item.kind} className={`grid h-8 w-8 place-items-center rounded-full p-0 text-sm ${(rocketTargeting && item.kind === 'rocket') || (laughTargeting && item.kind === 'laugh') ? 'bg-rose-500 ring-2 ring-white' : 'bg-white/5'} disabled:opacity-30`}>{item.kind === 'clap' ? <ClappingHandsAnimation key={`clap-button-${clapAnimationKey}`} autoplay={clapAnimationKey > 0} className="h-8 w-8" /> : item.icon}</button>)}</div>
+            <div className="flex justify-end gap-1">{([{kind:'clap',icon:'👏',label:'تصفيق'},{kind:'laugh',icon:'😂',label:'إضحاك لاعب'},{kind:'think',icon:'🤔',label:'إرباك لاعب'},{kind:'angry',icon:'😡',label:'إغضاب لاعب'},{kind:'rocket',icon:'🚀',label:'قصف لاعب'}] as const).map(item => <button key={item.kind} disabled={reactionUsed} onClick={() => sendReaction(item.kind)} aria-label={item.label} className={`grid h-8 w-8 place-items-center rounded-full p-0 text-sm transition-all active:scale-90 ${targetingReaction === item.kind ? 'scale-110 bg-rose-500 ring-2 ring-white shadow-[0_0_16px_rgba(244,63,94,.9)]' : 'bg-white/5 hover:bg-white/15'} disabled:opacity-30`}>{item.kind === 'clap' ? <ClappingHandsAnimation key={`clap-button-${clapAnimationKey}`} autoplay={clapAnimationKey > 0} className="h-8 w-8" /> : item.icon}</button>)}</div>
           </div>
           <div className="h-1.5 shrink-0 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full transition-all duration-1000 ${turnSeconds <= 5 ? 'bg-rose-500' : turnSeconds <= 12 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.max(0, Math.min(100, (turnSeconds / 25) * 100))}%` }}/></div>
           <div className="flex min-h-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-500/40 bg-[#07142d]/90 px-4 py-2 text-center text-base font-black leading-6 sm:text-xl"><ScientificText value={displayedQuestion.question} /></div>
@@ -741,7 +739,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           {gibhaPowerResult?.kind === 'reveal' && <div className="shrink-0 rounded-xl bg-amber-500/15 px-3 py-1 text-center text-xs text-amber-100">{Number.isInteger(gibhaPowerResult.option) ? `آخر اختيار لمنافس: البطاقة ${(gibhaPowerResult.option || 0) + 1}` : 'لا يوجد اختيار سابق للمنافس بعد'}</div>}
           {roundResult && <div className={`shrink-0 rounded-xl border px-3 py-1 text-center text-xs font-black ${roundResult.correct ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200' : 'border-rose-500/50 bg-rose-500/10 text-rose-200'}`}>{roundResult.timedOut ? 'انتهى الوقت ⏱️ — بقيت البطاقة وينتقل الدور' : roundResult.correct ? 'جبتها صح! ✨ البطاقة خرجت من اللوحة' : 'ليست صحيحة — لا نكشف الحل وينتقل الدور'}</div>}
           <div className="grid shrink-0 grid-cols-2 gap-2">{[2, 3].map(index => renderGibhaPlayer(state.players[index], index))}</div>
-        </>}{gibhaFinalResult}</main>{(rocketTargeting || laughTargeting) && <div className="pointer-events-none absolute inset-x-3 top-1/2 z-40 flex items-center justify-center"><span className="rounded-full bg-rose-600/95 px-4 py-2 text-sm font-black shadow-xl"><Crosshair className="ml-1 inline h-4 w-4"/>{rocketTargeting ? 'اختر اللاعب الذي تريد قصفه' : 'اختر اللاعب الذي تريد إضحاكه'}</span></div>}{reactionFx?.path && (reactionFx.kind === 'rocket' || reactionFx.kind === 'laugh') && <div key={reactionFx.nonce} className="pointer-events-none absolute inset-0 z-50" style={{ '--gibha-start-x': `${reactionFx.path.startX}px`, '--gibha-start-y': `${reactionFx.path.startY}px`, '--gibha-end-x': `${reactionFx.path.endX}px`, '--gibha-end-y': `${reactionFx.path.endY}px`, '--gibha-mid-x': `${(reactionFx.path.startX + reactionFx.path.endX) / 2}px`, '--gibha-mid-y': `${Math.min(reactionFx.path.startY, reactionFx.path.endY) - 100}px` } as React.CSSProperties}><span className={reactionFx.kind === 'rocket' ? 'gibha-path-rocket' : 'gibha-path-laugh'}>{reactionFx.kind === 'rocket' ? '🚀' : '😂'}</span>{reactionFx.kind === 'rocket' && <><span className="gibha-path-explosion">💥</span><span className="gibha-explosion-ring"/><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span></>}</div>}{reactionFx && reactionFx.kind !== 'rocket' && !(reactionFx.kind === 'laugh' && reactionFx.targetId) && <div key={reactionFx.nonce} className="gibha-reaction-pop pointer-events-none absolute inset-0 z-50 grid place-items-center text-7xl">{reactionFx.kind === 'clap' ? <ClappingHandsAnimation pingPong className="h-32 w-32" /> : ({laugh:'😂',think:'🤔',angry:'😡'} as Record<string,string>)[reactionFx.kind]}</div>}{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
+        </>}{gibhaFinalResult}</main>{targetingReaction && <div className="pointer-events-none absolute inset-x-3 top-1/2 z-40 flex items-center justify-center"><span className="gibha-target-prompt rounded-full bg-rose-600/95 px-4 py-2 text-sm font-black shadow-xl"><Crosshair className="ml-1 inline h-4 w-4"/>{targetingReaction === 'rocket' ? 'اختر اللاعب الذي تريد قصفه' : targetingReaction === 'laugh' ? 'اختر اللاعب الذي تريد إضحاكه' : targetingReaction === 'think' ? 'اختر اللاعب الذي تريد إرباكه' : 'اختر اللاعب الذي تريد إغضابه'}</span></div>}{reactionFx?.path && (reactionFx.kind === 'rocket' || reactionFx.kind === 'laugh') && <div key={reactionFx.nonce} className="pointer-events-none absolute inset-0 z-50" style={{ '--gibha-start-x': `${reactionFx.path.startX}px`, '--gibha-start-y': `${reactionFx.path.startY}px`, '--gibha-end-x': `${reactionFx.path.endX}px`, '--gibha-end-y': `${reactionFx.path.endY}px`, '--gibha-mid-x': `${(reactionFx.path.startX + reactionFx.path.endX) / 2}px`, '--gibha-mid-y': `${Math.min(reactionFx.path.startY, reactionFx.path.endY) - 100}px` } as React.CSSProperties}><span className={reactionFx.kind === 'rocket' ? 'gibha-path-rocket' : 'gibha-path-laugh'}>{reactionFx.kind === 'rocket' ? '🚀' : '😂'}</span>{reactionFx.kind === 'rocket' && <><span className="gibha-path-explosion">💥</span><span className="gibha-explosion-ring"/><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span><span className="gibha-fire-particle">🔥</span></>}</div>}{reactionFx && reactionFx.kind === 'clap' && <div key={reactionFx.nonce} className="gibha-reaction-pop pointer-events-none absolute inset-0 z-50 grid place-items-center"><ClappingHandsAnimation pingPong className="h-32 w-32" /></div>}{error && <p className="absolute bottom-2 left-2 right-2 z-30 rounded-xl bg-red-500/90 p-2 text-center text-xs text-white">{error}</p>}
     </div>{chatPanel}
   </div>;
 

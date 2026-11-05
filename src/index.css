@@ -290,6 +290,16 @@ a[href]:hover > svg,
 @keyframes gibha-fire-particle { 0% { transform: translate(-50%,-50%) translate(0,0) scale(.45); opacity: 0; } 18% { opacity: 1; } 100% { transform: translate(-50%,-50%) translate(var(--fire-x),var(--fire-y)) scale(1.15) rotate(var(--fire-r)); opacity: 0; } }
 @keyframes gibha-rocket-hit { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-10px) rotate(-2deg); filter: brightness(1.6); } 40%,80% { transform: translateX(10px) rotate(2deg); filter: hue-rotate(-25deg) saturate(2); } }
 .gibha-reaction-pop { animation: gibha-reaction-pop 1.1s ease-out both; }
+.gibha-target-ready { animation: gibha-target-ready .9s ease-in-out infinite alternate; }
+.gibha-target-prompt { animation: gibha-target-prompt .5s cubic-bezier(.2,.85,.25,1) both; }
+.gibha-angry-target { animation: gibha-angry-hit .62s cubic-bezier(.2,.8,.3,1) both; }
+.gibha-think-target { animation: gibha-think-hit 1.25s cubic-bezier(.2,.75,.3,1) both; }
+.gibha-laugh-target { animation: gibha-laugh-hit 1.15s cubic-bezier(.2,.8,.25,1) both; }
+@keyframes gibha-target-ready { from { box-shadow: 0 0 8px rgba(244,63,94,.45); } to { box-shadow: 0 0 26px rgba(244,63,94,.95); transform: translateY(-2px); } }
+@keyframes gibha-target-prompt { 0% { transform: translateY(18px) scale(.85); opacity: 0; } 70% { transform: translateY(-3px) scale(1.04); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes gibha-angry-hit { 0%,100% { transform: translate(0) rotate(0); } 18% { transform: translate(-8px,2px) rotate(-2deg); filter: saturate(1.8) brightness(1.35); } 36% { transform: translate(9px,-2px) rotate(2deg); } 54% { transform: translate(-6px,1px) rotate(-1deg); } 72% { transform: translate(4px) rotate(1deg); } }
+@keyframes gibha-think-hit { 0% { transform: scale(1) rotate(0); filter: none; } 32% { transform: scale(.97) rotate(-1.5deg); filter: hue-rotate(28deg) brightness(1.35); } 62% { transform: scale(1.025) rotate(1.5deg); } 100% { transform: scale(1) rotate(0); filter: none; } }
+@keyframes gibha-laugh-hit { 0%,100% { transform: translateY(0) rotate(0); } 22% { transform: translateY(-7px) rotate(-2deg); } 44% { transform: translateY(2px) rotate(2deg); } 66% { transform: translateY(-5px) rotate(-1deg); } 84% { transform: translateY(1px) rotate(1deg); } }
 .gibha-rocket-target { animation: gibha-rocket-hit .8s 1.48s ease-in-out both; }
 .gibha-path-rocket { position: absolute; animation: gibha-rocket-route 1.6s cubic-bezier(.2,.5,.25,1) both; font-size: 2.8rem; filter: drop-shadow(0 0 12px rgba(251,146,60,.95)); }
 .gibha-path-laugh { position: absolute; animation: gibha-laugh-route 1.45s cubic-bezier(.2,.65,.2,1) both; font-size: 2.6rem; filter: drop-shadow(0 0 10px rgba(250,204,21,.9)); }
