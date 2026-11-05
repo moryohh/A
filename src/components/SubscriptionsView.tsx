@@ -30,7 +30,7 @@ import {
 import { CompetitionSnapshot, EducationalLesson } from '../types';
 import { getSubjectIndex } from '../services/lessonsService';
 import { fetchSolveWithMeTopics } from '../services/solveWithMeCatalog';
-import { fetchLessonGamesData } from '../services/gamesService';
+import { fetchLessonGamesData, fetchMillionaireTeamQuestions } from '../services/gamesService';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 
 const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
@@ -212,9 +212,8 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
     setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
     try {
-      const selectedLesson = challengeGame === 'live_classroom'
-        ? (challengeLessons.find((lesson) => lesson.id === classroomLessonId) || challengeLessons[0])
-        : challengeLessons[Math.floor(Math.random() * challengeLessons.length)];
+      const selectedLesson = challengeLessons.find((lesson) => lesson.id === classroomLessonId)
+        || (challengeGame === 'live_classroom' ? challengeLessons[0] : challengeLessons[Math.floor(Math.random() * challengeLessons.length)]);
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
         onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — غرفة دراسة أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
@@ -226,18 +225,22 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
       let questions: ChallengeQuestion[] = [];
       for (const candidate of shuffledLessons) {
         const candidateContext = { ...context, lessonNumber: candidate.number, lessonId: candidate.id, lessonTitle: candidate.title };
+        if (challengeGame === 'millionaire_team') {
+          const teamQuestions = await fetchMillionaireTeamQuestions(candidateContext, 20);
+          questions = teamQuestions.map((item) => ({ question: item.question, options: [...item.options], correctAnswer: item.correctAnswer }));
+          if (questions.length > 0) { playableLesson = candidate; break; }
+          continue;
+        }
         const bundle = await fetchLessonGamesData(candidateContext);
-        const config: any = challengeGame === 'millionaire' ? bundle.mcqConfig : challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
+        const config: any = challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
         const sourceQuestions = Array.isArray(config?.questions) ? config.questions : [];
-        questions = challengeGame === 'millionaire'
-          ? sourceQuestions.map((item: any) => ({ question: item.question, options: item.options, correctAnswer: item.correctAnswer }))
-          : challengeGame === 'true_false'
+        questions = challengeGame === 'true_false'
             ? sourceQuestions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
             : sourceQuestions.map((item: any) => ({ question: item.question, options: (config?.cards || []).map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
         if (questions.length > 0) { playableLesson = candidate; break; }
       }
       if (questions.length < 1) throw new Error('لا توجد أسئلة لهذه اللعبة في دروس الفصل المحدد.');
-      onCreateChallenge({ questions: questions.slice(0, 11), lessonTitle: playableLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire' ? 'من سيربح المليون' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: playableLesson.number });
+      onCreateChallenge({ questions: questions.slice(0, challengeGame === 'millionaire_team' ? 20 : 11), lessonTitle: playableLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire_team' ? 'من سيربح المليون — لعب فرق' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: playableLesson.number });
       setChallengeMessage('');
     } catch (error) { setChallengeMessage(error instanceof Error ? error.message : 'تعذر تجهيز الغرفة.'); }
     finally { setChallengeBusy(false); }
@@ -348,7 +351,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                 {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
                 {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
                 <option value="true_false">صواب أم خطأ</option>
-                <option value="millionaire">من سيربح المليون</option>
+                <option value="millionaire_team">من سيربح المليون — جماعي 2 ضد 2</option>
                 <option value="gibha_sah">جبتها صح</option>
               </select>
               <ChevronDown className="ml-3 h-4 w-4 shrink-0" style={{ color: theme.colors.secondary }} />
