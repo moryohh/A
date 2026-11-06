@@ -58,6 +58,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
   const [clapAnimationKey, setClapAnimationKey] = useState(0);
   const [targetingReaction, setTargetingReaction] = useState<'rocket' | TargetReactionKind | null>(null);
   const [reactionFx, setReactionFx] = useState<{ kind: string; from: string; targetId?: string | null; nonce: number; path?: ReactionPath } | null>(null);
+  const localReactionUntilRef = useRef(0);
   const gibhaBoardRef = useRef<HTMLDivElement | null>(null);
   const suppressCloseMessageRef = useRef(false);
   const meRef = useRef('');
@@ -364,6 +365,9 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         // Ignore only that sender's echoed copy so React does not replace the
         // live animation before its first frame becomes visible.
         if (payload.from === meRef.current && payload.targetId && payload.kind !== 'rocket') return;
+        // Do not let a simultaneous remote reaction replace the attack the
+        // local player has just launched before its GitHub VFX can finish.
+        if (Date.now() < localReactionUntilRef.current) return;
         const board = gibhaBoardRef.current;
         const avatars: HTMLElement[] = board ? Array.from(board.querySelectorAll<HTMLElement>('[data-gibha-avatar]')) : [];
         const source = avatars.find(avatar => avatar.dataset.gibhaAvatar === payload.from);
@@ -377,14 +381,15 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           endX: targetBounds.left + targetBounds.width / 2 - bounds.left,
           endY: targetBounds.top + targetBounds.height / 2 - bounds.top,
         } : undefined;
-        setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce: Date.now(), path });
+        const nonce = Date.now();
+        setReactionFx({ kind: payload.kind, from: payload.from, targetId: payload.targetId, nonce, path });
         if (payload.kind === 'rocket') {
           gameAudio.playClick(1050);
           // Keep the impact sound aligned with the rocket reaching the target.
           window.setTimeout(() => gameAudio.playGibhaWrong(), 1480);
         }
         else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
-        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.targetId && payload.kind === 'laugh' ? 3400 : payload.targetId && payload.kind === 'angry' ? 5200 : payload.targetId && payload.kind === 'think' ? 3300 : payload.targetId ? 1500 : 1100);
+        window.setTimeout(() => setReactionFx(current => current?.nonce === nonce ? null : current), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.targetId && payload.kind === 'laugh' ? 3400 : payload.targetId && payload.kind === 'angry' ? 5200 : payload.targetId && payload.kind === 'think' ? 3300 : payload.targetId ? 1500 : 1100);
       }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
@@ -504,6 +509,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       // the same reaction back to the socket that sent it.
       setReactionFx({ kind, from: meRef.current, targetId, nonce });
       const visibleFor = kind === 'laugh' ? 3400 : kind === 'angry' ? 5200 : 3300;
+      localReactionUntilRef.current = Date.now() + visibleFor;
       window.setTimeout(() => setReactionFx(current => current?.nonce === nonce ? null : current), visibleFor);
       gameAudio.playClick(kind === 'angry' ? 180 : kind === 'think' ? 760 : 620);
     }
