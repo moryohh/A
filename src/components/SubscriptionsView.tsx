@@ -16,6 +16,7 @@ import {
   DoorOpen,
   Dice5,
   Sparkles,
+  Radio,
   GraduationCap,
   ChevronDown,
 } from 'lucide-react';
@@ -38,7 +39,7 @@ const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').repl
 type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah' | 'live_classroom';
 type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
 type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
-type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; contentMode?: 'board' | 'booklet'; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number; endsAt?: number; activePlayers?: Array<{ name?: string; avatar?: string; level?: number; activity?: string }> };
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; contentMode?: 'board' | 'booklet' | 'meet'; meetingUrl?: string; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number; endsAt?: number; activePlayers?: Array<{ name?: string; avatar?: string; level?: number; activity?: string }> };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
@@ -46,7 +47,7 @@ interface SubscriptionsViewProps {
   competitionSnapshot?: CompetitionSnapshot | null;
   onOpenChallenge?: () => void;
   onJoinChallenge?: (room: ActiveRoom) => void;
-  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; lessonId?: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' }) => void;
+  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; lessonId?: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' | 'meet'; meetingUrl?: string }) => void;
   challengeTargetName?: string;
 }
 
@@ -146,7 +147,8 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [challengeChapter, setChallengeChapter] = useState('');
   const [challengeChapters, setChallengeChapters] = useState<Array<{ number: number; title: string }>>([]);
   const [challengeGame, setChallengeGame] = useState<ChallengeGame | ''>('');
-  const [classroomContentMode, setClassroomContentMode] = useState<'board' | 'booklet'>('board');
+  const [classroomContentMode, setClassroomContentMode] = useState<'board' | 'booklet' | 'meet'>('board');
+  const [liveBroadcastTitle, setLiveBroadcastTitle] = useState('');
   const [classroomLessonId, setClassroomLessonId] = useState('');
   const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
@@ -230,6 +232,13 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     try {
       const selectedLesson = challengeLessons.find((lesson) => lesson.id === classroomLessonId)
         || (challengeGame === 'live_classroom' ? challengeLessons[0] : challengeLessons[Math.floor(Math.random() * challengeLessons.length)]);
+      if (classroomContentMode === 'meet') {
+        const title = liveBroadcastTitle.trim();
+        if (!title) throw new Error('اكتب اسم التحدي أو عنوان البث.');
+        onCreateChallenge({ questions: [], lessonTitle: title, gameType: 'live_classroom', gameTitle: `بث مباشر — ${title}`, subject: selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: 1, contentMode: 'meet' });
+        setChallengeMessage('');
+        return;
+      }
       const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
       if (challengeGame === 'live_classroom') {
         onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — غرفة دراسة أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
@@ -367,10 +376,11 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               <select value={challengeChapter} onChange={(event) => { animateControl('chapter', () => appSfx.chapterSelect()); setChallengeChapter(event.target.value); }} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none disabled:opacity-45" style={{ color: theme.colors.textPrimary }}><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
               <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'chapter' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.accent }} />
             </label>
-            {challengeSubject && challengeSubject !== 'mathematics' && <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'game' ? 'scale-[1.015] ring-2 ring-violet-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+            {challengeSubject && <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'game' ? 'scale-[1.015] ring-2 ring-violet-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
               <Gamepad2 className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'game' ? 'scale-125 -rotate-12' : ''}`} style={{ color: theme.colors.secondary }} />
-              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { animateControl('game', () => appSfx.gameSwitch()); const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
+              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'meet' ? 'live_meet' : classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { animateControl('game', () => appSfx.gameSwitch()); const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_meet') { setChallengeGame('live_classroom'); setClassroomContentMode('meet'); } else if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
                 <option value="">اختر نوع اللعبة / النشاط</option>
+                <option value="live_meet">بث مباشر — Google Meet</option>
                 {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
                 {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
                 <option value="true_false">صواب أم خطأ</option>
@@ -379,7 +389,8 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
               </select>
               <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'game' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.secondary }} />
             </label>}
-            {challengeSubject && challengeChapter && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
+            {challengeSubject && challengeChapter && challengeGame === 'live_classroom' && classroomContentMode === 'meet' && <label className="flex items-center overflow-hidden rounded-2xl border shadow-sm" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><Radio className="mr-3 h-5 w-5 text-rose-500"/><input value={liveBroadcastTitle} onChange={(event) => setLiveBroadcastTitle(event.target.value)} maxLength={80} placeholder="اسم التحدي أو عنوان البث" className="h-14 w-full bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}/></label>}
+            {challengeSubject && challengeChapter && classroomContentMode !== 'meet' && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
               <div className="rounded-2xl border p-2.5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
                 <p className="mb-2 text-center text-[11px] font-black" style={{ color: theme.colors.textSecondary }}>تحديد موضوع</p>
                 <label className={`mb-2 flex items-center overflow-hidden rounded-xl border transition-all duration-300 ${animatedControl === 'lesson' ? 'scale-[1.015] ring-2 ring-cyan-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
@@ -392,10 +403,10 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                 </label>
               </div>
             )}
-            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && !classroomLessonId)} onClick={() => void createRandomChallenge()} className={`group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${animatedControl === 'create' ? 'scale-[1.02] ring-4 ring-white/35 motion-safe:animate-pulse' : ''}`} style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && classroomContentMode !== 'meet' && !classroomLessonId) || (classroomContentMode === 'meet' && !liveBroadcastTitle.trim())} onClick={() => void createRandomChallenge()} className={`group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${animatedControl === 'create' ? 'scale-[1.02] ring-4 ring-white/35 motion-safe:animate-pulse' : ''}`} style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
               <span className={`pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/30 blur-md transition-transform duration-700 ${animatedControl === 'create' ? 'translate-x-[520px]' : 'group-hover:translate-x-[420px]'}`} />
               <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : animatedControl === 'create' ? 'scale-125 rotate-180 transition-transform duration-500' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
-              {challengeBusy ? 'جارٍ تجهيز الدرس…' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'ابدأ غرفة الملزمة الأونلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
+              {challengeBusy ? 'جارٍ تجهيز الدرس…' : classroomContentMode === 'meet' ? 'أنشئ رابط البث المباشر' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'ابدأ غرفة الملزمة الأونلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
             </button>
             {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
           </div>
@@ -425,7 +436,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
                 ? `${Math.max(0, room.players - 1)}/${room.capacity || 8} طالب`
                 : `${room.players}/${room.gameType === 'gibha_sah' || room.gameType === 'millionaire_team' ? 4 : 2} لاعبين`;
               const remainingMinutes = room.endsAt ? Math.max(0, Math.ceil((room.endsAt - Date.now()) / 60000)) : null;
-              const activeLabel = room.contentMode === 'booklet' ? 'الملزمة' : room.gameType === 'live_classroom' ? 'حل معي' : room.gameTitle || room.gameType;
+              const activeLabel = room.contentMode === 'meet' ? '🔴 بث مباشر' : room.contentMode === 'booklet' ? 'الملزمة' : room.gameType === 'live_classroom' ? 'حل معي' : room.gameTitle || room.gameType;
               return <button key={room.code} type="button" disabled={ended || (!classroomJoinable && (status === 'playing' || status === 'reconnecting'))} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' || classroomJoinable ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{classroomJoinable ? 'متاحة للدخول' : statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{activeLabel} · {room.lessonTitle} · {attendance}{remainingMinutes !== null && ` · متبقٍ ${remainingMinutes} د`}</span>{room.activePlayers?.length ? <span className="mt-2 flex items-center gap-1.5" aria-label="الأعضاء النشطون">{room.activePlayers.slice(0, 5).map((player, index) => <span key={`${room.code}-${index}`} className={`flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-1 text-[9px] ${index === 4 ? 'opacity-55' : ''}`}><img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt="" className="h-5 w-5 rounded-full object-cover"/><span className="max-w-20 truncate">{player.name || 'طالب'}</span></span>)}</span> : <span className="mt-2 block text-[10px]" style={{ color: theme.colors.textSecondary }}>لا يوجد نشاط حديث ظاهر بعد.</span>}</button>;
             })}
           </div>

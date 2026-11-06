@@ -116,7 +116,7 @@ export default {
             var directCode = String(Math.floor(1000 + Math.random() * 9000));
             var directRoomId = 'classroom:' + directCode;
             var directRegistration = await directRegistry.fetch(new Request('https://registry/internal/register', {
-              method: 'POST', body: JSON.stringify({ code: directCode, roomId: directRoomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity), contentMode: body.contentMode === 'booklet' ? 'booklet' : 'board', durationMinutes: Number(body.durationMinutes) || 30 }),
+              method: 'POST', body: JSON.stringify({ code: directCode, roomId: directRoomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle || body.gameType, capacity: classroomCapacity(body.capacity), contentMode: body.contentMode === 'meet' ? 'meet' : body.contentMode === 'booklet' ? 'booklet' : 'board', meetingUrl: body.contentMode === 'meet' && /^https:\/\/meet\.google\.com\/[a-z-]+$/i.test(String(body.meetingUrl || '')) ? body.meetingUrl : undefined, durationMinutes: Number(body.durationMinutes) || 30 }),
             }));
             if (directRegistration.status === 409) continue;
             if (!directRegistration.ok) return json({ error: 'room_code_unavailable' }, 503, origin);
@@ -1431,7 +1431,7 @@ export class ChallengeRegistry {
         }
       }
       if (!code) return json({ error: 'no_room_code' }, 503, '');
-      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, contentMode: body.gameType === 'live_classroom' ? (body.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now(), endsAt: body.gameType === 'live_classroom' ? Date.now() + Math.max(5, Math.min(180, Number(body.durationMinutes) || 30)) * 60000 : undefined, activePlayers: [] };
+      rooms[code] = { code: code, roomId: body.roomId, subject: body.subject, chapter: body.chapter, lesson: body.lesson, lessonTitle: body.lessonTitle, gameType: body.gameType, gameTitle: body.gameTitle, capacity: body.gameType === 'live_classroom' ? classroomCapacity(body.capacity) : undefined, contentMode: body.gameType === 'live_classroom' ? (body.contentMode === 'meet' ? 'meet' : body.contentMode === 'booklet' ? 'booklet' : 'board') : undefined, meetingUrl: body.contentMode === 'meet' ? body.meetingUrl : undefined, players: 1, status: body.gameType === 'live_classroom' ? 'playing' : 'waiting', createdAt: Date.now(), endsAt: body.gameType === 'live_classroom' ? Date.now() + Math.max(5, Math.min(180, Number(body.durationMinutes) || 30)) * 60000 : undefined, activePlayers: [] };
       await this.ctx.storage.put('rooms', rooms);
       return json({ code: code }, 201, '');
     }
@@ -1465,7 +1465,7 @@ export class ChallengeRegistry {
         if (now - room.createdAt >= 2 * 60 * 60 * 1000 || (room.status === 'ended' && now - (room.endedAt || now) >= 15000)) delete rooms[key];
       });
       await this.ctx.storage.put('rooms', rooms);
-      var list = Object.values(rooms);
+      var list = Object.values(rooms).filter(function (room) { return !room.endsAt || room.endsAt > now; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
       return json({ rooms: list }, 200, '');
     }
     return json({ error: 'not_found' }, 404, '');

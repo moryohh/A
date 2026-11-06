@@ -45,6 +45,7 @@ import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { OnlineChallengeModal } from './components/OnlineChallengeModal';
 import { LiveClassroomModal } from './components/LiveClassroomModal';
+import { GoogleMeetRoomModal } from './components/GoogleMeetRoomModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
 import { appSfx } from './utils/appSfx';
 import { useSwipeSfx } from './utils/useSwipeSfx';
@@ -1487,7 +1488,7 @@ function AppContent() {
               onOpenChallenge={() => { setChallengeRoomCode(undefined); setChallengeConfig(null); setIsChallengeHubOpen(true); }}
               onJoinChallenge={(room) => {
                 setChallengeRoomCode(room.code);
-                setChallengeConfig({ questions: [], lessonTitle: room.lessonTitle, gameType: room.gameType, gameTitle: room.gameTitle, subject: room.subject, chapterNumber: room.chapter, lessonNumber: room.lesson, contentMode: room.contentMode || (room.gameTitle.includes('الملزمة') ? 'booklet' : 'board') });
+                setChallengeConfig({ questions: [], lessonTitle: room.lessonTitle, gameType: room.gameType, gameTitle: room.gameTitle, subject: room.subject, chapterNumber: room.chapter, lessonNumber: room.lesson, contentMode: room.contentMode || (room.gameTitle.includes('الملزمة') ? 'booklet' : 'board'), meetingUrl: room.meetingUrl });
                 setIsChallengeHubOpen(true);
               }}
               onCreateChallenge={(config) => { setChallengeRoomCode(undefined); setChallengeConfig(config); setIsChallengeHubOpen(true); }}
@@ -1691,7 +1692,19 @@ function AppContent() {
         </React.Suspense>
       </GamesLoadBoundary>
 
-      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && (
+      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && challengeConfig?.contentMode === 'meet' && (
+        <GoogleMeetRoomModal
+          key={`google-meet-${challengeRoomCode || 'create'}`}
+          onClose={() => setIsChallengeHubOpen(false)}
+          title={challengeConfig?.lessonTitle || 'بث مباشر'}
+          subject={challengeConfig?.subject || 'المادة التعليمية'}
+          chapter={challengeConfig?.chapterNumber || 1}
+          initialRoomCode={challengeRoomCode}
+          initialMeetingUrl={challengeConfig?.meetingUrl}
+          onRoomCreated={sendChallengeInvite}
+        />
+      )}
+      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && challengeConfig?.contentMode !== 'meet' && (
         <LiveClassroomModal
           key={`live-classroom-${challengeRoomCode || 'create'}`}
           onClose={() => setIsChallengeHubOpen(false)}

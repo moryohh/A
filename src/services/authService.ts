@@ -162,6 +162,11 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
+        scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
 
