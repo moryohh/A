@@ -360,6 +360,10 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
         }
       }
       if (payload.type === 'reaction') {
+        // Targeted reactions are rendered optimistically by their sender.
+        // Ignore only that sender's echoed copy so React does not replace the
+        // live animation before its first frame becomes visible.
+        if (payload.from === meRef.current && payload.targetId && payload.kind !== 'rocket') return;
         const board = gibhaBoardRef.current;
         const avatars: HTMLElement[] = board ? Array.from(board.querySelectorAll<HTMLElement>('[data-gibha-avatar]')) : [];
         const source = avatars.find(avatar => avatar.dataset.gibhaAvatar === payload.from);
