@@ -3,22 +3,25 @@ import { clearFrame, composite, createFrame, createFx } from 'pixelfx';
 import * as bigExplosion from 'pixelfx/fx/explosions/big-explosion';
 import * as meteorImpact from 'pixelfx/fx/fire/meteor';
 import * as lightningStrike from 'pixelfx/fx/lightning/lightning-strike';
+import * as rocketProjectile from 'pixelfx/fx/projectiles/rocket';
 
-export type TargetReactionKind = 'angry' | 'think' | 'laugh';
+export type TargetReactionKind = 'angry' | 'think' | 'laugh' | 'rocket';
 
 const LABELS: Record<TargetReactionKind, string> = {
   angry: 'نيزك ناري يصيب الهدف',
   think: 'صاعقة برق تضرب الهدف',
   laugh: 'انفجار قنبلة',
+  rocket: 'صاروخ متحرك',
 };
 
 const EFFECTS = {
   angry: { module: meteorImpact, width: 272, height: 232, x: 150, y: 208, duration: 5 },
   think: { module: lightningStrike, width: 240, height: 264, x: 120, y: 228, duration: 3 },
   laugh: { module: bigExplosion, width: 200, height: 140, x: 100, y: 101, duration: 2.2 },
+  rocket: { module: rocketProjectile, width: 288, height: 76, x: 252, y: 42, duration: 1.7 },
 } as const;
 
-export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind; nonce: number }) {
+export function PixelReactionEffect({ kind, nonce, delayMs = 0 }: { kind: TargetReactionKind; nonce: number; delayMs?: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind;
       seed: Math.max(1, nonce % 997),
     });
     let raf = 0;
+    let delayTimer = 0;
     let previous = performance.now();
     let elapsed = 0;
     const duration = reducedMotion ? Math.min(1.2, effect.duration) : effect.duration;
@@ -57,12 +61,20 @@ export function PixelReactionEffect({ kind, nonce }: { kind: TargetReactionKind;
       ctx.putImageData(image, 0, 0);
       if (elapsed < duration) raf = requestAnimationFrame(render);
     };
-    raf = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(raf);
-  }, [kind, nonce]);
+    const start = () => {
+      previous = performance.now();
+      raf = requestAnimationFrame(render);
+    };
+    if (delayMs > 0) delayTimer = window.setTimeout(start, delayMs);
+    else start();
+    return () => {
+      window.clearTimeout(delayTimer);
+      cancelAnimationFrame(raf);
+    };
+  }, [delayMs, kind, nonce]);
 
   return (
-    <div aria-label={LABELS[kind]} data-vfx-source={kind === 'angry' ? 'pixelfx-meteor' : kind === 'think' ? 'pixelfx-lightning-strike' : 'pixelfx-big-explosion'} className={`relative h-full w-full overflow-visible gibha-vfx-${kind}`}>
+    <div aria-label={LABELS[kind]} data-vfx-source={kind === 'angry' ? 'pixelfx-meteor' : kind === 'think' ? 'pixelfx-lightning-strike' : kind === 'rocket' ? 'pixelfx-rocket' : 'pixelfx-big-explosion'} className={`relative h-full w-full overflow-visible gibha-vfx-${kind}`}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full object-contain [image-rendering:pixelated]" />
     </div>
   );

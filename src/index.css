@@ -301,7 +301,8 @@ a[href]:hover > svg,
 @keyframes gibha-think-hit { 0% { transform: scale(1) rotate(0); filter: none; } 32% { transform: scale(.97) rotate(-1.5deg); filter: hue-rotate(28deg) brightness(1.35); } 62% { transform: scale(1.025) rotate(1.5deg); } 100% { transform: scale(1) rotate(0); filter: none; } }
 @keyframes gibha-laugh-hit { 0%,100% { transform: translateY(0) rotate(0); } 22% { transform: translateY(-7px) rotate(-2deg); } 44% { transform: translateY(2px) rotate(2deg); } 66% { transform: translateY(-5px) rotate(-1deg); } 84% { transform: translateY(1px) rotate(1deg); } }
 .gibha-rocket-target { animation: gibha-rocket-hit .8s 1.48s ease-in-out both; }
-.gibha-path-rocket { position: absolute; animation: gibha-rocket-route 1.6s cubic-bezier(.2,.5,.25,1) both; font-size: 2.8rem; filter: drop-shadow(0 0 12px rgba(251,146,60,.95)); }
+.gibha-path-rocket-vfx { position: absolute; width: 9rem; height: 2.4rem; animation: gibha-rocket-route 1.6s cubic-bezier(.2,.5,.25,1) both; filter: drop-shadow(0 0 12px rgba(251,146,60,.95)); }
+.gibha-path-bomb-vfx { position: absolute; left: var(--gibha-end-x); top: var(--gibha-end-y); width: 12rem; height: 9rem; transform: translate(-50%,-65%); }
 .gibha-path-laugh { position: absolute; animation: gibha-laugh-route 1.45s cubic-bezier(.2,.65,.2,1) both; font-size: 2.6rem; filter: drop-shadow(0 0 10px rgba(250,204,21,.9)); }
 .gibha-path-explosion { position: absolute; left: var(--gibha-end-x); top: var(--gibha-end-y); animation: gibha-route-explosion .85s 1.48s ease-out both; font-size: 3.2rem; opacity: 0; }
 .gibha-explosion-ring { position: absolute; left: var(--gibha-end-x); top: var(--gibha-end-y); width: 3.4rem; height: 3.4rem; border: 7px solid #fb923c; border-radius: 9999px; box-shadow: 0 0 24px #f97316, inset 0 0 18px #fde047; animation: gibha-explosion-ring .72s 1.5s ease-out both; opacity: 0; }
