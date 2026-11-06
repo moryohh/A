@@ -40,6 +40,7 @@ import { CommunityProfileModal } from './components/CommunityProfileModal';
 import { CommunityAccountActionsModal } from './components/CommunityAccountActionsModal';
 import { MainHomeView } from './components/MainHomeView';
 import { SubjectBookTransition } from './components/SubjectBookTransition';
+import type { SubjectCardOrigin } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { OnlineChallengeModal } from './components/OnlineChallengeModal';
@@ -197,7 +198,8 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [homeSubView, setHomeSubView] = useState<'main_home' | 'learning_path' | 'lesson_player'>('main_home');
   const [selectedSubject, setSelectedSubject] = useState<(typeof GRADE_6_SUBJECTS)[0] | null>(GRADE_6_SUBJECTS[0]);
-  const [bookTransition, setBookTransition] = useState<{ subject: (typeof GRADE_6_SUBJECTS)[0]; direction: 'open' | 'close' } | null>(null);
+  const [bookTransition, setBookTransition] = useState<{ subject: (typeof GRADE_6_SUBJECTS)[0]; direction: 'open' | 'close'; origin: SubjectCardOrigin } | null>(null);
+  const subjectCardOriginRef = React.useRef<SubjectCardOrigin | null>(null);
   const [stories, setStories] = useState<TeacherStory[]>(INITIAL_STORIES);
   const [lesson, setLesson] = useState<EducationalLesson>(FEATURED_LESSON);
   const [notifications, setNotifications] = useState<AppNotification[]>(loadStoredNotifications);
@@ -626,21 +628,29 @@ function AppContent() {
     }
   }, [lesson]);
 
-  const handleSelectSubject = (subject: (typeof GRADE_6_SUBJECTS)[0]) => {
+  const handleSelectSubject = (subject: (typeof GRADE_6_SUBJECTS)[0], origin: SubjectCardOrigin) => {
     if (bookTransition) return;
-    setBookTransition({ subject, direction: 'open' });
+    subjectCardOriginRef.current = origin;
+    setBookTransition({ subject, direction: 'open', origin });
     appSfx.bookOpen();
   };
 
   const closeSubjectBook = () => {
     if (!selectedSubject || bookTransition) return;
-    setBookTransition({ subject: selectedSubject, direction: 'close' });
+    const origin = subjectCardOriginRef.current || {
+      top: window.innerHeight * .32,
+      left: window.innerWidth * .08,
+      width: window.innerWidth * .4,
+      height: 176,
+      scrollY: 0,
+    };
+    setBookTransition({ subject: selectedSubject, direction: 'close', origin });
     appSfx.bookClose();
   };
 
   React.useEffect(() => {
     if (!bookTransition) return;
-    const { subject, direction } = bookTransition;
+    const { subject, direction, origin } = bookTransition;
     const navigationTimer = window.setTimeout(() => {
       if (direction === 'open') {
         setSelectedSubject(subject);
@@ -655,9 +665,10 @@ function AppContent() {
         setHomeSubView('learning_path');
       } else {
         setHomeSubView('main_home');
+        window.requestAnimationFrame(() => window.scrollTo({ top: origin.scrollY, left: 0, behavior: 'auto' }));
       }
-    }, direction === 'open' ? 720 : 640);
-    const cleanupTimer = window.setTimeout(() => setBookTransition(null), direction === 'open' ? 930 : 820);
+    }, direction === 'open' ? 390 : 860);
+    const cleanupTimer = window.setTimeout(() => setBookTransition(null), direction === 'open' ? 1120 : 1110);
     return () => {
       window.clearTimeout(navigationTimer);
       window.clearTimeout(cleanupTimer);
@@ -1432,7 +1443,7 @@ function AppContent() {
             />
           )}
 
-          {bookTransition && <SubjectBookTransition subject={bookTransition.subject} direction={bookTransition.direction} />}
+          {bookTransition && <SubjectBookTransition subject={bookTransition.subject} direction={bookTransition.direction} origin={bookTransition.origin} />}
 
           {/* 3. Lesson Player View */}
           {activeTab === 'home' && homeSubView === 'lesson_player' && (

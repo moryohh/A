@@ -5,8 +5,16 @@ import { SubjectNeonIcon } from './SubjectNeonIcon';
 import { getSubjectIndex } from '../services/lessonsService';
 import { useAppTheme } from '../services/themeService';
 
+export interface SubjectCardOrigin {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  scrollY: number;
+}
+
 interface MainHomeViewProps {
-  onSelectSubject: (subject: (typeof GRADE_6_SUBJECTS)[0]) => void;
+  onSelectSubject: (subject: (typeof GRADE_6_SUBJECTS)[0], origin: SubjectCardOrigin) => void;
   onSelectLesson?: (lesson: EducationalLesson) => void;
   onOpenGames?: () => void;
 }
@@ -41,7 +49,17 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
           return (
             <button
               key={subject.id}
-              onClick={() => onSelectSubject(subject)}
+              data-subject-card={subject.id}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                onSelectSubject(subject, {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                  scrollY: window.scrollY,
+                });
+              }}
               className="relative flex min-h-[168px] cursor-pointer flex-col items-center justify-between rounded-2xl border p-3.5 pb-3 pt-4 text-center shadow-lg backdrop-blur-xl transition-all duration-200 active:scale-[0.96] hover:scale-[1.02] sm:min-h-[185px] group"
               style={{
                 background: `linear-gradient(155deg, color-mix(in srgb, ${theme.colors.bgCard} 92%, ${subject.color}), color-mix(in srgb, ${theme.colors.bgCardSubtle} 96%, ${subject.color}))`,
