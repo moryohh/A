@@ -39,6 +39,7 @@ import { MessengerModal } from './components/MessengerModal';
 import { CommunityProfileModal } from './components/CommunityProfileModal';
 import { CommunityAccountActionsModal } from './components/CommunityAccountActionsModal';
 import { MainHomeView } from './components/MainHomeView';
+import { SubjectBookTransition } from './components/SubjectBookTransition';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
 import { OnlineChallengeModal } from './components/OnlineChallengeModal';
@@ -196,6 +197,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [homeSubView, setHomeSubView] = useState<'main_home' | 'learning_path' | 'lesson_player'>('main_home');
   const [selectedSubject, setSelectedSubject] = useState<(typeof GRADE_6_SUBJECTS)[0] | null>(GRADE_6_SUBJECTS[0]);
+  const [bookTransition, setBookTransition] = useState<{ subject: (typeof GRADE_6_SUBJECTS)[0]; direction: 'open' | 'close' } | null>(null);
   const [stories, setStories] = useState<TeacherStory[]>(INITIAL_STORIES);
   const [lesson, setLesson] = useState<EducationalLesson>(FEATURED_LESSON);
   const [notifications, setNotifications] = useState<AppNotification[]>(loadStoredNotifications);
@@ -625,17 +627,42 @@ function AppContent() {
   }, [lesson]);
 
   const handleSelectSubject = (subject: (typeof GRADE_6_SUBJECTS)[0]) => {
-    setSelectedSubject(subject);
-    setStories([]);
-    setOpenLessonContext(null);
-    const existingPos = savedPositions[subject.id] || {
-      subjectId: subject.id,
-      chapterNumber: 1,
-      lessonNumber: 1,
-    };
-    setLearningPosition(existingPos);
-    setHomeSubView('learning_path');
+    if (bookTransition) return;
+    setBookTransition({ subject, direction: 'open' });
+    appSfx.bookOpen();
   };
+
+  const closeSubjectBook = () => {
+    if (!selectedSubject || bookTransition) return;
+    setBookTransition({ subject: selectedSubject, direction: 'close' });
+    appSfx.bookClose();
+  };
+
+  React.useEffect(() => {
+    if (!bookTransition) return;
+    const { subject, direction } = bookTransition;
+    const navigationTimer = window.setTimeout(() => {
+      if (direction === 'open') {
+        setSelectedSubject(subject);
+        setStories([]);
+        setOpenLessonContext(null);
+        const existingPos = savedPositions[subject.id] || {
+          subjectId: subject.id,
+          chapterNumber: 1,
+          lessonNumber: 1,
+        };
+        setLearningPosition(existingPos);
+        setHomeSubView('learning_path');
+      } else {
+        setHomeSubView('main_home');
+      }
+    }, direction === 'open' ? 720 : 640);
+    const cleanupTimer = window.setTimeout(() => setBookTransition(null), direction === 'open' ? 930 : 820);
+    return () => {
+      window.clearTimeout(navigationTimer);
+      window.clearTimeout(cleanupTimer);
+    };
+  }, [bookTransition, savedPositions]);
 
   // Always open a subject from the top so the global header is visible immediately.
   React.useEffect(() => {
@@ -1335,7 +1362,7 @@ function AppContent() {
               if (homeSubView === 'lesson_player') {
                 setHomeSubView(selectedSubject ? 'learning_path' : 'main_home');
               } else if (homeSubView === 'learning_path') {
-                setHomeSubView('main_home');
+                closeSubjectBook();
               }
             } else {
               setActiveTab('home');
@@ -1368,7 +1395,7 @@ function AppContent() {
           {/* 2. Intermediate Subject Learning Path (خارطة المادة والتقدم) */}
           {activeTab === 'home' && homeSubView === 'learning_path' && selectedSubject && (
             selectedSubject.id === 'mathematics' ? <MathematicsCoursesView
-              onBack={() => setHomeSubView('main_home')}
+              onBack={closeSubjectBook}
               onOpenGames={(mathTopic) => {
                 setLesson((current) => ({
                   ...current,
@@ -1398,12 +1425,14 @@ function AppContent() {
               user={currentUser}
               onSelectLesson={handleSelectLessonWithContext}
               onBack={() => {
-                setHomeSubView('main_home');
+                closeSubjectBook();
               }}
               onOpenGames={openGames}
               onScoreUpdate={handleScoreUpdate}
             />
           )}
+
+          {bookTransition && <SubjectBookTransition subject={bookTransition.subject} direction={bookTransition.direction} />}
 
           {/* 3. Lesson Player View */}
           {activeTab === 'home' && homeSubView === 'lesson_player' && (

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { EducationalLesson } from '../types';
 import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
 import { SubjectNeonIcon } from './SubjectNeonIcon';
-import { appSfx } from '../utils/appSfx';
 import { getSubjectIndex } from '../services/lessonsService';
 import { useAppTheme } from '../services/themeService';
 
@@ -42,7 +41,7 @@ export const MainHomeView: React.FC<MainHomeViewProps> = ({
           return (
             <button
               key={subject.id}
-              onClick={() => { appSfx.subjectSelect(); onSelectSubject(subject); }}
+              onClick={() => onSelectSubject(subject)}
               className="relative flex min-h-[168px] cursor-pointer flex-col items-center justify-between rounded-2xl border p-3.5 pb-3 pt-4 text-center shadow-lg backdrop-blur-xl transition-all duration-200 active:scale-[0.96] hover:scale-[1.02] sm:min-h-[185px] group"
               style={{
                 background: `linear-gradient(155deg, color-mix(in srgb, ${theme.colors.bgCard} 92%, ${subject.color}), color-mix(in srgb, ${theme.colors.bgCardSubtle} 96%, ${subject.color}))`,

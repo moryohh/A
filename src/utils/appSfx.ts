@@ -19,7 +19,9 @@ type AppSfxName =
   | 'next'
   | 'previous'
   | 'gameSelect'
-  | 'gameSwitch';
+  | 'gameSwitch'
+  | 'bookOpen'
+  | 'bookClose';
 
 const KENNEY = `${import.meta.env.BASE_URL}audio/kenney-ui`;
 
@@ -46,6 +48,8 @@ const SOURCES: Record<AppSfxName, string> = {
   // Interactive-game entry cues stay on the previously approved assets.
   gameSelect: `${import.meta.env.BASE_URL}audio/ui/success.mp3`,
   gameSwitch: `${import.meta.env.BASE_URL}audio/ui/toggle.mp3`,
+  bookOpen: `${import.meta.env.BASE_URL}audio/subject-book-open.mp3`,
+  bookClose: `${import.meta.env.BASE_URL}audio/subject-book-close.mp3`,
 };
 
 const VOLUMES: Record<AppSfxName, number> = {
@@ -70,6 +74,8 @@ const VOLUMES: Record<AppSfxName, number> = {
   previous: 0.25,
   gameSelect: 0.17,
   gameSwitch: 0.12,
+  bookOpen: 0.48,
+  bookClose: 0.44,
 };
 
 class AppSfxEngine {
@@ -118,6 +124,8 @@ class AppSfxEngine {
   cardFlip() { this.play('cardFlip', 160); }
   next() { this.play('next', 120); }
   previous() { this.play('previous', 120); }
+  bookOpen() { this.play('bookOpen', 700); }
+  bookClose() { this.play('bookClose', 700); }
 }
 
 export const appSfx = new AppSfxEngine();
