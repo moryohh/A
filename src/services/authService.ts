@@ -162,6 +162,31 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return {};
+  } catch (err: any) {
+    return { error: err.message || 'حدث خطأ أثناء الاتصال بمزود Google' };
+  }
+}
+
+/** Request Calendar only when the teacher explicitly creates a Meet room. */
+export async function authorizeGoogleCalendar(): Promise<{ error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { error: 'خدمة Supabase غير مهيأة حالياً. يرجى التحقق من المتغيرات البيئية.' };
+  }
+
+  try {
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
         scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events',
         queryParams: {
           access_type: 'offline',

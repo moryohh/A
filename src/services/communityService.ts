@@ -9,7 +9,7 @@ const LOCAL_STORAGE_LIKES_KEY = 'nahn_maak_user_liked_posts_v2';
 
 const COMMUNITY_API_BASE_URL = (
   import.meta.env.VITE_COMMUNITY_API_URL ||
-  'https://community-k8dy.onrender.com/api/v1/community'
+  '/api/community'
 ).replace(/\/+$/, '');
 
 async function communityRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

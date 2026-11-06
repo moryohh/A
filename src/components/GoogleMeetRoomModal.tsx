@@ -3,7 +3,7 @@ import { ArrowRight, Check, Clipboard, ExternalLink, Radio, Share2, Video } from
 import { getSupabaseClient } from '../lib/supabase';
 import { loadGuestSession } from '../services/guestPreviewService';
 import { createGoogleMeet } from '../services/googleMeetService';
-import { signInWithGoogle } from '../services/authService';
+import { authorizeGoogleCalendar } from '../services/authService';
 import { appSfx } from '../utils/appSfx';
 
 const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
@@ -85,7 +85,7 @@ export const GoogleMeetRoomModal: React.FC<Props> = ({ onClose, title, subject, 
         <div className="mt-3 text-center"><div className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-3 py-1 text-[10px] font-black text-rose-300"><Radio className="h-3 w-3 animate-pulse" /> بث مباشر لمدة ساعة</div><h1 className="mt-3 text-xl font-black">{title}</h1><p className="mt-1 text-xs font-bold text-cyan-200">{subject} — الفصل {chapter}</p></div>
 
         {busy && <div className="my-8 text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/25 border-t-cyan-300"/><p className="mt-3 text-sm font-bold text-slate-300">جارٍ إنشاء رابط Google Meet…</p></div>}
-        {error && <div className="my-5 rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-center"><p className="text-sm font-bold leading-7 text-amber-100">{error}</p><button onClick={() => void signInWithGoogle()} className="mt-3 rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-900">ربط حساب Google ومنح الصلاحية</button></div>}
+        {error && <div className="my-5 rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-center"><p className="text-sm font-bold leading-7 text-amber-100">{error}</p><button onClick={() => void authorizeGoogleCalendar()} className="mt-3 rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-900">ربط Google Meet ومنح صلاحية التقويم</button></div>}
         {meetingUrl && <>
           <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-white/5 p-3"><p className="mb-2 text-[10px] font-bold text-slate-400">رابط الاجتماع {roomCode && `· الغرفة #${roomCode}`}</p><div className="flex items-center gap-2"><div className="min-w-0 flex-1 truncate rounded-xl bg-slate-950/70 px-3 py-3 text-left text-xs text-cyan-200" dir="ltr">{meetingUrl}</div><button onClick={copy} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-500/15 text-cyan-200" aria-label="نسخ الرابط">{copied ? <Check className="h-5 w-5"/> : <Clipboard className="h-5 w-5"/>}</button></div></div>
           <button onClick={join} className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-600 px-5 py-5 text-lg font-black shadow-[0_14px_35px_rgba(37,99,235,.38)] transition active:scale-95"><ExternalLink className="h-7 w-7"/>انضم إلى البث الآن</button>
