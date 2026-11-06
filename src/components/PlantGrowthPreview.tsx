@@ -1,6 +1,8 @@
 import React, { useId, useMemo, useState } from 'react';
 import { FlaskConical, Sparkles, X } from 'lucide-react';
 import { gameAudio } from '../utils/gameAudio';
+import { appSfx } from '../utils/appSfx';
+import { PlantStageVideo } from './PlantStageVideo';
 
 const growthStages = [
   { points: 0, label: 'بذرة', color: '#9a5b22' },
@@ -310,7 +312,7 @@ export const PlantGrowthPreview: React.FC = () => {
     <>
       <button
         type="button"
-        onClick={() => { gameAudio.playClick(); setIsOpen(true); }}
+        onClick={() => { appSfx.panelOpen(); setIsOpen(true); }}
         className="fixed bottom-24 left-4 z-[65] flex h-14 w-14 items-center justify-center rounded-full border border-emerald-300/50 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-2xl shadow-emerald-900/30 transition-transform active:scale-95"
         aria-label="فتح مختبر النمو والدروع"
         title="مختبر النمو والدروع"
@@ -328,7 +330,7 @@ export const PlantGrowthPreview: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => { appSfx.panelClose(); setIsOpen(false); }}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm transition-colors active:bg-slate-100"
                 aria-label="إغلاق المعاينة"
               >
@@ -360,7 +362,9 @@ export const PlantGrowthPreview: React.FC = () => {
               </div>
             </section>
 
-            <FantasyTree cyclePoints={cyclePoints} burst={burst} />
+            <div className="h-[19rem] overflow-hidden rounded-[2rem]">
+              <PlantStageVideo stage={Math.min(12, stageIndex + 1)} sound />
+            </div>
 
             <div className="mt-4 rounded-3xl border border-emerald-100 bg-white/80 p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
@@ -422,7 +426,9 @@ export const PlantGrowthPreview: React.FC = () => {
                       ['--tw-ring-color' as string]: item.color,
                     }}
                   >
-                    <FantasyTree cyclePoints={item.points} burst={false} compact />
+                    <div className="flex h-24 items-end justify-center overflow-hidden rounded-2xl bg-sky-50">
+                      <PlantStageVideo stage={Math.min(12, getStageIndex(item.points) + 1)} compact />
+                    </div>
                     <div className="mt-1 flex items-center justify-between gap-1 px-1">
                       <span className="text-[10px] font-black text-slate-900">{item.points}</span>
                       <span className="truncate text-[9px] font-bold" style={{ color: item.color }}>{item.label}</span>

@@ -150,7 +150,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
   const fruitCount = stageIndex >= 10 ? 10 : stageIndex >= 9 ? 4 : 0;
 
   return (
-    <div className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
+    <div className="relative isolate flex h-32 w-32 shrink-0 items-center justify-center rounded-full p-1 shadow-lg" style={{ background: `conic-gradient(${stage.tone} ${progress}%, rgba(148,163,184,.22) ${progress}% 100%)` }}>
       <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white/75 p-2">
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100 shadow-inner" style={{ borderColor: `${stage.tone}55` }}>
       <style>{`
@@ -264,7 +264,7 @@ const GrowthTree: React.FC<{ points: number; animate: boolean; progress: number;
       </svg>
       </div>
       </div>
-      <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
+      <span className="absolute -bottom-1 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center whitespace-nowrap rounded-full border border-sky-100 bg-white/95 px-3 py-1 text-xs font-black text-sky-700 shadow-md"><span>المستوى {level}</span><span className="text-[10px] font-bold">{progress}%</span></span>
     </div>
   );
 };
@@ -322,10 +322,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isCollectingPoints, setIsCollectingPoints] = useState(false);
   const [lastCollectedPoints, setLastCollectedPoints] = useState<number | null>(null);
   const profileThemeOptions: { id: AppThemeId; label: string; colors: string[] }[] = [
-    { id: 'solar_light', label: 'شمسي', colors: ['#FFFFFF', '#0284C7'] },
+    { id: 'solar_light', label: 'أزرق نعناعي', colors: ['#FFFFFF', '#087FE5', '#43D5A0'] },
     { id: 'golden_navy', label: 'ذهبي', colors: ['#FFFDF5', '#D97706'] },
-    { id: 'amber_work', label: 'كهربائي مزرق', colors: ['#FACC15', '#2563EB', '#0F172A'] },
-    { id: 'sky_cyan', label: 'سماوي', colors: ['#F0FAFF', '#0891B2'] },
+    { id: 'amber_work', label: 'كهربائي مرجاني', colors: ['#F0AAA6', '#63C8BD', '#142629'] },
+    { id: 'sky_cyan', label: 'سماوي', colors: ['#DDF3FF', '#087FE5', '#61C8BC'] },
     { id: 'emerald_nature', label: 'زمردي', colors: ['#F0FDF4', '#059669'] },
     { id: 'night', label: 'ليلي أسود وأخضر', colors: ['#020403', '#22C55E', '#06100A'] },
   ];

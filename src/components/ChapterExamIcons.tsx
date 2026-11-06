@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Award, Camera, ChevronLeft, DoorOpen, ImageIcon, Loader2, X } from 'lucide-react';
+import { Award, CalendarDays, Camera, CheckCircle2, ChevronLeft, DoorOpen, FileText, GraduationCap, ImageIcon, Loader2, Sparkles, X } from 'lucide-react';
 import { CurriculumExamIndexRecord, CurriculumExamRecord, fetchChapterExamBank, fetchExamById } from '../services/examBankService';
 import { supabase } from '../lib/supabase';
 import { getMinistryExamReward, getMonthlyExamReward } from '../services/pointsService';
+import { releaseFailedExamAttempt, reserveExamAttempt } from '../services/examQuotaService';
 import { NotificationExamResult } from '../types';
+import { ExamResultDetailsModal } from './ExamResultDetailsModal';
 import { gameAudio } from '../utils/gameAudio';
 
 interface ChapterExamIconsProps {
@@ -12,6 +14,7 @@ interface ChapterExamIconsProps {
   chapterNumber: number;
   className?: string;
   onScoreUpdate?: (points: number) => void;
+  openPickerRequest?: number;
 }
 
 type QuestionEntry = { title: string; text: string; answer?: string };
@@ -49,7 +52,7 @@ type ChapterExamNotificationDetail = {
 
 const ANSWER_KEY_PATTERN = /answer|model_answer|solution|جواب|اجابة|إجابة|حل/i;
 const QUESTION_KEY_PATTERN = /question|prompt|content|body|^q\d*$|^س\d*$/i;
-const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|date|year|round|dawr|chapter|subject/i;
+const IGNORED_KEY_PATTERN = /raw_text|raw|json|metadata|lesson_ids|question_type|type|exam_type|source|id|title|section|instructions|marks?|date|year|round|dawr|chapter|subject/i;
 const CHAPTER_EXAM_CORRECTION_ENDPOINTS = [
   'https://hhh-two-black.vercel.app/api/ocr',
   'https://hhh-main-wheat.vercel.app/api/ocr',
@@ -63,7 +66,25 @@ function isAnswerKey(key: string) {
 
 function titleFromKey(key: string) {
   const clean = key.replace(/[_-]+/g, ' ').trim();
+  const questionMatch = clean.match(/^question\s*(\d+)$/i);
+  if (questionMatch) return `س${questionMatch[1]}`;
+  const branchMatch = clean.match(/^branch\s*(.*)$/i);
+  if (branchMatch) return `الفرع ${branchMatch[1] || ''}`.trim();
+  const partMatch = clean.match(/^part\s*(.*)$/i);
+  if (partMatch) return `الفرع ${partMatch[1] || ''}`.trim();
   return clean || 'سؤال';
+}
+
+function displayPartTitle(value: string, fallback: string) {
+  const raw = titleFromKey(value || fallback).replace(/^س[٠-٩0-9]+$/, 'المطلوب');
+  const marker = raw.replace(/^الفرع\s*/i, '').trim();
+  const arabicMarkers: Record<string, string> = {
+    a: 'أ',
+    b: 'ب',
+    c: 'ج',
+    d: 'د',
+  };
+  return arabicMarkers[marker.toLowerCase()] || marker || 'المطلوب';
 }
 
 function questionTitleFromKey(key: string, index: number) {
@@ -77,6 +98,37 @@ function parseJsonString(value: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
+    // Some imported text files contain one valid JSON value followed by source
+    // notes. Recover only the first balanced JSON object/array.
+    const opening = text[0];
+    const closing = opening === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === opening) depth += 1;
+      else if (char === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            return JSON.parse(text.slice(0, index + 1));
+          } catch {
+            return value;
+          }
+        }
+      }
+    }
     return value;
   }
 }
@@ -85,12 +137,20 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function firstText(obj: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const text = cleanText(obj[key]);
+    if (text) return text;
+  }
+  return '';
+}
+
 function formatQuestionItem(item: unknown, index: number) {
   if (typeof item === 'string') return `${index + 1}. ${item.trim()}`;
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.label) || cleanText(obj.number) || cleanText(obj.id) || `${index + 1}`;
-  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'title', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
@@ -99,18 +159,54 @@ function formatQuestionPoint(item: unknown, index: number) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
   const obj = item as Record<string, unknown>;
   const label = cleanText(obj.point_number) || cleanText(obj.label) || cleanText(obj.number) || `${index + 1}`;
-  const question = cleanText(obj.question) || cleanText(obj.text) || cleanText(obj.prompt) || cleanText(obj.content) || cleanText(obj.body);
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'text', 'prompt', 'content', 'body', 'instruction']);
   return question ? `${label}. ${question}` : '';
 }
 
 function readBranch(value: unknown, fallbackTitle: string): QuestionEntry | null {
+  if (typeof value === 'string') {
+    const parsed = parseJsonString(value);
+    if (parsed !== value) return readBranch(parsed, fallbackTitle);
+    const branchText = value.trim();
+    return branchText.length >= 4
+      ? { title: displayPartTitle('', fallbackTitle), text: branchText }
+      : null;
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return readQuestion(value, fallbackTitle);
   const obj = value as Record<string, unknown>;
-  const points = Array.isArray(obj.points) ? obj.points.map(formatQuestionPoint).filter(Boolean) : [];
-  const title = cleanText(obj.branch_label) || cleanText(obj.title) || titleFromKey(fallbackTitle);
-  const heading = cleanText(obj.title);
+  const rawPoints = Array.isArray(obj.points) ? obj.points : [];
+  const points = rawPoints.map(formatQuestionPoint).filter(Boolean);
+  const title = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label', 'title']), fallbackTitle);
+  const heading = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'text', 'prompt', 'content', 'body', 'instruction', 'title']);
+  // Some imported exams store the model answer as a plain string list in
+  // `points`. It must feed correction, never appear inside the student's prompt.
+  const plainTextPoints = rawPoints.length > 0 && rawPoints.every((point) => typeof point === 'string');
+  const pointsArePrompts = plainTextPoints && (
+    rawPoints.some((point) => /^\s*[٠-٩0-9]+[.)-]/.test(String(point)))
+    || /(?:استخرج|علل|صوّب|صوب|أنشئ|اختر|مثّل|مثل|أعرب|حوّل|حول|النصوص الآتية|العبارات الآتية|ما يأتي)/i.test(heading)
+  );
+  if (pointsArePrompts) {
+    return { title, text: [heading, ...rawPoints.map(formatQuestionPoint)].filter(Boolean).join('\n\n') };
+  }
+  if (plainTextPoints) {
+    return {
+      title,
+      text: heading,
+      answer: rawPoints.map((point, index) => `${index + 1}. ${String(point).trim()}`).join('\n'),
+    };
+  }
   if (points.length > 0) return { title, text: [heading, ...points].filter(Boolean).join('\n\n') };
   return readQuestion(value, fallbackTitle);
+}
+
+function examDisplayName(title: string, examKind: 'monthly' | 'ministry') {
+  const normalized = title.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  const numericMatches = [...normalized.matchAll(/([0-9]+)/g)];
+  const match = normalized.match(/set[_\s-]*([0-9]+)/i)
+    || normalized.match(/(?:نموذج|امتحان)[^0-9]*([0-9]+)/i)
+    || numericMatches[numericMatches.length - 1];
+  const kindLabel = examKind === 'monthly' ? 'الامتحان الشهري' : 'الامتحان الوزاري';
+  return match ? `${kindLabel} ${match[1]}` : kindLabel;
 }
 
 function readPartCollection(value: unknown): QuestionEntry[] {
@@ -136,17 +232,23 @@ function readQuestion(value: unknown, title = ''): QuestionEntry | null {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  const question = obj.question || obj.text || obj.prompt || obj.content || obj.body;
+  const question = firstText(obj, ['question', 'question_text', 'question_body', 'question_part', 'instructions', 'text', 'prompt', 'content', 'body', 'instruction', 'heading']);
   const itemValues = Array.isArray(obj.items)
     ? obj.items
     : obj.items && typeof obj.items === 'object'
       ? Object.values(obj.items as Record<string, unknown>)
       : [];
   const items = itemValues.map(formatQuestionItem).filter(Boolean);
-  const answer = obj.answer || obj.model_answer;
-  if (typeof question !== 'string' || !question.trim()) return null;
-  const text = [question.trim(), ...items].join('\n\n');
-  const entryTitle = cleanText(obj.question_number) || cleanText(obj.label) || titleFromKey(title);
+  const itemAnswers = itemValues.flatMap((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const itemObj = item as Record<string, unknown>;
+    const itemAnswer = firstText(itemObj, ['answer', 'model_answer', 'solution', 'correct_answer']);
+    return itemAnswer ? [`${index + 1}. ${itemAnswer}`] : [];
+  });
+  const answer = obj.answer || obj.model_answer || (itemAnswers.length > 0 ? itemAnswers.join('\n') : undefined);
+  if (!question && items.length === 0) return null;
+  const text = [question, ...items].join('\n\n');
+  const entryTitle = displayPartTitle(firstText(obj, ['branch_label', 'branch', 'part', 'label']), title);
   return { title: entryTitle, text, answer: typeof answer === 'string' ? answer : undefined };
 }
 
@@ -157,12 +259,19 @@ function readQuestionParts(value: unknown, fallbackTitle: string): QuestionEntry
   if (branches.length > 0) return branches;
   const nestedParts = readPartCollection(obj.parts);
   if (nestedParts.length > 0) return nestedParts;
-  const nestedItems = readPartCollection(obj.items);
-  if (nestedItems.length > 0) return nestedItems;
+  const nestedSubQuestions = readPartCollection(obj.sub_questions);
+  if (nestedSubQuestions.length > 0) return nestedSubQuestions;
+  const nestedQuestions = readPartCollection(obj.questions);
+  if (nestedQuestions.length > 0) return nestedQuestions;
   const entry = readQuestion(value, fallbackTitle);
   if (entry) return [entry];
   const keyedBranches = Object.entries(obj)
-    .filter(([key, branchValue]) => !IGNORED_KEY_PATTERN.test(key) && !isAnswerKey(key) && branchValue && typeof branchValue === 'object')
+    .filter(([key, branchValue]) =>
+      !IGNORED_KEY_PATTERN.test(key)
+      && !isAnswerKey(key)
+      && Boolean(branchValue)
+      && (typeof branchValue === 'object' || typeof branchValue === 'string')
+    )
     .map(([key, branchValue]) => readBranch(branchValue, key))
     .filter(Boolean) as QuestionEntry[];
   if (keyedBranches.length > 0) return keyedBranches;
@@ -175,6 +284,17 @@ function questionNumber(title: string) {
 }
 
 function groupResettingQuestionSeries(entries: ExamQuestion[]): ExamQuestion[] {
+  const groupedByNumber: ExamQuestion[] = [];
+  entries.forEach((entry) => {
+    const number = questionNumber(entry.title);
+    const previous = groupedByNumber[groupedByNumber.length - 1];
+    if (number !== null && previous && questionNumber(previous.title) === number) {
+      previous.parts.push(...entry.parts);
+    } else {
+      groupedByNumber.push({ title: entry.title, parts: [...entry.parts] });
+    }
+  });
+  if (groupedByNumber.length < entries.length) return groupedByNumber;
   if (entries.length < 4) return entries;
   const numbers = entries.map((entry) => questionNumber(entry.title));
   if (numbers.some((number) => number === null)) return entries;
@@ -219,7 +339,8 @@ export function examQuestions(payload: Record<string, unknown>): ExamQuestion[] 
     const direct = source
       .map((item, index) => {
         const itemObj = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : null;
-        const title = cleanText(itemObj?.question_number) || `س${index + 1}`;
+        const rawTitle = cleanText(itemObj?.question_number);
+        const title = rawTitle ? (/^\d+$/.test(rawTitle) ? `س${rawTitle}` : titleFromKey(rawTitle)) : `س${index + 1}`;
         const parts = readQuestionParts(item, title);
         return parts.length > 0 ? { title, parts } : null;
       })
@@ -358,25 +479,80 @@ function textFromCorrectionResult(value: unknown): string {
   if (typeof value === 'string') return value;
   if (!value || typeof value !== 'object') return '';
   const obj = value as Record<string, unknown>;
-  return [
+  const direct = [
     obj.feedback,
+    obj.explanation,
+    obj.correction,
+    obj.mistakes,
+    obj.errors,
     obj.output,
     obj.text,
     obj.extractedText,
+    obj.extracted_text,
+    obj.recognizedText,
+    obj.recognized_text,
+    obj.ocrText,
+    obj.ocr_text,
     obj.message,
-  ].filter((item): item is string => typeof item === 'string').join(' ');
+  ].filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).join(' ');
+  if (direct) return direct;
+  for (const child of Object.values(obj)) {
+    const nested = textFromCorrectionResult(child);
+    if (nested) return nested;
+  }
+  return '';
+}
+
+function normalizedAnswerTokens(value: string): string[] {
+  const stopWords = new Set(['التي', 'الذي', 'هذه', 'هذا', 'ذلك', 'تلك', 'على', 'الى', 'إلى', 'عن', 'مما', 'كما', 'لأن', 'لان', 'هي', 'هو', 'في', 'من', 'كل', 'ما', 'ماذا', 'لماذا']);
+  return value
+    .toLocaleLowerCase('ar')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !stopWords.has(token));
+}
+
+function extractedStudentText(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const obj = value as Record<string, unknown>;
+  for (const key of ['extractedText', 'extracted_text', 'recognizedText', 'recognized_text', 'ocrText', 'ocr_text', 'studentText', 'student_text']) {
+    const candidate = obj[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  for (const child of Object.values(obj)) {
+    const nested = extractedStudentText(child);
+    if (nested) return nested;
+  }
+  return '';
+}
+
+function inferScoreFromAnswerSimilarity(studentAnswer: string, modelAnswer: string): number | null {
+  const studentTokens = new Set(normalizedAnswerTokens(studentAnswer));
+  const modelTokens = [...new Set(normalizedAnswerTokens(modelAnswer))];
+  if (studentTokens.size === 0 || modelTokens.length === 0) return null;
+  const matched = modelTokens.filter((token) => studentTokens.has(token)).length;
+  const coverage = matched / modelTokens.length;
+  if (coverage < 0.12) return 0;
+  if (coverage < 0.3) return 25;
+  if (coverage < 0.55) return 50;
+  if (coverage < 0.78) return 75;
+  return 100;
 }
 
 function inferScoreFromCorrectionText(text: string): number | null {
   const normalized = text.trim();
   if (!normalized) return null;
-  if (/غير صحيحة|غير صحيح|لا تحتوي|لم يتم تقديم|لا توجد إجابة|ليست إجابة|خاطئة/i.test(normalized)) return 0;
+  if (/غير صحيحة|غير صحيح|لا تحتوي|لم يتم تقديم|لا توجد إجابة|ليست إجابة|خاطئة|مختلف(?:ة|ين)|لا ترتبط|لا يتعلق|غير متعلق|لا علاقة/i.test(normalized)) return 0;
   if (/جزئي|جزئياً|جزئيا|ناقص/i.test(normalized)) return 50;
   if (/صحيحة|صحيح|دقيقة|ممتاز/i.test(normalized)) return 100;
   return null;
 }
 
-function normalizeCorrectionResult(result: unknown): unknown {
+function normalizeCorrectionResult(result: unknown, modelAnswer = '', studentAnswer = '', hasImage = false): unknown {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   const obj = result as Record<string, unknown>;
   const nested = obj.result && typeof obj.result === 'object' && !Array.isArray(obj.result)
@@ -385,12 +561,21 @@ function normalizeCorrectionResult(result: unknown): unknown {
   const target = nested || obj;
   const currentScore = findNumericValue(target, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
   if (currentScore !== null) return result;
-  const inferredScore = inferScoreFromCorrectionText(textFromCorrectionResult(target));
+  const correctionText = textFromCorrectionResult(target);
+  const answerForComparison = studentAnswer.trim() || extractedStudentText(target);
+  const inferredScore = inferScoreFromCorrectionText(correctionText)
+    ?? inferScoreFromAnswerSimilarity(answerForComparison, modelAnswer)
+    ?? (hasImage ? 0 : null);
   if (inferredScore === null) return result;
+  const fallbackFeedback = inferredScore === 0
+    ? answerForComparison
+      ? 'الإجابة المرفوعة لا تطابق عناصر الإجابة النموذجية. تم احتسابها بدرجة صفر بواسطة المقارنة الاحتياطية بعد أن أعاد مسار القراءة نصاً بلا درجة.'
+      : 'لم يُعد مسار قراءة الصورة نص الطالب أو درجة صريحة، لذلك لم تُمنح درجة تلقائية منعاً لاحتساب إجابة غير متعلقة بالسؤال.'
+    : 'تم احتساب الدرجة بواسطة المقارنة الاحتياطية مع الإجابة النموذجية لأن مسار القراءة أعاد نصاً بلا درجة صريحة.';
   if (nested) {
-    return { ...obj, result: { ...nested, score: inferredScore, inferred_score: true } };
+    return { ...obj, result: { ...nested, score: inferredScore, maxScore: 100, percentage: inferredScore, feedback: nested.feedback || fallbackFeedback, inferred_score: true } };
   }
-  return { ...obj, score: inferredScore, inferred_score: true };
+  return { ...obj, score: inferredScore, maxScore: 100, percentage: inferredScore, feedback: obj.feedback || fallbackFeedback, inferred_score: true };
 }
 
 async function correctSingleChapterExamEntry(submission: ChapterSubmission, entry: SubmissionEntry, index: number) {
@@ -464,7 +649,7 @@ async function correctSingleChapterExamEntry(submission: ChapterSubmission, entr
       if (!response.ok) {
         throw new Error(`${endpoint} رفض الطلب برمز ${response.status}`);
       }
-      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result) };
+      return { status: 'completed', endpoint, question: entry.question, part: entry.part, result: normalizeCorrectionResult(result, entry.modelAnswer || '', entry.answer, Boolean(entry.image)) };
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'تعذر الاتصال بمسار التصحيح.');
     } finally {
@@ -501,9 +686,20 @@ async function correctChapterExamSubmission(submission: ChapterSubmission) {
   );
 
   const completedCount = results.filter((result) => result.status === 'completed').length;
-  if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result: { results } };
-  if (completedCount > 0) return { status: 'partial' as const, endpoint: 'distributed', result: { results }, error: 'تم تصحيح بعض الإجابات فقط.' };
-  return { status: 'failed' as const, endpoint: '', result: { results }, error: 'تعذر تصحيح كل الإجابات عبر مسارات API.' };
+  const percentages = results.flatMap((entryResult) => {
+    if (entryResult.status !== 'completed' || !('result' in entryResult)) return [];
+    const score = findNumericValue(entryResult.result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+    const total = findNumericValue(entryResult.result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
+    if (score === null) return [];
+    return [Math.max(0, Math.min(100, total && total > 0 ? Math.round((score / total) * 100) : Math.round(score)))];
+  });
+  const aggregate = percentages.length > 0
+    ? { score: Math.round(percentages.reduce((sum, value) => sum + value, 0) / Math.max(1, submission.entries.length)), totalScore: 100, percentage: Math.round(percentages.reduce((sum, value) => sum + value, 0) / Math.max(1, submission.entries.length)) }
+    : {};
+  const result = { results, ...aggregate, correctedCount: completedCount, answeredCount: answeredEntries.length };
+  if (completedCount === answeredEntries.length) return { status: 'completed' as const, endpoint: 'distributed', result };
+  if (completedCount > 0) return { status: 'partial' as const, endpoint: 'distributed', result, error: 'تم تصحيح بعض الإجابات فقط.' };
+  return { status: 'failed' as const, endpoint: '', result, error: 'تعذر تصحيح كل الإجابات عبر مسارات API.' };
 }
 
 function findNumericValue(value: unknown, keys: string[]): number | null {
@@ -536,31 +732,47 @@ function buildResultMessage(submission: ChapterSubmission) {
   return `تم حفظ إجابات ${submission.exam_title}، لكن لم تصل نتيجة التصحيح بعد.`;
 }
 
-function notifyChapterExamResult(submission: ChapterSubmission) {
-  const message = buildResultMessage(submission);
+function buildChapterExamResult(submission: ChapterSubmission): NotificationExamResult {
   const score = findNumericValue(submission.correction_result, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
   const totalScore = findNumericValue(submission.correction_result, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']);
+  return {
+    title: submission.exam_title,
+    subject: submission.subject_name,
+    completedAt: submission.submitted_at,
+    score: score ?? undefined,
+    totalScore: totalScore ?? undefined,
+    percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
+    summary: textFromCorrectionResult(submission.correction_result) || buildResultMessage(submission),
+    answers: submission.entries.map((entry) => {
+      const resultList = submission.correction_result && typeof submission.correction_result === 'object'
+        ? (submission.correction_result as { results?: Array<{ question?: string; part?: string; result?: unknown }> }).results
+        : undefined;
+      const matchedResult = resultList?.find((item) => item.question === entry.question && item.part === entry.part)?.result;
+      const entryScore = findNumericValue(matchedResult, ['score', 'grade', 'points', 'درجة', 'الدرجة']);
+      const entryTotal = findNumericValue(matchedResult, ['totalScore', 'total_score', 'maxScore', 'max_score', 'المجموع']) || 100;
+      const entryPercentage = entryScore === null ? null : Math.round((entryScore / Math.max(1, entryTotal)) * 100);
+      return {
+        label: [entry.question, entry.part].filter(Boolean).join(' — '),
+        prompt: entry.prompt,
+        userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
+        modelAnswer: entry.modelAnswer,
+        score: entryScore ?? undefined,
+        maxScore: entryScore === null ? undefined : entryTotal,
+        status: entryPercentage === null ? 'ungraded' as const : entryPercentage >= 90 ? 'correct' as const : entryPercentage <= 25 ? 'wrong' as const : 'partial' as const,
+        feedback: textFromCorrectionResult(matchedResult) || undefined,
+      };
+    }),
+  };
+}
+
+function notifyChapterExamResult(submission: ChapterSubmission, examResult = buildChapterExamResult(submission)) {
+  const message = buildResultMessage(submission);
   const detail: ChapterExamNotificationDetail = {
     id: `chapter-exam-result-${submission.id}`,
     title: 'نتيجة الامتحان',
     message,
     submittedAt: submission.submitted_at,
-    examResult: {
-      title: submission.exam_title,
-      subject: submission.subject_name,
-      completedAt: submission.submitted_at,
-      score: score ?? undefined,
-      totalScore: totalScore ?? undefined,
-      percentage: score !== null && totalScore ? Math.round((score / totalScore) * 100) : undefined,
-      summary: textFromCorrectionResult(submission.correction_result) || message,
-      answers: submission.entries.map((entry) => ({
-        label: [entry.question, entry.part].filter(Boolean).join(' — '),
-        prompt: entry.prompt,
-        userAnswer: entry.answer || (entry.hasImage ? 'إجابة بصورة مرفوعة' : 'لم تتم الإجابة'),
-        modelAnswer: entry.modelAnswer,
-        status: 'ungraded' as const,
-      })),
-    },
+    examResult,
   };
   window.dispatchEvent(new CustomEvent<ChapterExamNotificationDetail>('chapter-exam-result', { detail }));
 }
@@ -580,6 +792,8 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
   const [submitState, setSubmitState] = useState<'idle' | 'confirming' | 'processing' | 'completed' | 'error'>('idle');
   const [processingPhase, setProcessingPhase] = useState(0);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [completedResult, setCompletedResult] = useState<NotificationExamResult | null>(null);
+  const [isResultOpen, setIsResultOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [images, setImages] = useState<Record<number, string>>({});
   const activeQuestion = questions[activeQuestionIndex];
@@ -597,6 +811,14 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       ? exam.payload.dawr
       : '';
   const answerKey = activeQuestionIndex * 100 + activePartIndex;
+  const isPartAnswered = (questionIndex: number, partIndex: number) => {
+    const key = questionIndex * 100 + partIndex;
+    return Boolean(answers[key]?.trim() || images[key]);
+  };
+  const isQuestionAnswered = (questionIndex: number) => {
+    const question = questions[questionIndex];
+    return Boolean(question?.parts.length) && question.parts.every((_, partIndex) => isPartAnswered(questionIndex, partIndex));
+  };
   const partStyles = [
     { card: 'border-sky-300 bg-sky-50/35', question: 'bg-sky-50 text-sky-950' },
     { card: 'border-emerald-300 bg-emerald-50/35', question: 'bg-emerald-50 text-emerald-950' },
@@ -718,13 +940,20 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
     const submission: ChapterSubmission = {
       id: `submission_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       exam_id: exam.id,
-      exam_title: exam.title,
+      exam_title: examDisplayName(exam.title, examKind),
       subject_id: exam.subject_id,
       subject_name: subjectName,
       chapter_number: exam.chapter_number,
       submitted_at: submittedAt,
       entries,
     };
+
+    const quota = await reserveExamAttempt(examKind, exam.id, submission.id);
+    if (!quota.allowed) {
+      setSubmitMessage(quota.message || 'لا يمكن بدء محاولة جديدة الآن.');
+      setSubmitState('error');
+      return;
+    }
 
     setSubmitState('processing');
     setProcessingPhase(0);
@@ -777,9 +1006,12 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
       } else {
         setSubmitMessage('تم حفظ الإجابات، لكن تعذر استلام نتيجة التصحيح من مسارات API.');
       }
-      notifyChapterExamResult(finalSubmission);
+      const examResult = buildChapterExamResult(finalSubmission);
+      setCompletedResult(examResult);
+      notifyChapterExamResult(finalSubmission, examResult);
       setSubmitState('completed');
     } catch {
+      await releaseFailedExamAttempt(submission.id);
       setSubmitMessage('تعذر إكمال الإرسال أو الحفظ. حاول مرة أخرى بصورة أوضح وأصغر.');
       setSubmitState('error');
     }
@@ -808,7 +1040,6 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-right">
               <p>جمهورية العراق - وزارة التربية</p>
-              <p className="mt-1 text-slate-500">{subjectName}</p>
             </div>
             <div className="min-w-0 flex-1" aria-hidden="true" />
             <button type="button" onClick={onClose} className="shrink-0 rounded-full border border-slate-200 bg-slate-100 p-2 text-slate-700 shadow-sm" aria-label="خروج من الامتحان">
@@ -824,25 +1055,62 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
         </header>
 
         {questions.length > 0 && (
-          <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-stone-100 px-3 py-2" aria-label="التنقل بين أسئلة الامتحان">
-            {questions.map((question, index) => {
-              const isActive = index === activeQuestionIndex;
-              return (
-                <button
-                  key={`exam-question-tab-${index}`}
-                  type="button"
-                  onClick={() => openQuestion(index)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black transition ${
-                    isActive
-                      ? 'border-slate-950 bg-slate-950 text-white'
-                      : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
-                  }`}
-                  aria-current={isActive ? 'step' : undefined}
-                >
-                  {question.title || `س${index + 1}`}
-                </button>
-              );
-            })}
+          <nav className="border-b border-slate-200 bg-stone-100 px-3 py-2" aria-label="التنقل بين أسئلة وفروع الامتحان">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {questions.map((question, index) => {
+                const isActive = index === activeQuestionIndex;
+                const questionAnswered = isQuestionAnswered(index);
+                return (
+                  <div key={`exam-question-group-${index}`} className="shrink-0 rounded-2xl border border-violet-200 bg-violet-50/70 p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openQuestion(index)}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black transition ${
+                        questionAnswered
+                          ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                          : isActive
+                            ? 'border-slate-950 bg-slate-950 text-white'
+                            : 'border-violet-300 bg-white text-violet-950 hover:border-violet-500'
+                      }`}
+                      aria-current={isActive ? 'step' : undefined}
+                    >
+                      {questionAnswered && <CheckCircle2 className="h-3.5 w-3.5" />}
+                      {question.title || `س${index + 1}`}
+                    </button>
+                    {question.parts.length > 1 && (
+                      <div className="mt-1 flex items-center justify-center gap-1">
+                        {question.parts.map((part, partIndex) => {
+                          const partAnswered = isPartAnswered(index, partIndex);
+                          const partActive = isActive && partIndex === activePartIndex;
+                          return (
+                            <button
+                              key={`exam-part-tab-${index}-${partIndex}`}
+                              type="button"
+                              onClick={() => {
+                                setActiveQuestionIndex(index);
+                                setActivePartIndex(partIndex);
+                                setTouchDeltaX(0);
+                              }}
+                              className={`flex items-center gap-0.5 rounded-lg border px-2 py-1 text-[10px] font-black transition ${
+                                partAnswered
+                                  ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
+                                  : partActive
+                                    ? 'border-violet-500 bg-violet-200 text-violet-950'
+                                    : 'border-violet-200 bg-white text-violet-700 hover:border-violet-400'
+                              }`}
+                              aria-label={`${question.title || `السؤال ${index + 1}`} ${part.title || `الفرع ${partIndex + 1}`}`}
+                            >
+                              {partAnswered && <CheckCircle2 className="h-3 w-3" />}
+                              {part.title || `فرع ${partIndex + 1}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </nav>
         )}
 
@@ -856,17 +1124,20 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                 '--page-drag-x': `${touchDeltaX * 0.18}px`,
                 '--page-drag-rotate': `${touchDeltaX * -0.16}deg`,
               } as React.CSSProperties}
-              className={`exam-page-turn ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-xl border-2 p-4 text-right shadow-sm ${activePartStyle.card}`}
+              className={`exam-page-turn exam-paper ${touchStartX !== null ? 'exam-page-dragging' : pageTurnDirection === 1 ? 'exam-page-turn-next' : 'exam-page-turn-prev'} flex min-h-full flex-col rounded-[1.35rem] border-2 p-5 text-right shadow-[0_10px_28px_rgba(111,86,42,.2)]`}
             >
-              <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
-                <h3 className="text-sm font-black text-slate-950">{activeQuestion.title} - الفرع {activePart.title}</h3>
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#cbb98d]/70 pb-3">
+                <h3 className="text-sm font-black text-[#594a2d]">
+                  {activeQuestion.title}
+                  {activeQuestion.parts.length > 1 ? ` - الفرع ${activePart.title}` : ''}
+                </h3>
                 {activeQuestion.parts.length > 1 && (
                   <button
                     type="button"
                     onClick={flipForward}
-                    className="shrink-0 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm transition hover:bg-slate-950 hover:text-white"
+                    className="shrink-0 rounded-full border border-[#c8b57e] bg-[#fffaf0]/90 px-3 py-1 text-[10px] font-black text-[#66552f] shadow-sm transition hover:bg-[#66552f] hover:text-white"
                   >
-                    اقلب الصفحة
+                    صفحة {activePartIndex + 1} من {activeQuestion.parts.length}
                   </button>
                 )}
               </div>
@@ -879,22 +1150,22 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                 onTouchEnd={handleTouchEnd}
                 className="exam-page-sheet rounded-xl"
               >
-                <p className={`whitespace-pre-line rounded-xl p-3 text-sm leading-6 ${activePartStyle.question}`}>{activePart.text}</p>
+                <p className="whitespace-pre-line rounded-xl border border-[#d8c99e]/80 bg-[#eee1bf]/70 p-4 text-sm leading-7 text-[#4d422c] shadow-inner">{activePart.text}</p>
               </div>
               <div
-                className="mt-5 border-t border-slate-100 pt-4"
+                className="mt-5 border-t border-[#cbb98d]/70 pt-4"
                 onTouchStart={(event) => event.stopPropagation()}
                 onTouchMove={(event) => event.stopPropagation()}
                 onTouchEnd={(event) => event.stopPropagation()}
               >
-                <label className="text-xs font-black text-slate-600" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
+                <label className="text-xs font-black text-[#66552f]" htmlFor={`exam-answer-${exam.id}-${answerKey}`}>
                   الجواب
                 </label>
                 <textarea
                   id={`exam-answer-${exam.id}-${answerKey}`}
                   value={answers[answerKey] || ''}
                   onChange={(event) => setAnswers((current) => ({ ...current, [answerKey]: event.target.value }))}
-                  className="mt-2 min-h-32 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-7 outline-none focus:border-sky-400 focus:bg-white"
+                  className="mt-2 min-h-32 w-full resize-y rounded-xl border border-[#d1c096] bg-[#fffaf0]/80 p-3 text-sm leading-7 text-[#403722] outline-none focus:border-[#a98b4f] focus:bg-white"
                   placeholder="اكتب جوابك بدون أن تظهر الإجابة النموذجية للطالب..."
                   onTouchStart={(event) => event.stopPropagation()}
                 />
@@ -907,10 +1178,11 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
                       accept="image/*"
                       capture="environment"
                       className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) handleImageSelected(file);
-                        event.target.value = '';
+                      onChange={async (event) => {
+                        const input = event.currentTarget;
+                        const file = input.files?.[0];
+                        if (file) await handleImageSelected(file);
+                        input.value = '';
                       }}
                     />
                   </label>
@@ -1002,8 +1274,24 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
               ) : (
                 <>
                   <Award className="mx-auto h-10 w-10 text-emerald-600" />
-                  <h3 className="mt-4 text-lg font-black text-slate-950">تم إرسال إجاباتك</h3>
+                  <h3 className="mt-4 text-lg font-black text-slate-950">اكتمل تصحيح الامتحان</h3>
+                  {completedResult?.score !== undefined && (
+                    <div className="mt-4 rounded-2xl bg-gradient-to-l from-emerald-500 to-cyan-600 px-4 py-4 text-white shadow-lg">
+                      <p className="text-xs font-bold text-white/80">النتيجة النهائية</p>
+                      <p className="mt-1 text-3xl font-black" dir="ltr">{completedResult.score} / {completedResult.totalScore || 100}</p>
+                      <p className="mt-1 text-sm font-black">%{completedResult.percentage ?? completedResult.score}</p>
+                    </div>
+                  )}
                   <p className="mt-2 text-sm leading-7 text-slate-600">{submitMessage || 'تم تسجيل نتيجة الامتحان.'}</p>
+                  {completedResult && (
+                    <button
+                      type="button"
+                      onClick={() => setIsResultOpen(true)}
+                      className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm"
+                    >
+                      عرض النتيجة والتصحيح
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
@@ -1016,6 +1304,7 @@ const ExamPreview: React.FC<{ exam: CurriculumExamRecord; subjectName: string; e
             </div>
           </div>
         )}
+        <ExamResultDetailsModal result={isResultOpen ? completedResult : null} onClose={() => setIsResultOpen(false)} />
       </div>
     </div>
   );
@@ -1046,11 +1335,12 @@ function ministryExamLabel(exam: CurriculumExamIndexRecord, index: number) {
   return year ? `سنة ${year} — الدور ${round}` : `نموذج وزاري ${index + 1} — الدور ${round}`;
 }
 
-export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate }) => {
+export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, subjectName, chapterNumber, className, onScoreUpdate, openPickerRequest = 0 }) => {
   const [monthly, setMonthly] = useState<CurriculumExamIndexRecord[]>([]);
   const [ministry, setMinistry] = useState<CurriculumExamIndexRecord[]>([]);
   const [selected, setSelected] = useState<CurriculumExamRecord | null>(null);
   const [selectedKind, setSelectedKind] = useState<'monthly' | 'ministry'>('monthly');
+  const [pickerCategory, setPickerCategory] = useState<'monthly' | 'ministry'>('monthly');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -1082,6 +1372,12 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
     }
   };
 
+  useEffect(() => {
+    if (openPickerRequest > 0) void openExamPicker();
+    // The numeric request changes only when an external exam button is pressed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPickerRequest]);
+
   const openSelectedExam = async (exam: CurriculumExamIndexRecord) => {
     setIsLoading(true);
     setLoadError('');
@@ -1098,52 +1394,66 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
     }
   };
 
-  const renderExamColumn = (
-    title: string,
-    description: string,
+  const renderExamList = (
     exams: CurriculumExamIndexRecord[],
     emptyMessage: string,
-    accentClass: string,
-  ) => (
-    <section className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3">
-        <p className={`text-[11px] font-black ${accentClass}`}>{description}</p>
-        <h3 className="text-lg font-black text-white">{title}</h3>
-      </div>
-      <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white/80">{exams.length} امتحان متاح</div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
+  ) => {
+    const cardThemes = pickerCategory === 'monthly'
+      ? [
+          'from-sky-500/30 via-blue-600/20 to-indigo-500/30 border-sky-300/45 shadow-sky-500/15',
+          'from-violet-500/30 via-fuchsia-600/15 to-purple-500/30 border-violet-300/45 shadow-violet-500/15',
+          'from-cyan-500/30 via-teal-600/15 to-emerald-500/25 border-cyan-300/45 shadow-cyan-500/15',
+          'from-rose-500/25 via-pink-600/15 to-orange-500/25 border-rose-300/40 shadow-rose-500/15',
+        ]
+      : [
+          'from-amber-500/30 via-orange-600/20 to-yellow-500/25 border-amber-300/50 shadow-amber-500/15',
+          'from-orange-500/30 via-red-600/15 to-amber-500/25 border-orange-300/45 shadow-orange-500/15',
+          'from-yellow-500/25 via-amber-600/15 to-orange-500/25 border-yellow-300/45 shadow-yellow-500/15',
+          'from-fuchsia-500/25 via-purple-600/15 to-amber-500/20 border-fuchsia-300/40 shadow-fuchsia-500/15',
+        ];
+
+    return (
+      <section className="min-h-0 flex-1 overflow-hidden">
+        <div className="h-full space-y-3 overflow-y-auto overscroll-contain px-1 pb-5 pt-1 custom-scrollbar">
         {isLoading ? (
-          <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">جاري تحميل الامتحانات...</p>
+          <div className="grid min-h-40 place-items-center rounded-3xl border border-white/10 bg-white/5"><Loader2 className="h-9 w-9 animate-spin text-cyan-300" /></div>
         ) : loadError ? (
           <p className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4 text-center text-xs font-bold leading-6 text-red-100">{loadError}</p>
         ) : exams.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold leading-6 text-white/60">{emptyMessage}</p>
         ) : exams.map((exam, index) => {
           const displayName = exam.exam_type === 'monthly' ? `الامتحان ${index + 1}` : ministryExamLabel(exam, index);
+          const theme = cardThemes[index % cardThemes.length];
           return (
             <button
               key={exam.id}
               type="button"
               onClick={() => openSelectedExam(exam)}
               disabled={isLoading}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-right transition hover:border-sky-300/50 hover:bg-sky-500/15 disabled:opacity-45"
+              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+              className={`exam-card-enter group relative flex min-h-[82px] w-full items-center gap-4 overflow-hidden rounded-[22px] border bg-gradient-to-l p-3.5 text-right shadow-lg transition duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:opacity-45 ${theme}`}
             >
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-black leading-6 text-white">{displayName}</span>
-                <span className="block text-[10px] font-bold text-white/55">اضغط لتحميل هذا الامتحان فقط</span>
+              <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-white/90 via-cyan-300 to-transparent" />
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/25 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,.2)] backdrop-blur-md transition duration-300 group-hover:rotate-[-6deg] group-hover:scale-110">
+                {exam.exam_type === 'monthly' ? <FileText className="h-6 w-6" /> : <GraduationCap className="h-7 w-7" />}
               </span>
-              <ChevronLeft className="h-4 w-4 shrink-0 text-sky-300" />
+              <span className="min-w-0 flex-1 truncate text-sm font-black leading-7 text-white sm:text-base">{displayName}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/20 bg-black/15 text-white/90 transition duration-300 group-hover:-translate-x-1 group-hover:bg-white/15">
+                <ChevronLeft className="h-5 w-5" />
+              </span>
+              <span className="exam-card-shine pointer-events-none absolute inset-y-0 -right-1/3 w-1/3 skew-x-[-18deg] bg-gradient-to-l from-transparent via-white/15 to-transparent" />
             </button>
           );
         })}
-      </div>
-    </section>
-  );
+        </div>
+      </section>
+    );
+  };
 
   return (
     <>
       <div className={`${className || 'absolute left-3 top-3'} z-40`} dir="rtl">
-        <style>{`@keyframes satelliteFloat{0%,100%{transform:translateY(-5px) rotate(-2deg)}50%{transform:translateY(7px) rotate(2deg)}}`}</style>
+        <style>{`@keyframes satelliteFloat{0%,100%{transform:translateY(-5px) rotate(-2deg)}50%{transform:translateY(7px) rotate(2deg)}}@keyframes examCardEnter{0%{opacity:0;transform:translateY(18px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}@keyframes examCardShine{0%,65%{transform:translateX(0)}100%{transform:translateX(-440%)}}.exam-card-enter{animation:examCardEnter .48s cubic-bezier(.2,.8,.2,1) both}.exam-card-enter:hover .exam-card-shine{animation:examCardShine .8s ease-out}`}</style>
         <button type="button" onClick={openExamPicker} disabled={isLoading} className="group rounded-3xl transition hover:scale-105 disabled:opacity-60" aria-label={`فتح فهرس امتحانات الفصل ${chapterNumber}`}>
           <ExamSatellite loading={isLoading} />
         </button>
@@ -1151,32 +1461,37 @@ export const ChapterExamIcons: React.FC<ChapterExamIconsProps> = ({ subjectId, s
 
       {isPickerOpen && !selected && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm" dir="rtl">
-          <div className="flex h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl">
-            <header className="flex items-center justify-between border-b border-white/10 p-4">
-              <div>
+          <div className="relative flex h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-[30px] border border-cyan-300/25 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,.16),transparent_35%),linear-gradient(180deg,#07142f,#030817)] text-white shadow-[0_0_60px_rgba(14,165,233,.22)]">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
+            <header className="relative flex items-center justify-between border-b border-white/10 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/30 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.18)]"><Sparkles className="h-6 w-6" /></span>
+                <div>
                 <p className="text-[10px] font-bold text-sky-300">{subjectName}</p>
-                <h2 className="text-base font-black">اختر نموذج الامتحان</h2>
+                <h2 className="text-lg font-black">اختر نموذج الامتحان</h2>
+                </div>
               </div>
-              <button type="button" onClick={() => setIsPickerOpen(false)} className="rounded-full bg-white/10 p-2" aria-label="خروج">
+              <button type="button" onClick={() => setIsPickerOpen(false)} className="rounded-2xl border border-white/10 bg-white/10 p-2.5 transition hover:rotate-90 hover:bg-white/15" aria-label="خروج">
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="grid min-h-0 flex-1 grid-cols-[1fr_auto_1fr] gap-3 p-4">
-              {renderExamColumn(
-                'شهري',
-                'نماذج الفصل المتوفرة',
-                monthly,
-                'لا توجد امتحانات شهرية لهذا الفصل حاليًا.',
-                'text-amber-300',
-              )}
-              <div className="w-px bg-white/10" aria-hidden="true" />
-              {renderExamColumn(
-                'وزاري',
-                'أسئلة السنوات والأدوار',
-                ministry,
-                'لا توجد امتحانات وزارية لهذا الموضوع حاليًا.',
-                'text-sky-300',
-              )}
+            <div className="relative flex min-h-0 flex-1 flex-col p-4">
+              <div className="mb-4 grid grid-cols-2 gap-3" role="tablist" aria-label="نوع الامتحان">
+                <button type="button" role="tab" aria-selected={pickerCategory === 'monthly'} onClick={() => setPickerCategory('monthly')} className={`group relative min-h-[88px] overflow-hidden rounded-[22px] border p-3 text-right transition duration-300 ${pickerCategory === 'monthly' ? 'scale-[1.02] border-violet-300/70 bg-gradient-to-l from-violet-600 to-indigo-600 shadow-[0_10px_30px_rgba(124,58,237,.35)]' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
+                  <CalendarDays className={`mb-2 h-7 w-7 transition group-hover:scale-110 ${pickerCategory === 'monthly' ? 'text-violet-100' : 'text-violet-300'}`} />
+                  <span className="block text-base font-black">شهري</span>
+                  {pickerCategory === 'monthly' && <span className="absolute bottom-0 right-4 h-1 w-12 rounded-t-full bg-white shadow-[0_0_12px_white]" />}
+                </button>
+                <button type="button" role="tab" aria-selected={pickerCategory === 'ministry'} onClick={() => setPickerCategory('ministry')} className={`group relative min-h-[88px] overflow-hidden rounded-[22px] border p-3 text-right transition duration-300 ${pickerCategory === 'ministry' ? 'scale-[1.02] border-amber-300/70 bg-gradient-to-l from-amber-500 to-orange-600 shadow-[0_10px_30px_rgba(245,158,11,.3)]' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
+                  <GraduationCap className={`mb-2 h-8 w-8 transition group-hover:-rotate-6 group-hover:scale-110 ${pickerCategory === 'ministry' ? 'text-amber-50' : 'text-amber-300'}`} />
+                  <span className="block text-base font-black">وزاري</span>
+                  {pickerCategory === 'ministry' && <span className="absolute bottom-0 right-4 h-1 w-12 rounded-t-full bg-white shadow-[0_0_12px_white]" />}
+                </button>
+              </div>
+              {pickerCategory === 'monthly'
+                ? renderExamList(monthly, 'لا توجد امتحانات شهرية لهذا الفصل حاليًا.')
+                : renderExamList(ministry, 'لا توجد امتحانات وزارية لهذا الموضوع حاليًا.')}
             </div>
           </div>
         </div>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EducationalLesson, SubjectChapter, SubjectChapterLesson, OpenLessonContext, LearningPosition, UserProfile } from '../types';
-import { getCurriculumForSubject } from '../data/mockCurriculums';
 import { getSubjectIndex, getSubjectChapters, getChapterLessons, getLessonDetails, formatArabicLessonTitle, buildLessonKey } from '../services/lessonsService';
 import { MapRewardsModal } from './MapRewardsModal';
 import { gameAudio } from '../utils/gameAudio';
+import { appSfx } from '../utils/appSfx';
 import { MapLeaderboardModal } from './MapLeaderboardModal';
 import { AdventureWorldMap } from './AdventureWorldMap';
 import { ScienceLaboratoryModal } from './ScienceLaboratoryModal';
@@ -192,8 +192,6 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
           if (currentReqId !== loadRequestIdRef.current) return;
           if (res.data && res.data.length > 0) {
             loadedChapters = res.data;
-          } else {
-            loadedChapters = getCurriculumForSubject(subject.id);
           }
           if (res.error) {
             setErrorMessage(res.error);
@@ -213,15 +211,11 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
       } catch (err: any) {
         console.error('Failed to load chapters:', err);
         if (currentReqId === loadRequestIdRef.current) {
-          const fallbackData = getCurriculumForSubject(subject.id);
-          setChapters(fallbackData);
-          const initChNum =
-            (learningPosition?.subjectId === subject.id && learningPosition?.chapterNumber) ||
-            fallbackData[0]?.number ||
-            1;
-          setSelectedChapterNumber(initChNum);
-          loadLessonsForChapterNumber(initChNum, fallbackData);
-          setErrorMessage('تعذر الاتصال بـ Supabase لجلب الفصول');
+          // Never display mock chapters when the canonical Supabase index is
+          // unavailable; fabricated lesson numbers can request unrelated data.
+          setChapters([]);
+          setSelectedChapterNumber(1);
+          setErrorMessage('تعذر الاتصال بفهرس Supabase لجلب الفصول والدروس');
         }
       } finally {
         if (currentReqId === loadRequestIdRef.current) {
@@ -275,6 +269,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
 
   // Lazy load specific lesson JSON when clicked by user
   const handleSelectLessonWithLazyLoad = async (lessonItem: SubjectChapterLesson) => {
+    appSfx.lessonSelect();
     try {
       const parentChapter =
         chapters.find((ch) => ch.lessons.some((l) => l.id === lessonItem.id)) ||
@@ -301,14 +296,10 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
         lessonId: lessonItem.id,
       });
 
-      const res = await getLessonDetails(
-        subject.id,
-        chapterTitle,
-        lessonItem.title,
-        subject.name,
-        chapterNumber,
-        lessonItem.number
-      );
+      // Preserve the immutable lessonId from the canonical index. Rebuilding
+      // it from subject/chapter/lesson can detach the video record and the
+      // curriculum/game files from the selected lesson.
+      const res = await getLessonDetails(lessonContext);
 
       if (res.data) {
         onSelectLesson(res.data, lessonContext);
@@ -435,7 +426,7 @@ export const SubjectLearningPathView: React.FC<SubjectLearningPathViewProps> = (
                 <div className="rounded-2xl bg-[#091124]/95 border border-sky-500/30 overflow-hidden shadow-xl">
                   {/* Chapter Header */}
                   <div
-                    onClick={() => { gameAudio.playPrimaryNavigation(); toggleChapter(chapter.id); }}
+                    onClick={() => { appSfx.chapterSelect(); toggleChapter(chapter.id); }}
                     className="p-3.5 sm:p-4 bg-gradient-to-r from-[#0e1b3d] to-[#0a142c] flex items-center justify-between gap-3 cursor-pointer border-b border-white/5 select-none hover:bg-[#12224d] transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">

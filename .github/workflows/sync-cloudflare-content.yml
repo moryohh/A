@@ -1,0 +1,50 @@
+name: Synchronize educational content
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 1 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synchronize-educational-content
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview-online-challenge
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Deploy temporary writer and synchronize
+        shell: bash
+        run: |
+          set -euo pipefail
+          SYNC_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$SYNC_TOKEN"
+          python3 - "$SYNC_TOKEN" <<'PY'
+          import json, sys
+          from pathlib import Path
+          Path('/tmp/wrangler-content-sync.json').write_text(json.dumps({
+            'name': 'duha-content-sync', 'main': str(Path.cwd() / 'cloudflare/duha-content-sync-worker.js'),
+            'compatibility_date': '2026-10-20', 'vars': {'SYNC_TOKEN': sys.argv[1]},
+            'r2_buckets': [{'binding': 'CONTENT_R2', 'bucket_name': 'duha-educational-content'}],
+            'd1_databases': [{'binding': 'CONTENT_DB', 'database_name': 'duha-content-index', 'database_id': '88f179a9-4cab-4649-8981-fece0c155ba2'}],
+          }))
+          PY
+          npx wrangler@4 deploy --config /tmp/wrangler-content-sync.json
+          CONTENT_SYNC_URL="https://duha-content-sync.rafos72171.workers.dev" CONTENT_SYNC_TOKEN="$SYNC_TOKEN" node scripts/sync-content-to-cloudflare.mjs
+      - name: Remove temporary writer
+        if: always()
+        run: npx wrangler@4 delete duha-content-sync --force || true

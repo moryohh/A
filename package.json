@@ -9,10 +9,10 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "node scripts/build-solve-with-me.mjs && vite build",
-    "build:solve-manifest": "node scripts/build-solve-with-me-manifest.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "audit:educational-index": "node scripts/audit-educational-index.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -22,8 +22,10 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "katex": "^0.18.4",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pixelfx": "https://github.com/patch-gg/pixelfx/archive/a84159688af3ca37a4be05a0d422b94451b2e24e.tar.gz",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-katex": "^3.1.0"

@@ -66,14 +66,21 @@ function shuffleExamItems<T>(values: T[]): T[] {
 
 function selectExamItems<T>(pool: T[], target: number): T[] {
   if (pool.length === 0) return [];
-  const selected = pool.length > target
-    ? shuffleExamItems(pool).slice(0, target)
-    : Array.from({ length: target }, (_, idx) => pool[idx % pool.length]);
-  return selected;
+  return pool.length > target ? shuffleExamItems(pool).slice(0, target) : [...pool];
 }
 
 function uniqueExamItems<T extends { q: string }>(pool: T[]): T[] {
   return Array.from(new Map(pool.map((item) => [item.q.trim(), item])).values());
+}
+
+function bestLessonFact(prompt: string, facts: string[]) {
+  const promptTokens = new Set(prompt.replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, ' ').split(/\s+/).filter((token) => token.length > 2));
+  const score = (value: string) => value.split(/\s+/).filter((rawToken) => {
+      const token = rawToken.replace(/[^\u0600-\u06FFa-zA-Z0-9]/g, '');
+      return [...promptTokens].some((promptToken) => token === promptToken || (token.length >= 4 && promptToken.length >= 4 && (token.includes(promptToken) || promptToken.includes(token))));
+    }).length;
+  const sorted = [...facts].sort((left, right) => score(right) - score(left));
+  return sorted[0] && score(sorted[0]) > 0 ? sorted[0] : '';
 }
 
 function createUnavailableDailyExam(lessonTitle: string, subject: string): DailyExamConfig {
@@ -114,6 +121,11 @@ export function extractDailyExamFromCurriculum(
   }
 
   const allItems: any[] = curriculum.pages.flatMap((p: any) => p.items || []);
+  const lessonFacts = allItems
+    .filter((item: any) => item && item.type !== 'question' && !item.question && !item.question_type)
+    .map((item: any) => toCleanString(item.text || item.content || item.description || item.answer))
+    .filter((text: string) => text.length >= 20)
+    .slice(0, 6);
 
   // Filter question items and lists
   const questionItems = allItems.filter(
@@ -137,7 +149,7 @@ export function extractDailyExamFromCurriculum(
 
   for (const item of questionItems) {
     const qText = toCleanString(item.question || item.title || item.prompt);
-    const aText = toCleanString(item.answer || item.content || item.model_answer);
+    const aText = toCleanString(item.answer || item.correct_answer || item.model_answer || item.modelAnswer || item.solution || item.explanation || item.content);
     const qType = toCleanString(item.question_type).toLowerCase();
 
     if (!qText) continue;
@@ -270,6 +282,15 @@ export function extractDailyExamFromCurriculum(
     }
   }
 
+  if (q1Branches.length === 1) {
+    q1Branches[0].points = 10;
+    q1Instruction = 'أجب عن السؤال الآتي بدقة واختصار منهجي:';
+  }
+  q1Branches.forEach((branch) => {
+    const matchedFact = bestLessonFact(branch.prompt, lessonFacts);
+    if (matchedFact) branch.modelAnswer = matchedFact;
+  });
+
   // ==========================================
   // --- QUESTION 2: STRICTLY 1 SINGLE COMPREHENSIVE QUESTION ---
   // (عدّد واحد OR اشرح واحد OR اذكر واحد OR حل مسألة واحدة)
@@ -309,12 +330,12 @@ export function extractDailyExamFromCurriculum(
         points: 10,
       });
     } else {
-      q2Instruction = 'عدّد واشرح بالتفصيل المنهجي:';
+      q2Instruction = 'اشرح الفكرة الآتية من محتوى الدرس شرحاً منهجياً:';
       q2Branches.push({
         id: 'q2-b1',
         label: 'أ',
-        prompt: `عدّد المراحل والخصائص الحيوية الرئيسية لموضوع (${lessonTitle})، مع شرح الآلية والوظيفة المنهجية بالتفصيل.`,
-        modelAnswer: `المراحل والخطوات العلمية المفصلة وفق التسلسل المنهجي المعتمد في الكتاب الوزاري لجمهورية العراق.`,
+        prompt: `اشرح أهم الأحكام والأفكار الواردة في درس (${lessonTitle}) مع ذكر التفاصيل والأمثلة المتاحة.`,
+        modelAnswer: lessonFacts.slice(0, 3).join('\n') || `شرح الأفكار والأحكام الأساسية الواردة في درس ${lessonTitle} وفق نص المنهج.`,
         points: 10,
       });
     }

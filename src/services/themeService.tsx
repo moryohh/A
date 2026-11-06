@@ -47,42 +47,42 @@ export interface ThemeConfig {
 }
 
 export const APP_THEMES: Record<AppThemeId, ThemeConfig> = {
-  // 1. DEFAULT: Solar Light (Pure White / Day Mode)
+  // 1. DEFAULT: unified blue + mint learning identity
   solar_light: {
     id: 'solar_light',
-    name: 'النظام الشمسي المشرق (الافتراضي)',
-    subtitle: 'واجهة بيضاء ساطعة ونقية عالية الوضوح مع تفاصيل شمسية زاهية',
+    name: 'الأزرق النعناعي (الافتراضي)',
+    subtitle: 'واجهة تعليمية هادئة تجمع الأزرق الواضح والنعناعي مع قراءة مريحة',
     isLight: true,
     colors: {
-      primary: '#0284C7',
-      secondary: '#F59E0B',
-      accent: '#2563EB',
-      bgMain: '#E8EDF5',
-      bgWrapper: '#F8FAFC',
+      primary: '#087FE5',
+      secondary: '#43D5A0',
+      accent: '#61C8BC',
+      bgMain: '#DDF3FF',
+      bgWrapper: '#F5FBFF',
       bgCard: '#FFFFFF',
-      bgCardSubtle: '#F1F5F9',
-      border: 'rgba(0,0,0,0.1)',
-      textPrimary: '#0F172A',
-      textSecondary: '#475569',
-      glow: 'rgba(2, 132, 199, 0.15)',
+      bgCardSubtle: '#EDF9FC',
+      border: 'rgba(8,127,229,0.16)',
+      textPrimary: '#23313D',
+      textSecondary: '#526979',
+      glow: 'rgba(8,127,229,0.18)',
     },
     classes: {
-      outerBg: 'bg-[#E2E8F0]',
-      wrapperBg: 'bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#F1F5F9]',
+      outerBg: 'bg-[#DDF3FF]',
+      wrapperBg: 'bg-gradient-to-b from-[#FFFFFF] via-[#F5FBFF] to-[#DDF3FF]',
       headerBg: 'bg-white/95',
       navBg: 'bg-white/95',
       cardBg: 'bg-white shadow-md',
-      cardSubtleBg: 'bg-slate-50',
+      cardSubtleBg: 'bg-[#EDF9FC]',
       cardBorder: 'border-slate-200/80 shadow-sm',
-      textMain: 'text-slate-900',
-      textMuted: 'text-slate-500',
-      accentText: 'text-sky-600',
-      accentBg: 'bg-gradient-to-r from-sky-500 to-blue-600 text-white',
-      accentBorder: 'border-sky-500/40',
-      modalBg: 'bg-white text-slate-900',
-      glowBlob1: 'bg-sky-400/10',
-      glowBlob2: 'bg-amber-400/10',
-      pillActive: 'bg-sky-600 text-white',
+      textMain: 'text-[#23313D]',
+      textMuted: 'text-[#526979]',
+      accentText: 'text-[#087FE5]',
+      accentBg: 'bg-gradient-to-r from-[#087FE5] to-[#43D5A0] text-white',
+      accentBorder: 'border-[#087FE5]/40',
+      modalBg: 'bg-white text-[#23313D]',
+      glowBlob1: 'bg-[#087FE5]/10',
+      glowBlob2: 'bg-[#43D5A0]/12',
+      pillActive: 'bg-[#087FE5] text-white',
     },
   },
 
@@ -125,42 +125,42 @@ export const APP_THEMES: Record<AppThemeId, ThemeConfig> = {
     },
   },
 
-  // 3. Electric Amber Blue (Electric Yellow + Dark Blue + Clear Mid Blue)
+  // 3. Electric Coral Teal — derived from the approved classroom/game references.
   amber_work: {
     id: 'amber_work',
-    name: 'النمط الكهربائي الكهرماني الأزرق',
-    subtitle: 'أصفر كهربائي مع أزرق داكن وأزرق متوسط واضح القراءة',
-    isLight: true,
+    name: 'النمط الكهربائي المرجاني',
+    subtitle: 'مرجاني وفيروزي فوق درجات فحمية ورملية، بلا أسطح بيضاء',
+    isLight: false,
     colors: {
-      primary: '#F59E0B',
-      secondary: '#FACC15',
-      accent: '#2563EB',
-      bgMain: '#DBEAFE',
-      bgWrapper: '#F8FBFF',
-      bgCard: '#FFFFFF',
-      bgCardSubtle: '#EFF6FF',
-      border: 'rgba(37,99,235,0.24)',
-      textPrimary: '#0F172A',
-      textSecondary: '#1E3A8A',
-      glow: 'rgba(37, 99, 235, 0.22)',
+      primary: '#F0AAA6',
+      secondary: '#63C8BD',
+      accent: '#C8A86D',
+      bgMain: '#142629',
+      bgWrapper: '#1B3234',
+      bgCard: '#294744',
+      bgCardSubtle: '#355956',
+      border: 'rgba(99,200,189,0.34)',
+      textPrimary: '#F1DEC0',
+      textSecondary: '#CEB98F',
+      glow: 'rgba(240,170,166,0.22)',
     },
     classes: {
-      outerBg: 'bg-[#DBEAFE]',
-      wrapperBg: 'bg-gradient-to-b from-[#FFFFFF] via-[#EFF6FF] to-[#DBEAFE]',
-      headerBg: 'bg-[#F8FBFF]/95',
-      navBg: 'bg-[#F8FBFF]/95',
-      cardBg: 'bg-white shadow-md',
-      cardSubtleBg: 'bg-[#EFF6FF]',
-      cardBorder: 'border-blue-200 shadow-sm',
-      textMain: 'text-slate-900',
-      textMuted: 'text-blue-900/70',
-      accentText: 'text-blue-700',
-      accentBg: 'bg-gradient-to-r from-yellow-400 via-amber-400 to-blue-600 text-slate-950',
-      accentBorder: 'border-blue-400/60',
-      modalBg: 'bg-white text-slate-900',
-      glowBlob1: 'bg-blue-500/15',
-      glowBlob2: 'bg-amber-400/20',
-      pillActive: 'bg-blue-600 text-white',
+      outerBg: 'bg-[#142629]',
+      wrapperBg: 'bg-gradient-to-b from-[#1B3234] via-[#203B3B] to-[#3C3430]',
+      headerBg: 'bg-[#193032]/95',
+      navBg: 'bg-[#193032]/95',
+      cardBg: 'bg-[#294744] shadow-md',
+      cardSubtleBg: 'bg-[#355956]',
+      cardBorder: 'border-[#63C8BD]/35 shadow-sm',
+      textMain: 'text-[#F1DEC0]',
+      textMuted: 'text-[#CEB98F]',
+      accentText: 'text-[#63C8BD]',
+      accentBg: 'bg-gradient-to-r from-[#F0AAA6] via-[#C8A86D] to-[#63C8BD] text-[#142629]',
+      accentBorder: 'border-[#F0AAA6]/55',
+      modalBg: 'bg-[#294744] text-[#F1DEC0]',
+      glowBlob1: 'bg-[#F0AAA6]/16',
+      glowBlob2: 'bg-[#63C8BD]/16',
+      pillActive: 'bg-[#63C8BD] text-[#142629]',
     },
   },
 
@@ -323,6 +323,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const theme = APP_THEMES[currentThemeId] || APP_THEMES.solar_light;
+
+  useEffect(() => {
+    document.documentElement.dataset.appTheme = currentThemeId;
+    document.body.dataset.appTheme = currentThemeId;
+    return () => {
+      delete document.documentElement.dataset.appTheme;
+      delete document.body.dataset.appTheme;
+    };
+  }, [currentThemeId]);
 
   return (
     <ThemeContext.Provider value={{ currentThemeId, theme, setThemeId }}>

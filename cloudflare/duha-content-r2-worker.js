@@ -1,22 +1,10 @@
-const PRIMARY_ORIGIN = "https://a-1q1.pages.dev";
-
 function allowedOrigin(origin) {
-  try {
-    const url = new URL(origin);
-    const host = url.hostname;
-    const isOfficialPagesDomain =
-      host === "a-1q1.pages.dev" ||
-      host === "a-bjc.pages.dev" ||
-      host.endsWith(".a-bjc.pages.dev") ||
-      host === "duha-challenge-preview.pages.dev" ||
-      host.endsWith(".duha-challenge-preview.pages.dev");
-    return url.protocol === "https:" && isOfficialPagesDomain ? origin : PRIMARY_ORIGIN;
-  } catch {
-    return PRIMARY_ORIGIN;
-  }
+  if (origin === "https://a-1q1.pages.dev") return origin;
+  if (/^https:\/\/[a-z0-9-]+\.duha-challenge-preview\.pages\.dev$/.test(origin)) return origin;
+  return "https://a-1q1.pages.dev";
 }
 
-function headers(origin) {
+function headers(origin = "") {
   return {
     "Access-Control-Allow-Origin": allowedOrigin(origin),
     "Access-Control-Allow-Headers": "content-type",

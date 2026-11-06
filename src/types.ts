@@ -327,6 +327,8 @@ export interface LeaderboardEntry {
 }
 
 export interface UserProfile {
+  /** Local-only Preview guest; never created in Supabase. */
+  isGuest?: boolean;
   id: string;
   email?: string;
   name: string;

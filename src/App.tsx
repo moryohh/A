@@ -39,9 +39,17 @@ import { MessengerModal } from './components/MessengerModal';
 import { CommunityProfileModal } from './components/CommunityProfileModal';
 import { CommunityAccountActionsModal } from './components/CommunityAccountActionsModal';
 import { MainHomeView } from './components/MainHomeView';
+import { SubjectBookTransition } from './components/SubjectBookTransition';
+import type { SubjectCardOrigin } from './components/MainHomeView';
 import { SubjectLearningPathView } from './components/SubjectLearningPathView';
 import { MathematicsCoursesView } from './components/MathematicsCoursesView';
+import { OnlineChallengeModal } from './components/OnlineChallengeModal';
+import { LiveClassroomModal } from './components/LiveClassroomModal';
+import { GoogleMeetRoomModal } from './components/GoogleMeetRoomModal';
 import { GRADE_6_SUBJECTS } from './data/mockSubjects';
+import { appSfx } from './utils/appSfx';
+import { useSwipeSfx } from './utils/useSwipeSfx';
+import { useInterfaceMotion } from './utils/useInterfaceMotion';
 import { Toast } from './components/Toast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { cleanTeacherName } from './utils/cleanTeacherName';
@@ -71,8 +79,9 @@ import {
   updateUserProfileData,
   fetchCommunityMemberProfile,
 } from './services/communityService';
-import { fetchUnreadMessageCount, markAllMessagesRead } from './services/messengerService';
+import { fetchUnreadMessageCount, markAllMessagesRead, sendDirectMessage } from './services/messengerService';
 import { getSupabaseClient } from './lib/supabase';
+import { guestToUserProfile, isGuestPreviewEnabled, isGuestProfile, loadGuestSession, clearGuestSession } from './services/guestPreviewService';
 import { getLevelSnapshot } from './services/pointsService';
 import { collectGrowthPoints, getGrowthSession, queueGrowthPoints, resetGrowthSession } from './services/growthSessionService';
 import {
@@ -174,16 +183,24 @@ function saveStoredPosition(pos: LearningPosition) {
 
 function AppContent() {
   const { theme } = useAppTheme();
+  useSwipeSfx();
+  useInterfaceMotion();
 
   // Authentication state - Strictly driven by Supabase Auth sessions
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const guest = isGuestPreviewEnabled() ? loadGuestSession() : null;
+    return guest ? guestToUserProfile(guest) : null;
+  });
+  const [isAuthChecking, setIsAuthChecking] = useState(() => !isGuestPreviewEnabled() || !loadGuestSession());
+  const isGuestPreview = isGuestProfile(currentUser);
   const [growthSession, setGrowthSession] = useState({ points: 0, pendingPoints: 0 });
 
   // Main app state
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [homeSubView, setHomeSubView] = useState<'main_home' | 'learning_path' | 'lesson_player'>('main_home');
   const [selectedSubject, setSelectedSubject] = useState<(typeof GRADE_6_SUBJECTS)[0] | null>(GRADE_6_SUBJECTS[0]);
+  const [bookTransition, setBookTransition] = useState<{ subject: (typeof GRADE_6_SUBJECTS)[0]; direction: 'open' | 'close'; origin: SubjectCardOrigin } | null>(null);
+  const subjectCardOriginRef = React.useRef<SubjectCardOrigin | null>(null);
   const [stories, setStories] = useState<TeacherStory[]>(INITIAL_STORIES);
   const [lesson, setLesson] = useState<EducationalLesson>(FEATURED_LESSON);
   const [notifications, setNotifications] = useState<AppNotification[]>(loadStoredNotifications);
@@ -217,6 +234,7 @@ function AppContent() {
   const [messengerContact, setMessengerContact] = useState<CommunityMember | null>(null);
   const [communityProfileMember, setCommunityProfileMember] = useState<CommunityMember | null>(null);
   const [communityAccountActionsMember, setCommunityAccountActionsMember] = useState<CommunityMember | null>(null);
+  const [challengeInviteTarget, setChallengeInviteTarget] = useState<CommunityMember | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [activeExamResult, setActiveExamResult] = useState<NotificationExamResult | null>(null);
 
@@ -224,6 +242,7 @@ function AppContent() {
   React.useEffect(() => {
     let isMounted = true;
     async function loadCommunity() {
+      if (isGuestPreview) return;
       try {
         const loadedPosts = await fetchCommunityPosts(currentUser?.id);
         if (isMounted) {
@@ -265,10 +284,10 @@ function AppContent() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   React.useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || isGuestPreview) return;
     const client = getSupabaseClient();
     if (!client) return;
     const channel = client
@@ -296,21 +315,21 @@ function AppContent() {
       })
       .subscribe();
     return () => { client.removeChannel(channel); };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!currentUser?.id || isGuestPreview) {
       setUnreadMessageCount(0);
       return;
     }
     fetchUnreadMessageCount(currentUser)
       .then(setUnreadMessageCount)
       .catch(() => setUnreadMessageCount(0));
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   // A message notification is created only from the real unread count returned by the messaging service.
   React.useEffect(() => {
-    if (!currentUser?.id || unreadMessageCount <= 0) return;
+    if (!currentUser?.id || isGuestPreview || unreadMessageCount <= 0) return;
     const messageNotification: AppNotification = {
       id: `unread-messages-${currentUser.id}`,
       title: 'لديك رسائل جديدة',
@@ -324,9 +343,10 @@ function AppContent() {
       messageNotification,
       ...previous.filter((item) => item.id !== messageNotification.id),
     ].slice(0, 50));
-  }, [currentUser?.id, unreadMessageCount]);
+  }, [currentUser?.id, unreadMessageCount, isGuestPreview]);
 
   const openMessenger = (member: CommunityMember | null = null) => {
+    if (isGuestPreview) return;
     setMessengerContact(member);
     setCommunityProfileMember(null);
     setIsMessengerOpen(true);
@@ -335,6 +355,7 @@ function AppContent() {
   };
 
   const openCommunityProfile = async (member: CommunityMember) => {
+    if (isGuestPreview) return;
     setCommunityProfileMember(member);
     if (!member.isDemoAccount) {
       const realProfile = await fetchCommunityMemberProfile(member);
@@ -350,7 +371,54 @@ function AppContent() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isTeacherInfoOpen, setIsTeacherInfoOpen] = useState(false);
   const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const openGames = () => {
+    appSfx.panelOpen();
+    setIsGamesOpen(true);
+  };
+  const [isChallengeHubOpen, setIsChallengeHubOpen] = useState(false);
+  const [challengeRoomCode, setChallengeRoomCode] = useState<string | undefined>();
+  const [challengeConfig, setChallengeConfig] = useState<any | null>(null);
   const [isDailyExamOpen, setIsDailyExamOpen] = useState(false);
+
+  const startPlayerChallenge = (member: CommunityMember) => {
+    setCommunityAccountActionsMember(null);
+    setCommunityProfileMember(null);
+    setChallengeInviteTarget(member);
+    setActiveTab('subscriptions');
+    setHomeSubView('main_home');
+    showToast(`اختر اللعبة التي تريد تحدّي ${member.name} بها`);
+  };
+
+  const sendChallengeInvite = async (roomCode: string) => {
+    if (!challengeInviteTarget || !currentUser) return;
+    const target = challengeInviteTarget;
+    try {
+      await sendDirectMessage(currentUser, target, `⚔️ دعوة تحدٍّ من ${currentUser.name}\nاللعبة: ${challengeConfig?.gameTitle || 'تحدٍ جماعي'}\nرمز الغرفة: ${roomCode}\nافتح قسم دوراتي وأدخل الرمز للانضمام.`);
+      appSfx.success();
+      showToast(`أُرسلت دعوة التحدّي إلى ${target.name}`);
+      setChallengeInviteTarget(null);
+    } catch (error) {
+      appSfx.attention();
+      showToast(error instanceof Error ? error.message : 'تعذر إرسال دعوة التحدّي');
+    }
+  };
+
+  React.useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('classroom')?.trim();
+    if (!code || !/^\d{1,4}$/.test(code)) return;
+    setChallengeRoomCode(code.padStart(4, '0'));
+    setChallengeConfig({
+      questions: [],
+      lessonTitle: 'الفصل التعليمي المباشر',
+      gameType: 'live_classroom',
+      gameTitle: 'حل معي أونلاين',
+      subject: 'mathematics',
+      chapterNumber: 1,
+      lessonNumber: 1,
+      contentMode: 'board',
+    });
+    setIsChallengeHubOpen(true);
+  }, []);
 
 
   // Toast feedback state
@@ -366,6 +434,8 @@ function AppContent() {
     isNotificationsOpen,
     isTeacherInfoOpen,
     isGamesOpen,
+    isChallengeHubOpen,
+    challengeGameType: challengeConfig?.gameType,
     isDailyExamOpen,
     isCreatePostOpen,
     activeCommunityPostForComments,
@@ -383,6 +453,8 @@ function AppContent() {
     isNotificationsOpen,
     isTeacherInfoOpen,
     isGamesOpen,
+    isChallengeHubOpen,
+    challengeGameType: challengeConfig?.gameType,
     isDailyExamOpen,
     isCreatePostOpen,
     activeCommunityPostForComments,
@@ -429,7 +501,21 @@ function AppContent() {
       if (state.activeCommunityPostForComments) { setActiveCommunityPostForComments(null); return true; }
       if (state.isCreatePostOpen) { setIsCreatePostOpen(false); return true; }
       if (state.isDailyExamOpen) { setIsDailyExamOpen(false); return true; }
-      if (state.isGamesOpen) { setIsGamesOpen(false); return true; }
+      if (state.isChallengeHubOpen) {
+        if (state.challengeGameType === 'live_classroom') {
+          const classroomBack = new Event('duha-live-classroom-back', { cancelable: true });
+          window.dispatchEvent(classroomBack);
+          if (classroomBack.defaultPrevented) return true;
+        }
+        setIsChallengeHubOpen(false);
+        return true;
+      }
+      if (state.isGamesOpen) {
+        const gamesBack = new Event('duha-games-back', { cancelable: true });
+        window.dispatchEvent(gamesBack);
+        if (!gamesBack.defaultPrevented) setIsGamesOpen(false);
+        return true;
+      }
       if (state.isAttachmentOpen) { setIsAttachmentOpen(false); setActiveAttachment(null); return true; }
       if (state.isCommentsOpen) { setIsCommentsOpen(false); return true; }
       if (state.selectedStory) { setSelectedStory(null); return true; }
@@ -476,6 +562,11 @@ function AppContent() {
   // Initialize and listen to Auth state (Google OAuth, dev bypass, sessions)
   React.useEffect(() => {
     let isMounted = true;
+    if (isGuestPreview) {
+      setIsAuthChecking(false);
+      return () => { isMounted = false; };
+    }
+
     getInitialAuthState().then((user) => {
       if (isMounted) {
         if (user) setCurrentUser(user);
@@ -494,9 +585,17 @@ function AppContent() {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [isGuestPreview]);
 
   const handleSignOut = async () => {
+    if (isGuestPreview) {
+      clearGuestSession();
+      setCurrentUser(null);
+      setActiveTab('home');
+      setHomeSubView('main_home');
+      showToast('تم إنهاء جلسة الضيف');
+      return;
+    }
     resetGrowthSession(currentUser?.id);
     setGrowthSession({ points: 0, pendingPoints: 0 });
     await signOutUser();
@@ -530,18 +629,52 @@ function AppContent() {
     }
   }, [lesson]);
 
-  const handleSelectSubject = (subject: (typeof GRADE_6_SUBJECTS)[0]) => {
-    setSelectedSubject(subject);
-    setStories([]);
-    setOpenLessonContext(null);
-    const existingPos = savedPositions[subject.id] || {
-      subjectId: subject.id,
-      chapterNumber: 1,
-      lessonNumber: 1,
-    };
-    setLearningPosition(existingPos);
-    setHomeSubView('learning_path');
+  const handleSelectSubject = (subject: (typeof GRADE_6_SUBJECTS)[0], origin: SubjectCardOrigin) => {
+    if (bookTransition) return;
+    subjectCardOriginRef.current = origin;
+    setBookTransition({ subject, direction: 'open', origin });
+    appSfx.bookOpen();
   };
+
+  const closeSubjectBook = () => {
+    if (!selectedSubject || bookTransition) return;
+    const origin = subjectCardOriginRef.current || {
+      top: window.innerHeight * .32,
+      left: window.innerWidth * .08,
+      width: window.innerWidth * .4,
+      height: 176,
+      scrollY: 0,
+    };
+    setBookTransition({ subject: selectedSubject, direction: 'close', origin });
+    appSfx.bookClose();
+  };
+
+  React.useEffect(() => {
+    if (!bookTransition) return;
+    const { subject, direction, origin } = bookTransition;
+    const navigationTimer = window.setTimeout(() => {
+      if (direction === 'open') {
+        setSelectedSubject(subject);
+        setStories([]);
+        setOpenLessonContext(null);
+        const existingPos = savedPositions[subject.id] || {
+          subjectId: subject.id,
+          chapterNumber: 1,
+          lessonNumber: 1,
+        };
+        setLearningPosition(existingPos);
+        setHomeSubView('learning_path');
+      } else {
+        setHomeSubView('main_home');
+        window.requestAnimationFrame(() => window.scrollTo({ top: origin.scrollY, left: 0, behavior: 'auto' }));
+      }
+    }, direction === 'open' ? 390 : 860);
+    const cleanupTimer = window.setTimeout(() => setBookTransition(null), direction === 'open' ? 1120 : 1110);
+    return () => {
+      window.clearTimeout(navigationTimer);
+      window.clearTimeout(cleanupTimer);
+    };
+  }, [bookTransition, savedPositions]);
 
   // Always open a subject from the top so the global header is visible immediately.
   React.useEffect(() => {
@@ -726,6 +859,7 @@ function AppContent() {
   };
 
   const handleAssessmentResult = async (correctPoints: number, totalPoints: number) => {
+    if (isGuestPreview) return;
     const snapshot = await recordAssessmentResult(correctPoints, totalPoints);
     if (snapshot) applyCompetitionSnapshot(snapshot);
   };
@@ -739,6 +873,7 @@ function AppContent() {
     completedAt: string;
     answers?: NotificationExamAnswer[];
   }) => {
+    if (isGuestPreview) return;
     const completedDate = new Date(result.completedAt).toLocaleDateString('ar-IQ', {
       year: 'numeric',
       month: 'long',
@@ -812,7 +947,7 @@ function AppContent() {
 
   // Count only visible, recently active time. The database function enforces the 5-point daily cap.
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!currentUser?.id || isGuestPreview) {
       setCompetitionSnapshot(null);
       lastActivityPointsRef.current = null;
       activityBlockStartedAtRef.current = null;
@@ -867,12 +1002,12 @@ function AppContent() {
       document.removeEventListener('visibilitychange', handleVisibility);
       activityRecordingRef.current = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   const lastRewardRef = React.useRef<{ points: number; at: number } | null>(null);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || isGuestPreview) return;
     const todayKey = new Date().toISOString().slice(0, 10);
     const activityKey = `nahnu_maak:activity-day:${currentUser.id}`;
     if (window.localStorage.getItem(activityKey) === todayKey) return;
@@ -881,10 +1016,10 @@ function AppContent() {
     const updatedUser = { ...currentUser, streakDays: nextStreakDays };
     setCurrentUser(updatedUser);
     void updateUserProfileData(currentUser.id, { streakDays: nextStreakDays });
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGuestPreview]);
 
   const handleScoreUpdate = async (points: number) => {
-    if (!currentUser || points <= 0) return;
+    if (!currentUser || isGuestPreview || points <= 0) return;
     const now = Date.now();
     const lastReward = lastRewardRef.current;
     if (lastReward && lastReward.points === points && now - lastReward.at < 5000) return;
@@ -894,7 +1029,7 @@ function AppContent() {
   };
 
   const handleCollectGrowthPoints = () => {
-    if (!currentUser) return 0;
+    if (!currentUser || isGuestPreview) return 0;
     const collected = collectGrowthPoints(currentUser.id, currentUser.growthShieldTier ?? -1);
     if (collected.collected <= 0) return 0;
 
@@ -1088,6 +1223,7 @@ function AppContent() {
 
   // Community Handlers
   const handleCreatePost = async (newPostData: Omit<CommunityPost, 'id' | 'likesCount' | 'commentsCount' | 'isLiked' | 'comments'>) => {
+    if (isGuestPreview) return;
     try {
       const createdPost = await createCommunityPost(newPostData, currentUser?.id);
       setCommunityPosts((prev) => [createdPost, ...prev]);
@@ -1100,6 +1236,7 @@ function AppContent() {
   };
 
   const handleToggleLikeCommunityPost = async (postId: string) => {
+    if (isGuestPreview) return;
     try {
       const result = await toggleLikeCommunityPost(postId, currentUser?.id);
       setCommunityPosts((prev) => prev.map((post) => post.id === postId ? {
@@ -1121,6 +1258,7 @@ function AppContent() {
   };
 
   const handleReportCommunityPost = async (postId: string) => {
+    if (isGuestPreview) return;
     try {
       await reportCommunityPost(postId);
       showToast('تم إرسال البلاغ إلى الإدارة');
@@ -1130,6 +1268,7 @@ function AppContent() {
   };
 
   const handleAddCommunityComment = async (postId: string, text: string) => {
+    if (isGuestPreview) return;
     try {
       const newComment = await addCommunityComment(postId, text, currentUser);
       setCommunityPosts((prev) =>
@@ -1219,7 +1358,7 @@ function AppContent() {
               : activeTab === 'community'
               ? 'المجتمع الطلابي'
               : activeTab === 'subscriptions'
-              ? 'الاشتراكات والدروس'
+              ? 'التحدّي ودوراتي'
               : activeTab === 'profile'
               ? 'الملف الشخصي'
               : 'الإعدادات'
@@ -1235,20 +1374,20 @@ function AppContent() {
               if (homeSubView === 'lesson_player') {
                 setHomeSubView(selectedSubject ? 'learning_path' : 'main_home');
               } else if (homeSubView === 'learning_path') {
-                setHomeSubView('main_home');
+                closeSubjectBook();
               }
             } else {
               setActiveTab('home');
               setHomeSubView('main_home');
             }
           }}
-          onOpenNotifications={() => {
+          onOpenNotifications={isGuestPreview ? undefined : () => {
             setNotifications((previous) => previous.map((item) => ({ ...item, isRead: true })));
             setIsNotificationsOpen(true);
           }}
           onOpenProfile={() => setActiveTab('profile')}
-          onOpenGames={() => setIsGamesOpen(true)}
-          onOpenMessenger={() => openMessenger()}
+          onOpenGames={openGames}
+          onOpenMessenger={isGuestPreview ? undefined : () => openMessenger()}
           unreadMessagesCount={unreadMessageCount}
         />
 
@@ -1261,13 +1400,35 @@ function AppContent() {
               onSelectLesson={(selectedLesson) => {
                 handleSelectLessonWithContext(selectedLesson);
               }}
-              onOpenGames={() => setIsGamesOpen(true)}
+              onOpenGames={openGames}
             />
           )}
 
           {/* 2. Intermediate Subject Learning Path (خارطة المادة والتقدم) */}
           {activeTab === 'home' && homeSubView === 'learning_path' && selectedSubject && (
-            selectedSubject.id === 'mathematics' ? <MathematicsCoursesView onBack={() => setHomeSubView('main_home')} /> :
+            selectedSubject.id === 'mathematics' ? <MathematicsCoursesView
+              onBack={closeSubjectBook}
+              onOpenGames={(mathTopic) => {
+                setLesson((current) => ({
+                  ...current,
+                  id: mathTopic.topicId,
+                  title: mathTopic.title,
+                  subtitle: `الفصل ${mathTopic.chapterNumber} — ${mathTopic.teacherName}`,
+                  category: 'mathematics',
+                  teacherName: mathTopic.teacherName,
+                }));
+                setOpenLessonContext({
+                  subjectId: 'mathematics',
+                  chapterNumber: mathTopic.chapterNumber,
+                  lessonNumber: mathTopic.sortOrder + 1,
+                  lessonId: mathTopic.topicId,
+                  lessonKey: buildLessonKey('mathematics', mathTopic.chapterNumber, mathTopic.sortOrder + 1),
+                  title: mathTopic.title,
+                  lessonTitle: mathTopic.title,
+                });
+                openGames();
+              }}
+            /> :
             <SubjectLearningPathView
               subject={selectedSubject}
               learningPosition={learningPosition}
@@ -1276,12 +1437,14 @@ function AppContent() {
               user={currentUser}
               onSelectLesson={handleSelectLessonWithContext}
               onBack={() => {
-                setHomeSubView('main_home');
+                closeSubjectBook();
               }}
-              onOpenGames={() => setIsGamesOpen(true)}
+              onOpenGames={openGames}
               onScoreUpdate={handleScoreUpdate}
             />
           )}
+
+          {bookTransition && <SubjectBookTransition subject={bookTransition.subject} direction={bookTransition.direction} origin={bookTransition.origin} />}
 
           {/* 3. Lesson Player View */}
           {activeTab === 'home' && homeSubView === 'lesson_player' && (
@@ -1292,7 +1455,7 @@ function AppContent() {
                 currentPlayingYoutubeId={lesson.youtubeId}
                 currentPlayingTeacher={lesson.teacherName}
                 onSelectStory={handleSelectStory}
-                onOpenQuiz={() => setIsGamesOpen(true)}
+                onOpenQuiz={openGames}
               />
 
               {/* Main Educational Video & Content Card */}
@@ -1303,7 +1466,7 @@ function AppContent() {
                   onOpenTeacherInfo={() => setIsTeacherInfoOpen(true)}
                   isPaused={isGamesOpen || isAttachmentOpen || isTeacherInfoOpen || isNotificationsOpen}
                   onBackToMap={() => setHomeSubView('learning_path')}
-                  onOpenGames={() => setIsGamesOpen(true)}
+                  onOpenGames={openGames}
                 />
               </div>
             </div>
@@ -1311,6 +1474,7 @@ function AppContent() {
 
           {activeTab === 'subscriptions' && (
             <SubscriptionsView
+              challengeTargetName={challengeInviteTarget?.name}
               onSelectLesson={(selectedLesson) => {
                 setLesson(selectedLesson);
                 setActiveTab('home');
@@ -1321,6 +1485,13 @@ function AppContent() {
                 setHomeSubView('main_home');
               }}
               competitionSnapshot={competitionSnapshot}
+              onOpenChallenge={() => { setChallengeRoomCode(undefined); setChallengeConfig(null); setIsChallengeHubOpen(true); }}
+              onJoinChallenge={(room) => {
+                setChallengeRoomCode(room.code);
+                setChallengeConfig({ questions: [], lessonTitle: room.lessonTitle, gameType: room.gameType, gameTitle: room.gameTitle, subject: room.subject, chapterNumber: room.chapter, lessonNumber: room.lesson, contentMode: room.contentMode || (room.gameTitle.includes('الملزمة') ? 'booklet' : 'board'), meetingUrl: room.meetingUrl });
+                setIsChallengeHubOpen(true);
+              }}
+              onCreateChallenge={(config) => { setChallengeRoomCode(undefined); setChallengeConfig(config); setIsChallengeHubOpen(true); }}
             />
           )}
 
@@ -1373,6 +1544,7 @@ function AppContent() {
         <BottomNav
           activeTab={activeTab}
           onSelectTab={(tab) => {
+            if (isGuestPreview && tab === 'community') return;
             if (tab === 'home') {
               setActiveTab('home');
               setHomeSubView('main_home');
@@ -1381,6 +1553,7 @@ function AppContent() {
             }
           }}
           communityUnreadCount={0}
+          hideCommunity={isGuestPreview}
           avatarUrl={currentUser?.avatarUrl}
         />
       </div>
@@ -1442,6 +1615,7 @@ function AppContent() {
           setCommunityAccountActionsMember(null);
           openMessenger(member);
         }}
+        onChallenge={startPlayerChallenge}
       />
 
       <CommunityProfileModal
@@ -1450,6 +1624,7 @@ function AppContent() {
         currentUserId={currentUser?.id}
         onClose={() => setCommunityProfileMember(null)}
         onMessage={(member) => openMessenger(member)}
+        onChallenge={startPlayerChallenge}
       />
 
       <MessengerModal
@@ -1516,6 +1691,73 @@ function AppContent() {
           />
         </React.Suspense>
       </GamesLoadBoundary>
+
+      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && challengeConfig?.contentMode === 'meet' && (
+        <GoogleMeetRoomModal
+          key={`google-meet-${challengeRoomCode || 'create'}`}
+          onClose={() => setIsChallengeHubOpen(false)}
+          title={challengeConfig?.lessonTitle || 'بث مباشر'}
+          subject={challengeConfig?.subject || 'المادة التعليمية'}
+          chapter={challengeConfig?.chapterNumber || 1}
+          initialRoomCode={challengeRoomCode}
+          initialMeetingUrl={challengeConfig?.meetingUrl}
+          onRoomCreated={sendChallengeInvite}
+        />
+      )}
+      {isChallengeHubOpen && challengeConfig?.gameType === 'live_classroom' && challengeConfig?.contentMode !== 'meet' && (
+        <LiveClassroomModal
+          key={`live-classroom-${challengeRoomCode || 'create'}`}
+          onClose={() => setIsChallengeHubOpen(false)}
+          lessonTitle={challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر'}
+          category={challengeConfig?.subject || 'المادة التعليمية'}
+          openLessonContext={{
+            subjectId: challengeConfig?.subject || 'biology',
+            chapterNumber: challengeConfig?.chapterNumber || 1,
+            lessonNumber: challengeConfig?.lessonNumber || 1,
+            lessonId: challengeConfig?.lessonId || `lesson-${challengeConfig?.lessonNumber || 1}`,
+            lessonKey: `${challengeConfig?.subject || 'biology'}-ch${challengeConfig?.chapterNumber || 1}-les${challengeConfig?.lessonNumber || 1}`,
+            title: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
+            lessonTitle: challengeConfig?.lessonTitle || 'الفصل التعليمي المباشر',
+          }}
+          initialRoomCode={challengeRoomCode}
+          initialContentMode={challengeConfig?.contentMode || 'board'}
+          onJoinActiveRoom={(activeRoom) => {
+            const nextConfig = {
+              questions: [],
+              lessonTitle: activeRoom.lessonTitle || 'غرفة تحدٍ نشطة',
+              gameType: activeRoom.gameType || 'live_classroom',
+              gameTitle: activeRoom.gameTitle || 'التحدّي الجماعي',
+              subject: activeRoom.subject,
+              chapterNumber: activeRoom.chapter,
+              lessonNumber: activeRoom.lesson,
+              contentMode: activeRoom.contentMode || (activeRoom.gameType === 'live_classroom' ? 'booklet' : undefined),
+            };
+            // Unmount the current room before mounting the selected one. Keeping both
+            // transitions in the same render left the old full-screen portal visible.
+            setIsChallengeHubOpen(false);
+            window.setTimeout(() => {
+              setChallengeRoomCode(activeRoom.code);
+              setChallengeConfig(nextConfig);
+              setIsChallengeHubOpen(true);
+            }, 0);
+          }}
+        />
+      )}
+      {isChallengeHubOpen && challengeConfig?.gameType !== 'live_classroom' && (
+        <OnlineChallengeModal
+          key={`online-challenge-${challengeRoomCode || challengeConfig?.gameType || 'create'}`}
+          onClose={() => setIsChallengeHubOpen(false)}
+          questions={challengeConfig?.questions || []}
+          lessonTitle={challengeConfig?.lessonTitle || 'مركز الغرف النشطة'}
+          gameType={challengeConfig?.gameType || 'true_false'}
+          gameTitle={challengeConfig?.gameTitle || 'التحدّي الجماعي'}
+          subject={challengeConfig?.subject}
+          chapterNumber={challengeConfig?.chapterNumber}
+          lessonNumber={challengeConfig?.lessonNumber}
+          initialRoomCode={challengeRoomCode}
+          onRoomCreated={sendChallengeInvite}
+        />
+      )}
 
       <DailyExamModal
         isOpen={isDailyExamOpen}

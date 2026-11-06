@@ -1,5 +1,5 @@
-import React from 'react';
-import { CheckCircle2, X, XCircle, AlertTriangle, ClipboardCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle2, X, XCircle, AlertTriangle, ClipboardCheck, Eye, ChevronDown } from 'lucide-react';
 import { NotificationExamResult } from '../types';
 import { useAppTheme } from '../services/themeService';
 
@@ -10,6 +10,7 @@ interface ExamResultDetailsModalProps {
 
 export const ExamResultDetailsModal: React.FC<ExamResultDetailsModalProps> = ({ result, onClose }) => {
   const { theme } = useAppTheme();
+  const [expandedAnswers, setExpandedAnswers] = useState<Record<number, boolean>>({});
   if (!result) return null;
 
   const total = result.totalScore ?? result.answers.reduce((sum, answer) => sum + (answer.maxScore || 0), 0);
@@ -63,12 +64,24 @@ export const ExamResultDetailsModal: React.FC<ExamResultDetailsModalProps> = ({ 
                     <span className="text-xs font-black" dir="ltr">{answer.score ?? '—'} / {answer.maxScore ?? '—'}</span>
                   </div>
                   {answer.prompt && <p className={`mt-2 text-xs leading-6 ${theme.classes.textMuted}`}>{answer.prompt}</p>}
-                  <div className="mt-2 rounded-xl bg-black/5 p-2">
-                    <span className="text-[10px] font-black text-sky-600">إجابتك</span>
-                    <p className={`mt-1 whitespace-pre-wrap text-xs leading-6 ${theme.classes.textMain}`}>{answer.userAnswer || 'لم تُسجل إجابة نصية'}</p>
-                  </div>
-                  {answer.modelAnswer && <div className="mt-2 rounded-xl bg-emerald-500/10 p-2"><span className="text-[10px] font-black text-emerald-600">الإجابة الصحيحة</span><p className={`mt-1 whitespace-pre-wrap text-xs leading-6 ${theme.classes.textMain}`}>{answer.modelAnswer}</p></div>}
-                  {answer.feedback && <p className={`mt-2 text-xs leading-6 ${theme.classes.textMuted}`}><AlertTriangle className="ml-1 inline h-3.5 w-3.5 text-amber-500" />{answer.feedback}</p>}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedAnswers((current) => ({ ...current, [index]: !current[index] }))}
+                    className="mt-2 flex w-full items-center justify-between rounded-xl border border-current/10 bg-black/5 px-3 py-2 text-xs font-black text-sky-600"
+                  >
+                    <span className="flex items-center gap-1.5"><Eye className="h-4 w-4" />عرض الإجابة والأخطاء</span>
+                    <ChevronDown className={`h-4 w-4 transition ${expandedAnswers[index] ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expandedAnswers[index] && (
+                    <div className="mt-2 space-y-2">
+                      <div className="rounded-xl bg-black/5 p-2">
+                        <span className="text-[10px] font-black text-sky-600">إجابتك</span>
+                        <p className={`mt-1 whitespace-pre-wrap text-xs leading-6 ${theme.classes.textMain}`}>{answer.userAnswer || 'لم تُسجل إجابة نصية'}</p>
+                      </div>
+                      {answer.modelAnswer && <div className="rounded-xl bg-emerald-500/10 p-2"><span className="text-[10px] font-black text-emerald-600">الإجابة الصحيحة</span><p className={`mt-1 whitespace-pre-wrap text-xs leading-6 ${theme.classes.textMain}`}>{answer.modelAnswer}</p></div>}
+                      {answer.feedback ? <p className="rounded-xl bg-amber-500/10 p-2 text-xs leading-6 text-amber-700"><AlertTriangle className="ml-1 inline h-3.5 w-3.5" />{answer.feedback}</p> : <p className={`rounded-xl bg-black/5 p-2 text-xs ${theme.classes.textMuted}`}>لم يرسل المصحح شرحًا نصيًا إضافيًا لهذا السؤال.</p>}
+                    </div>
+                  )}
                 </article>
               );
             })}

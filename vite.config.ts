@@ -30,6 +30,7 @@ export default defineConfig(() => {
           start_url: appBase,
           scope: appBase,
           display: 'standalone',
+          orientation: 'landscape',
           theme_color: '#050505',
           background_color: '#050505',
           icons: [
@@ -41,6 +42,7 @@ export default defineConfig(() => {
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           globIgnores: ['solve-with-me/**'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         },
         devOptions: {enabled: false},
       }),
@@ -51,6 +53,7 @@ export default defineConfig(() => {
       },
     },
     server: {
+      allowedHosts: ['terminal.local'],
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

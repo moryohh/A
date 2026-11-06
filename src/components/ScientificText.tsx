@@ -12,16 +12,27 @@ type MathPart = {type: 'text' | 'inline' | 'block'; value: string};
 function repairCommonEscapes(value: string): string {
   // A malformed JSON source may have interpreted \f and \t as control characters.
   return value
+    .replace(/\\{2,}(?=(?:frac|dfrac|tfrac|sqrt|times|Delta|circ|varsigma|mathrm|rightarrow|leftrightarrow)\b)/g, '\\')
     .replace(/\f(?=rac)/g, '\\frac')
     .replace(/\t(?=imes)/g, '\\times')
     .replace(/\u000b(?=ec|sqrt)/g, '\\vec')
     // Repair recurring OCR/JSON damage in chemistry and physics equations.
     .replace(/\\fracrac\b/g, '\\frac')
+    .replace(/\\timesimes\b/g, '\\times')
     .replace(/(?:\\)?leftrightarrow\b/g, '\\leftrightarrow')
     .replace(/(?:\\)?(?:r?ightarrow)\b/g, '\\rightarrow')
-    .replace(/\bDelta\s*Hfirc\b/g, '\\Delta H_f^{\\circ}')
-    .replace(/\bDelta\s*H\b/g, '\\Delta H')
-    .replace(/\bDelta(?=[A-Za-z])/g, '\\Delta ');
+    .replace(/(?<!\\)\bDelta\s*Hfirc\b/g, '\\Delta H_f^{\\circ}')
+    .replace(/(?<!\\)\bDelta\s*H_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/(?<!\\)\bDeltaH_([fr])\s*\^?\s*(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/(?<!\\)\bDeltaH([fr])(?:\\?circ|irc)\b/g, '\\Delta H_$1^{\\circ}')
+    .replace(/(?<!\\)\bDeltaH\b/g, '\\Delta H')
+    .replace(/(?<!\\)\bDelta\s*H\b/g, '\\Delta H')
+    .replace(/(?<!\\)\bDelta(?=[A-Za-z])/g, '\\Delta ')
+    .replace(/(?<!\\)\bDelta\b/g, '\\Delta')
+    .replace(/(?<!\\)\bvarsigma\b/g, '\\varsigma')
+    .replace(/(?<!\\)\bcirc\b/g, '\\circ')
+    .replace(/\\?(?:s?elect)\s*kJ\b/gi, '\\mathrm{kJ}')
+    .replace(/\\?(?:s?elect)\s*J\b/gi, '\\mathrm{J}');
 }
 
 function looksLikeLatex(value: string): boolean {
@@ -64,10 +75,20 @@ export const ScientificText: React.FC<ScientificTextProps> = ({value, className 
   const raw = repairCommonEscapes(String(value));
   if (!raw.trim()) return null;
 
-  if (display || isFormulaOnly(raw)) {
+  const hasExplicitDelimiters = /(\$\$[\s\S]*?\$\$|\$[^$\n]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\])/.test(raw);
+  const displayValue = raw.trim()
+    .replace(/^\$\$([\s\S]*)\$\$/, '$1')
+    .replace(/^\$([^$]*)\$/, '$1')
+    .replace(/^\\\[([\s\S]*)\\\]$/, '$1')
+    .replace(/^\\\(([\s\S]*)\\\)$/, '$1')
+    .trim();
+
+  // Explicit delimiters must be split first. Passing the surrounding $ signs
+  // into KaTeX makes otherwise valid equations fall back to raw code.
+  if (display || (isFormulaOnly(raw) && !hasExplicitDelimiters)) {
     return (
       <span className={`scientific-math block overflow-x-auto py-1 text-center ${className}`} dir="ltr">
-        <BlockMath math={raw} errorColor="#f87171" renderError={() => <MathFallback value={raw} />} />
+        <BlockMath math={display ? displayValue : raw} errorColor="#f87171" renderError={() => <MathFallback value={raw} />} />
       </span>
     );
   }

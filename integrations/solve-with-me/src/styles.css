@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 html,body{overscroll-behavior-y:none}
-:root{font-family:Cairo,sans-serif;color:#1e293b;background:#f8fafc;direction:rtl;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:320px;background-color:#f8fafc;background-image:radial-gradient(#cbd5e1 1px,transparent 1px);background-size:24px 24px}button,input{font:inherit}button{cursor:pointer}.game-header{position:sticky;top:0;z-index:30;height:54px;padding:7px max(14px,calc((100% - 1120px)/2));display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:#fff}.score,.board-actions{display:flex;gap:8px;align-items:center}.pill{height:38px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;font-weight:900}.pill.heart{color:#fb7185;background:#fb71851a;border:1px solid #fb718533}.pill.apple{color:#34d399;background:#34d39918;border:1px solid #34d39933}.icon-button{border:0;border-radius:10px;background:#1e293b;color:#fff;padding:9px 12px;display:flex;align-items:center;gap:7px;font-weight:800}.page{max-width:1120px;margin:auto;padding:28px 16px}.hero{text-align:center;margin:20px 0 32px}.hero-icon{width:68px;height:68px;margin:auto;display:grid;place-items:center;border-radius:20px;background:#0ea5e9;color:#fff;font-size:28px;font-weight:900}.hero h1{margin:14px 0 4px}.hero p{color:#64748b;font-weight:700}.chapter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}.chapter-card,.topic-card{border:1px solid #e2e8f0;border-radius:20px;background:#fff;box-shadow:0 5px 20px #0f172a0a}.chapter-card{text-align:right;padding:22px;transition:.2s}.chapter-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px #0f172a16}.card-top{display:flex;align-items:center;justify-content:space-between}.chapter-symbol{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:#0ea5e9;color:#fff}.count{padding:5px 10px;border-radius:99px;background:#f1f5f9;color:#64748b;font-size:12px;font-weight:800}.chapter-card h2{font-size:18px}.chapter-card p{margin:7px 0;color:#64748b;font-size:12px;font-weight:700}.chapter-card strong{display:block;margin-top:18px;padding-top:15px;border-top:1px solid #f1f5f9;color:#0284c7}.title-row{display:flex;gap:14px;align-items:center;margin-bottom:20px}.topic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}.topic-card{padding:18px}.topic-card h2{display:flex;gap:8px;align-items:center;font-size:15px;padding-bottom:12px;border-bottom:1px solid #f1f5f9}.file-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.file-grid button{display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:11px;background:#f8fafc;font-weight:800;color:#334155}.file-grid button:hover{border-color:#0ea5e9;background:#f0f9ff}.solver{max-width:1120px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:235px 1fr;gap:20px;align-items:start}.solver aside{position:sticky;top:72px;display:grid;gap:9px;padding:15px;border-radius:18px;border:1px solid #e2e8f0;background:#fff}.solver aside button{border:1px solid #e2e8f0;border-radius:12px;padding:11px;background:#f8fafc;display:flex;align-items:center;gap:8px;font-weight:900}.solver aside small{margin-right:auto}.solution{min-width:0}.problem-card,.solution-step{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:22px;margin-bottom:14px;box-shadow:0 4px 18px #0f172a0a}.problem-card{text-align:center}.problem-card h1{font-size:22px}.problem-card img{max-width:100%;border-radius:14px}.solution-step h3{font-size:14px}.solution-step p{padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.solution-step.done p{display:none}.equation{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;font-size:25px;font-weight:800;min-height:58px}.answer-box{min-width:58px;height:50px;border:2px solid #ef4444;border-radius:11px;background:#fef2f2;color:#991b1b;display:inline-grid;place-items:center}.answer-box.active{background:#fca5a5;box-shadow:0 0 0 8px #fecaca88}.answer-inline{display:inline-block;color:#047857;margin:0 4px}.modal-shade{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:#0f172a99;backdrop-filter:blur(3px)}.choices-card{position:relative;width:min(400px,100%);padding:26px;border-radius:24px;background:#fff;text-align:center}.modal-x{position:absolute;top:12px;left:12px;border:0;border-radius:50%;padding:7px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.choice-grid button{padding:14px;border:2px solid #e2e8f0;border-radius:13px;background:#f8fafc;font-size:18px;font-weight:900}.board-modal{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#fff}.board-head{height:64px;flex:none;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:8px 12px}.board-actions button{width:42px;height:42px;border:0;border-radius:12px;display:grid;place-items:center;background:#1e293b;color:#fff}.board-actions button.exit{background:#f43f5e}.board-actions button.calc{background:#fff;color:#0f172a}.board-scroll{position:relative;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;background-color:#fff;background-image:linear-gradient(#e2e8f0 1px,transparent 1px),linear-gradient(90deg,#e2e8f0 1px,transparent 1px);background-size:28px 28px}.board-flow{width:min(94%,820px);margin:auto;padding:16px 0 8px}.board-question{text-align:center;font-size:clamp(20px,5vw,30px);font-weight:900;padding:12px;border-bottom:2px solid #0ea5e944}.board-step{padding:13px;margin:10px auto;border:1px solid #e2e8f0;border-radius:16px;background:#fffffff2;text-align:center;box-shadow:0 4px 14px #0f172a0c}.board-step.current{border-color:#38bdf8;background:#f0f9fff5;box-shadow:0 8px 22px #0f172a22}.board-step small{color:#0284c7;font-weight:900}.pinned-step{position:sticky;top:0;z-index:10;width:min(94%,820px);margin:auto;pointer-events:none}.pinned-step .board-step{pointer-events:auto}.drawing-area{height:max(62vh,560px);border-top:2px solid #0ea5e933}.draw-canvas{display:block;width:100%;height:100%;touch-action:none}.teacher-bubble{position:relative;z-index:12;width:min(94%,650px);margin:12px auto;display:flex;align-items:flex-end;gap:8px}.teacher{width:60px;height:60px;overflow:hidden;border:4px solid #fff;border-radius:50% 50% 12px 50%;background:#0ea5e9;font-size:48px;line-height:1;transform:none;padding-top:12px}.teacher-bubble>div:last-child{position:relative;flex:1;padding:13px 38px 13px 14px;border:2px solid #6366f1;border-radius:16px 16px 4px;background:#fff;color:#3730a3;font-weight:800}.teacher-bubble button{position:absolute;top:6px;left:6px;border:0;border-radius:50%;padding:5px}.explain{position:sticky;bottom:10px;z-index:12;margin:0 12px 10px auto;border:2px solid #6366f1;border-radius:999px;background:#fff;color:#4338ca;padding:6px 8px 6px 14px;display:flex;align-items:center;gap:7px;font-weight:900}.explain b{width:36px;height:36px;border-radius:50%;overflow:hidden;background:#0ea5e9;font-size:29px;line-height:1;padding-top:8px}.draw-tools{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px;background:#fff;border-top:1px solid #e2e8f0}.draw-tools button,.draw-tools label{min-height:45px;border:1px solid #e2e8f0;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:900}.draw-tools .selected{background:#0f172a;color:#fff}.draw-tools .range{grid-column:1/-1;padding:0 10px}.range input{flex:1}.draw-tools .danger{color:#be123c}.calculator{position:fixed;z-index:140;bottom:18px;left:18px;width:280px;padding:14px;border-radius:18px;background:#0f172a;color:#fff;box-shadow:0 18px 50px #0006}.calculator>button{float:left;background:transparent;color:#fff;border:0}.calc-display{clear:both;padding:10px;margin:8px 0;background:#020617;color:#34d399;text-align:left;font:800 20px monospace;border-radius:10px}.calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.calc-grid button{padding:9px;border:0;border-radius:7px;background:#334155;color:#fff}.loading{padding:80px;text-align:center;font-weight:900}
+:root{font-family:Cairo,sans-serif;color:#1e293b;background:#f8fafc;direction:rtl;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:320px;background-color:#f8fafc;background-image:radial-gradient(#cbd5e1 1px,transparent 1px);background-size:24px 24px}button,input{font:inherit}button{cursor:pointer}.game-header{position:sticky;top:0;z-index:30;height:54px;padding:7px max(14px,calc((100% - 1120px)/2));display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:#fff}.score,.board-actions{display:flex;gap:8px;align-items:center}.pill{height:38px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;font-weight:900}.pill.heart{color:#fb7185;background:#fb71851a;border:1px solid #fb718533}.pill.apple{color:#34d399;background:#34d39918;border:1px solid #34d39933}.icon-button{border:0;border-radius:10px;background:#1e293b;color:#fff;padding:9px 12px;display:flex;align-items:center;gap:7px;font-weight:800}.page{max-width:1120px;margin:auto;padding:28px 16px}.hero{text-align:center;margin:20px 0 32px}.hero-icon{width:68px;height:68px;margin:auto;display:grid;place-items:center;border-radius:20px;background:#0ea5e9;color:#fff;font-size:28px;font-weight:900}.hero h1{margin:14px 0 4px}.hero p{color:#64748b;font-weight:700}.chapter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}.chapter-card,.topic-card{border:1px solid #e2e8f0;border-radius:20px;background:#fff;box-shadow:0 5px 20px #0f172a0a}.chapter-card{text-align:right;padding:22px;transition:.2s}.chapter-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px #0f172a16}.card-top{display:flex;align-items:center;justify-content:space-between}.chapter-symbol{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:#0ea5e9;color:#fff}.count{padding:5px 10px;border-radius:99px;background:#f1f5f9;color:#64748b;font-size:12px;font-weight:800}.chapter-card h2{font-size:18px}.chapter-card p{margin:7px 0;color:#64748b;font-size:12px;font-weight:700}.chapter-card strong{display:block;margin-top:18px;padding-top:15px;border-top:1px solid #f1f5f9;color:#0284c7}.title-row{display:flex;gap:14px;align-items:center;margin-bottom:20px}.header-left{display:flex;align-items:center;gap:7px}.header-back{width:42px;height:42px;border:0;border-radius:12px;display:grid;place-items:center;background:#0ea5e9;color:#fff}.topic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}.topic-card{padding:18px}.topic-card h2{display:flex;gap:8px;align-items:center;font-size:15px;padding-bottom:12px;border-bottom:1px solid #f1f5f9}.file-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.file-grid button{display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:11px;background:#f8fafc;font-weight:800;color:#334155}.file-grid button:hover{border-color:#0ea5e9;background:#f0f9ff}.solver{max-width:1120px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:235px 1fr;gap:20px;align-items:start}.solver aside{position:sticky;top:72px;display:grid;gap:9px;padding:15px;border-radius:18px;border:1px solid #e2e8f0;background:#fff}.solver aside button{border:1px solid #e2e8f0;border-radius:12px;padding:11px;background:#f8fafc;display:flex;align-items:center;gap:8px;font-weight:900}.solver aside small{margin-right:auto}.solution{min-width:0}.problem-card,.solution-step{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:22px;margin-bottom:14px;box-shadow:0 4px 18px #0f172a0a}.problem-card{text-align:center}.problem-card h1{font-size:22px}.problem-card img{max-width:100%;border-radius:14px}.solution-step h3{font-size:14px}.solution-step p{padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.solution-step.done p{display:none}.equation{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;font-size:25px;font-weight:800;min-height:58px}.answer-box{min-width:58px;height:50px;border:2px solid #ef4444;border-radius:11px;background:#fef2f2;color:#991b1b;display:inline-grid;place-items:center}.answer-box.active{background:#fca5a5;box-shadow:0 0 0 8px #fecaca88}.answer-inline{display:inline-block;color:#047857;margin:0 4px}.modal-shade{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:#0f172a99;backdrop-filter:blur(3px)}.choices-card{position:relative;width:min(400px,100%);padding:26px;border-radius:24px;background:#fff;text-align:center}.modal-x{position:absolute;top:12px;left:12px;border:0;border-radius:50%;padding:7px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.choice-grid button{padding:14px;border:2px solid #e2e8f0;border-radius:13px;background:#f8fafc;font-size:18px;font-weight:900}.board-modal{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#fff}.board-head{height:64px;flex:none;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:8px 12px}.board-actions button{width:42px;height:42px;border:0;border-radius:12px;display:grid;place-items:center;background:#1e293b;color:#fff}.board-actions button.exit{background:#f43f5e}.board-actions button.calc{background:#fff;color:#0f172a}.board-scroll{position:relative;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;background-color:#fff;background-image:linear-gradient(#e2e8f0 1px,transparent 1px),linear-gradient(90deg,#e2e8f0 1px,transparent 1px);background-size:28px 28px}.board-flow{width:min(94%,820px);margin:auto;padding:16px 0 8px}.board-question{text-align:center;font-size:clamp(20px,5vw,30px);font-weight:900;padding:12px;border-bottom:2px solid #0ea5e944}.board-step{padding:13px;margin:10px auto;border:1px solid #e2e8f0;border-radius:16px;background:#fffffff2;text-align:center;box-shadow:0 4px 14px #0f172a0c}.board-step.current{border-color:#38bdf8;background:#f0f9fff5;box-shadow:0 8px 22px #0f172a22}.board-step small{color:#0284c7;font-weight:900}.pinned-step{position:sticky;top:0;z-index:10;width:min(94%,820px);margin:auto;pointer-events:none}.pinned-step .board-step{pointer-events:auto}.drawing-area{height:max(62vh,560px);border-top:2px solid #0ea5e933}.draw-canvas{display:block;width:100%;height:100%;touch-action:none}.teacher-bubble{position:relative;z-index:12;width:min(94%,650px);margin:12px auto;display:flex;align-items:flex-end;gap:8px}.teacher{width:60px;height:60px;overflow:hidden;border:4px solid #fff;border-radius:50% 50% 12px 50%;background:#0ea5e9;font-size:48px;line-height:1;transform:none;padding-top:12px}.teacher-bubble>div:last-child{position:relative;flex:1;padding:13px 38px 13px 14px;border:2px solid #6366f1;border-radius:16px 16px 4px;background:#fff;color:#3730a3;font-weight:800}.teacher-bubble button{position:absolute;top:6px;left:6px;border:0;border-radius:50%;padding:5px}.explain{position:sticky;bottom:10px;z-index:12;margin:0 12px 10px auto;border:2px solid #6366f1;border-radius:999px;background:#fff;color:#4338ca;padding:6px 8px 6px 14px;display:flex;align-items:center;gap:7px;font-weight:900}.explain b{width:36px;height:36px;border-radius:50%;overflow:hidden;background:#0ea5e9;font-size:29px;line-height:1;padding-top:8px}.draw-tools{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px;background:#fff;border-top:1px solid #e2e8f0}.draw-tools button,.draw-tools label{min-height:45px;border:1px solid #e2e8f0;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:900}.draw-tools .selected{background:#0f172a;color:#fff}.draw-tools .range{grid-column:1/-1;padding:0 10px}.range input{flex:1}.draw-tools .danger{color:#be123c}.calculator{position:fixed;z-index:140;bottom:18px;left:18px;width:280px;padding:14px;border-radius:18px;background:#0f172a;color:#fff;box-shadow:0 18px 50px #0006}.calculator>button{float:left;background:transparent;color:#fff;border:0}.calc-display{clear:both;padding:10px;margin:8px 0;background:#020617;color:#34d399;text-align:left;font:800 20px monospace;border-radius:10px}.calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.calc-grid button{padding:9px;border:0;border-radius:7px;background:#334155;color:#fff}.loading{padding:80px;text-align:center;font-weight:900}
 @media(max-width:700px){.game-header .icon-button span{display:none}.solver{display:block;margin-top:12px}.solver aside{position:static;display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:12px}.solver aside button{justify-content:center;font-size:0}.solver aside svg{font-size:initial}.solution-step,.problem-card{padding:16px}.file-grid{grid-template-columns:1fr}.board-head{height:62px}.board-actions{gap:5px}.board-actions button{width:38px;height:40px}.board-head .pill{padding:0 9px}.draw-tools{order:3}.equation{font-size:21px}.teacher-bubble{align-items:flex-end}.teacher{width:52px;height:52px;font-size:42px}.chapter-grid,.topic-grid{grid-template-columns:1fr}}
 .solution-shell{min-width:0}.solver-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:12px;border:1px solid #e2e8f0;border-radius:16px;background:#fff}.solver-nav label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:900}.solver-nav select{max-width:230px;padding:7px;border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc}.progress{position:relative;flex:1;min-width:120px;height:12px;border-radius:99px;background:#e2e8f0}.progress span{display:block;height:100%;border-radius:inherit;background:#0ea5e9}.progress b{position:absolute;left:0;top:-24px;font-size:11px;color:#0284c7}.complete{padding:18px;border-radius:16px;background:#059669;color:#fff;text-align:center;margin:14px 0}
 .board-scroll{overscroll-behavior-y:none}.board-actions .named-tool{width:auto;min-width:63px;padding:0 8px;display:flex;grid-template-columns:none;gap:5px;font-size:11px;font-weight:900}.board-actions .hint-tool{background:#312e81;color:#e0e7ff}.board-actions .help-tool{background:#881337;color:#ffe4e6}@media(max-width:390px){.board-head{padding-inline:6px}.board-actions{gap:3px}.board-actions button{width:34px}.board-actions .named-tool{min-width:54px;padding:0 5px}.board-head .pill{padding:0 6px}}
@@ -20,10 +20,236 @@ html,body{overscroll-behavior-y:none}
 
 
 .question-images{display:grid;gap:12px;justify-items:center}.question-images img{display:block;max-width:100%;max-height:480px;object-fit:contain}
+.classroom-embedded{min-height:100dvh;padding-top:1px}.classroom-question-strip{position:sticky;top:0;z-index:60;display:flex;gap:8px;overflow-x:auto;padding:9px 12px;background:#eff6ffdd;backdrop-filter:blur(10px);border-bottom:1px solid #bae6fd}.classroom-question-strip:empty{display:none}.classroom-question-strip button{width:42px;height:42px;flex:none;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#334155;font-weight:900;box-shadow:0 3px 10px #0f172a12}.classroom-question-strip button.active{border-color:#22d3ee;background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;transform:translateY(-2px)}.classroom-question-strip button:disabled{cursor:default}.classroom-embedded .solver{margin-top:8px}.classroom-embedded .solver aside{display:none}
+.classroom-embedded .problem-card,.classroom-embedded .solution-step{padding:13px;margin-bottom:10px}.classroom-embedded .problem-card h1{margin:5px 0;font-size:18px;line-height:1.65}.classroom-embedded .solution-step h3{margin:4px 0;font-size:13px}.classroom-embedded .equation{min-height:46px;font-size:21px}.classroom-embedded .step-explanation{margin:7px 0;padding:9px 11px;font-size:14px;line-height:1.65}.solution-step{position:relative}.step-collapse{position:absolute;z-index:8;top:8px;left:8px;width:30px;height:30px;border:1px solid #bae6fd;border-radius:10px;background:#f0f9ff;color:#0369a1;display:grid;place-items:center}.step-collapse svg{width:17px;transition:transform .2s}.step-collapse svg.open{transform:rotate(180deg)}.solution-step.step-hidden{min-height:48px;padding:12px 48px 12px 14px!important;border:1px solid #bae6fd!important;border-radius:15px!important;background:#f8fafc!important}.collapsed-step-title{display:block;color:#075985;font-size:13px}.inline-board-actions .board-collapse{min-width:40px;width:40px;padding:0;background:#0c4a6e}.inline-board-actions .board-collapse svg{transition:transform .2s}.inline-board-actions .board-collapse svg.open{transform:rotate(180deg)}.choice-grid button:disabled,.modal-x:disabled{cursor:default;opacity:.78}
+.classroom-embedded .solution-step:not(.done)>.equation{min-height:72px;font-size:30px;line-height:1.2}.classroom-embedded .solution-step:not(.done)>.equation .answer-placeholder{min-width:1.75em;min-height:1.6em;padding:.12em .22em}
+@media(max-width:700px){.classroom-embedded .solver{padding-inline:7px}.classroom-embedded .problem-card,.classroom-embedded .solution-step{padding:11px}.classroom-embedded .problem-card h1{font-size:17px}.classroom-embedded .equation{font-size:19px}.classroom-embedded .step-explanation{font-size:13px}.step-collapse{top:6px;left:6px}}
+
+/* The online classroom is one landscape interactive board: drawing on the
+   left and the full question/solution sequence on the right. Offline lessons
+   intentionally keep their original vertical layout. */
+.step-copy{display:contents}
+.classroom-embedded{height:100dvh;overflow:hidden}
+.classroom-embedded .classroom-question-strip{height:61px;position:relative;flex:none}
+.classroom-landscape-board{
+  width:100%;
+  height:100dvh;
+  min-width:860px;
+  display:grid;
+  grid-template-columns:minmax(520px,1fr) minmax(310px,38%);
+  gap:10px;
+  padding:10px;
+  direction:ltr;
+  background:#dbeafe;
+  overflow:hidden;
+}
+.classroom-drawing-pane,.classroom-questions-pane{min-width:0;min-height:0;direction:rtl}
+.classroom-drawing-pane{position:relative;display:flex;isolation:isolate}
+.classroom-drawing-pane>.inline-board{
+  width:100%;
+  height:100%;
+  margin:0;
+  border-color:#38bdf8;
+  border-radius:22px;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 12px 34px #0f172a22;
+}
+.classroom-drawing-pane .inline-canvas{height:auto;min-height:0;flex:1}
+.classroom-drawing-pane .inline-tools{display:none}
+.classroom-drawing-pane .inline-board-title{height:44px;min-height:44px;justify-content:stretch;padding:4px 10px}
+.compact-board-tools{width:100%;height:100%;display:flex;align-items:center;justify-content:space-around;gap:4px;direction:ltr}
+.inline-board-actions .compact-board-tools button{width:30px;min-width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#dbeafe;display:grid;place-items:center;transition:.16s}
+.inline-board-actions .compact-board-tools button svg{width:17px;height:17px}
+.inline-board-actions .compact-board-tools .mini-tool:hover,.inline-board-actions .compact-board-tools .mini-tool.active{background:#075985;color:#7dd3fc;box-shadow:0 0 12px #38bdf877}
+.inline-board-actions .compact-board-tools .tool-calculator,.inline-board-actions .compact-board-tools .tool-hint,.inline-board-actions .compact-board-tools .tool-help{position:relative;color:#fff;border:1px solid #ffffff55;box-shadow:0 4px 12px #02061755;animation:tool-float 2.6s ease-in-out infinite}
+.inline-board-actions .compact-board-tools .tool-calculator{background:linear-gradient(145deg,#06b6d4,#2563eb)}
+.inline-board-actions .compact-board-tools .tool-hint{background:linear-gradient(145deg,#fbbf24,#f97316);animation-delay:.22s}
+.inline-board-actions .compact-board-tools .tool-help{background:linear-gradient(145deg,#ec4899,#7c3aed);animation-delay:.44s}
+.inline-board-actions .compact-board-tools .tool-calculator:hover,.inline-board-actions .compact-board-tools .tool-hint:hover,.inline-board-actions .compact-board-tools .tool-help:hover{color:#fff;filter:brightness(1.12)}
+.inline-board-actions .compact-board-tools .mini-tool:disabled{cursor:not-allowed;opacity:.38;filter:grayscale(.7);animation:none;box-shadow:none}
+.inline-board-actions .compact-board-tools .tool-hint small,.inline-board-actions .compact-board-tools .tool-help small{position:absolute;right:-5px;top:-6px;display:grid;min-width:14px;height:14px;padding:0 3px;place-items:center;border:1px solid #fff8;border-radius:999px;background:#166534;color:#fff;font-size:8px;font-weight:1000;line-height:1}
+@keyframes tool-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){.inline-board-actions .compact-board-tools .tool-calculator,.inline-board-actions .compact-board-tools .tool-hint,.inline-board-actions .compact-board-tools .tool-help{animation:none}}
+.inline-board-actions .compact-board-tools .pen-toggle{border-radius:0;background:transparent;color:#93c5fd}
+.inline-board-actions .compact-board-tools .pen-toggle.active{color:#38bdf8;filter:drop-shadow(0 0 7px #38bdf8)}
+.drawing-mode-label{margin-inline-start:auto;color:#7dd3fc;font-size:10px;font-weight:900;white-space:nowrap;direction:rtl}
+.inline-canvas:not(.drawing-enabled) .draw-canvas{touch-action:pan-y;cursor:default}
+.inline-canvas.drawing-enabled{box-shadow:inset 0 0 0 2px #38bdf8aa}
+.board-live-equation{position:absolute;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none;padding:18px}
+.board-live-equation .equation{font-size:clamp(25px,3vw,40px);pointer-events:auto}
+.board-tool-menu{position:relative;z-index:24}
+.inline-board-actions .board-tool-menu-button{width:34px;min-width:34px;height:34px;padding:0;border:1px solid #38bdf866;border-radius:10px;background:#172554;color:#e0f2fe;display:grid;place-items:center}
+.inline-board-actions .board-tool-menu-button svg{width:18px;height:18px}
+.board-tool-menu-popover{position:absolute;top:40px;left:0;z-index:80;width:140px;padding:7px;display:grid;gap:6px;border:1px solid #38bdf877;border-radius:14px;background:#0f172af5;box-shadow:0 14px 32px #02061766}
+.inline-board-actions .board-tool-menu-popover button{width:100%;height:36px;padding:0 10px;justify-content:flex-start;border-radius:9px;font-size:12px}
+.classroom-questions-pane{
+  height:100%;
+  padding:10px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  border:2px solid #93c5fd;
+  border-radius:22px;
+  background:#f8fafc;
+  box-shadow:0 12px 34px #0f172a18;
+}
+.classroom-questions-pane .problem-card{position:sticky;top:0;z-index:5;margin-bottom:9px;border-color:#bae6fd;background:#fff}
+.classroom-questions-pane .problem-card h1{margin:2px 0;font-size:14px;line-height:1.45}
+.classroom-steps-list{display:grid;gap:7px}
+.classroom-questions-pane .solution-step{margin:0;padding:10px;border-radius:14px;box-shadow:none}
+.classroom-questions-pane .solution-step.active-step{border:2px solid #38bdf8;background:#f0f9ff;box-shadow:0 6px 18px #0284c729}
+.classroom-questions-pane .solution-step.active-step .equation{display:none}
+.classroom-questions-pane .solution-step.future-step{opacity:.62;background:#f8fafc}
+.classroom-questions-pane .solution-step.done{padding:2px 6px;background:transparent}
+.classroom-questions-pane .solution-step:not(.done) .equation{min-height:58px;font-size:25px}
+.classroom-questions-pane .step-explanation{font-size:12px;line-height:1.55}
+@media(max-width:900px){
+  .classroom-embedded{overflow:hidden}
+  .classroom-landscape-board{
+    min-width:680px;
+    grid-template-columns:minmax(390px,1fr) minmax(260px,38%);
+    gap:6px;
+    padding:6px;
+  }
+  .classroom-questions-pane{padding:6px;border-radius:15px}
+  .classroom-drawing-pane>.inline-board{border-radius:15px}
+}
 
 
 /* Topic -> exercise navigation */
 .topic-list{display:grid;gap:12px;max-width:820px;margin:auto}.topic-list-button,.exercise-list>button{width:100%;border:1px solid #e2e8f0;border-radius:16px;background:#fff;display:flex;align-items:center;gap:14px;padding:16px;text-align:right;color:#1e293b;box-shadow:0 4px 16px #0f172a0a}.topic-list-button:hover,.exercise-list>button:hover{border-color:#0ea5e9;background:#f0f9ff}.topic-list-button>svg,.exercise-list>button>svg{margin-right:auto}.topic-list-button h2{margin:0 0 4px;font-size:17px}.topic-list-button p{margin:0;color:#64748b;font-size:12px;font-weight:800}.topic-number,.exercise-order{width:38px;height:38px;flex:none;border-radius:12px;display:grid;place-items:center;background:#e0f2fe;color:#0369a1;font-weight:900}.exercise-list{display:grid;gap:9px;max-width:900px;margin:auto}.exercise-name{min-width:0;display:grid;gap:6px;font-size:18px;font-weight:900}.exercise-name small{color:#64748b;font-size:12px;font-weight:700}.exercises-page .title-row small{color:#64748b;font-weight:800}.exercises-page .title-row h1{margin:3px 0}
 /* Solved equations read like one continuous model solution. */
-.solution-step.done{margin:0;padding:3px 12px;border:0;border-radius:0;background:transparent;box-shadow:none}.solution-step.done .equation{min-height:42px}.solution-step.done+.solution-step.done{border-top:0}.solution-step.done+.solution-step:not(.done){margin-top:14px}.problem-card+.solution-step.done{padding-top:8px}
-@media(max-width:700px){.topic-list-button,.exercise-list>button{padding:13px 11px}.exercise-name{font-size:16px}.solution-step.done{padding:2px 4px}.solution-step.done .equation{min-height:38px}}
+.solution-step.done{margin:0;padding:0 12px;border:0;border-radius:0;background:transparent;box-shadow:none}.solution-step.done .equation{min-height:30px;line-height:1.12}.solution-step.done+.solution-step.done{border-top:0}.solution-step.done+.solution-step:not(.done){margin-top:10px}.problem-card+.solution-step.done{padding-top:5px}
+@media(max-width:700px){.topic-list-button,.exercise-list>button{padding:13px 11px}.exercise-name{font-size:16px}.solution-step.done{padding:0 4px}.solution-step.done .equation{min-height:28px}}
+
+/* Compact classroom overlays and an unmistakable opt-in drawing mode. */
+.calculator{z-index:250;top:58px;bottom:auto;left:12px;width:min(220px,calc(100vw - 24px));padding:9px;border:1px solid #38bdf888;border-radius:15px;background:#0f172af7;box-shadow:0 18px 50px #0008}
+.calculator .calculator-close{position:absolute;z-index:2;top:6px;left:6px;float:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#ef4444;color:#fff}
+.calculator .calc-display{clear:none;min-height:36px;margin:0 0 7px;padding:7px 38px 7px 8px;border-radius:9px;font-size:17px;overflow:hidden}
+.calculator .calc-grid{grid-template-columns:repeat(4,1fr);gap:4px}
+.calculator .calc-grid button{height:31px;padding:0;font-weight:900}
+.calculator .calc-grid button:last-child{grid-column:span 2}
+.inline-hint-bubble{z-index:24;top:12px;left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:min(92%,620px);max-height:34%;overflow:auto;padding:12px 40px 12px 14px;background:#fffffff5;box-shadow:0 8px 24px #0f172a33}
+.inline-hint-bubble button{top:6px;left:6px;width:28px;height:28px;padding:0;display:grid;place-items:center;background:#ef4444;color:#fff}
+@keyframes activePenPulse{0%,100%{color:#22d3ee;filter:drop-shadow(0 0 3px #22d3ee);transform:scale(1)}50%{color:#facc15;filter:drop-shadow(0 0 10px #facc15);transform:scale(1.14)}}
+.inline-board-actions .compact-board-tools .pen-toggle.active{animation:activePenPulse .8s ease-in-out infinite}
+.inline-canvas.drawing-enabled .board-live-equation,.inline-canvas.drawing-enabled .board-live-equation .equation{pointer-events:none}
+.inline-canvas.drawing-enabled .board-live-equation .answer-box,.inline-canvas.drawing-enabled .board-live-equation .answer-placeholder{border-color:transparent;background:transparent;box-shadow:none;color:transparent;cursor:default}
+
+/* Classroom visual polish: paper board, emerald tools, and unobstructed close buttons. */
+.calculator .calculator-close{top:-11px;right:-11px;left:auto;box-shadow:0 4px 12px #7f1d1d66}
+.inline-hint-bubble{padding:12px 14px 12px 40px}
+.inline-hint-bubble button{top:-11px;right:-11px;left:auto;box-shadow:0 4px 12px #7f1d1d66}
+.classroom-drawing-pane .inline-board-title{background:linear-gradient(135deg,#064e3b,#047857,#0f766e)}
+.classroom-drawing-pane .inline-canvas{background-color:#fff9df;background-image:linear-gradient(#e8dfbd 1px,transparent 1px),linear-gradient(90deg,#e8dfbd 1px,transparent 1px);animation:classroomQuestionSwitch .9s ease-out}
+@keyframes classroomQuestionSwitch{0%,62%{background-color:#dff4ff;background-image:linear-gradient(#c2e4f2 1px,transparent 1px),linear-gradient(90deg,#c2e4f2 1px,transparent 1px)}100%{background-color:#fff9df;background-image:linear-gradient(#e8dfbd 1px,transparent 1px),linear-gradient(90deg,#e8dfbd 1px,transparent 1px)}}
+.board-recent-steps{position:absolute;z-index:5;top:10px;left:10px;right:10px;display:grid;grid-auto-flow:column;grid-auto-columns:calc(50% - 4px);gap:8px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:thin;scrollbar-color:#60a5fa transparent;direction:rtl;pointer-events:auto;padding-bottom:3px;touch-action:pan-x}
+.board-recent-step{min-width:0;min-height:76px;padding:6px 9px;border:1px solid #60a5fa88;border-radius:13px;background:#dbeafeeb;color:#1e3a8a;box-shadow:0 5px 14px #1d4ed822;overflow:hidden;scroll-snap-align:start;direction:rtl}
+.board-recent-step small{display:block;margin-bottom:2px;color:#1d4ed8;font-size:10px;font-weight:900;text-align:right}
+.board-recent-step .equation{min-height:38px;font-size:clamp(15px,1.7vw,22px);line-height:1.1}
+.board-recent-step .answer-placeholder{min-height:1.25em;border-color:#60a5fa;background:#eff6ff;color:#1d4ed8}
+.classroom-drawing-pane .board-live-equation{padding-top:72px;transform:translateY(-12px)}
+.inline-canvas.drawing-enabled .board-recent-steps{opacity:.2}
+.classroom-explanation-card{position:relative;margin-top:8px;padding:11px 12px;border:2px solid #38bdf8;border-radius:15px;background:#effaff;color:#0c4a6e;box-shadow:0 6px 18px #0284c724;font-size:12px;line-height:1.6;font-weight:750}
+.classroom-explanation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;color:#075985;font-weight:950}.classroom-explanation-head small{color:#64748b;font-size:10px}
+.classroom-explanation-text{transition:max-height .25s ease}.classroom-explanation-card.collapsed .classroom-explanation-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;padding-left:84px}
+.classroom-explanation-card>button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 9px;font-size:11px;font-weight:900}.classroom-explanation-card.collapsed>button{position:absolute;left:8px;bottom:8px}.classroom-explanation-card.expanded>button{display:block;margin:8px 0 0 auto}
+
+/* The classroom assistant is a pure overlay: it never changes board layout. */
+.classroom-assistant{position:absolute;z-index:18;right:8px;bottom:8px;width:min(82%,570px);height:clamp(118px,31vh,220px);pointer-events:none;direction:rtl}
+.assistant-character{position:absolute;z-index:2;right:-6px;bottom:0;width:clamp(72px,11vw,126px);height:clamp(108px,22vh,190px);padding:0;border:0;background:transparent;filter:drop-shadow(0 8px 10px #0f172a45);pointer-events:auto;cursor:pointer;transform-origin:bottom right;transition:transform .35s ease,opacity .35s ease,bottom .35s ease}
+.assistant-character img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;animation:assistantFloat 2.7s ease-in-out infinite}
+.assistant-explanation{position:absolute;z-index:1;right:clamp(64px,9vw,108px);bottom:8px;width:min(78%,455px);max-height:calc(100% - 16px);overflow:auto;overscroll-behavior:contain;padding:12px 16px 12px 38px;border:2px solid #0ea5e9;border-radius:18px 18px 5px 18px;background:#fffffff7;color:#0c4a6e;box-shadow:0 12px 28px #0f172a33;font-size:clamp(11px,1.25vw,15px);font-weight:750;line-height:1.65;pointer-events:auto;cursor:pointer;animation:assistantBubbleIn .34s cubic-bezier(.2,.9,.25,1.25) both}
+.assistant-explanation:after{content:'';position:absolute;right:-14px;bottom:17px;width:25px;height:25px;border-right:2px solid #0ea5e9;border-bottom:2px solid #0ea5e9;background:#fff;transform:rotate(-45deg)}
+.assistant-explanation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;color:#075985}.assistant-explanation-head small{color:#64748b;font-size:10px;white-space:nowrap}
+.assistant-close{position:absolute;z-index:3;top:6px;left:6px;width:27px;height:27px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#ef4444;color:#fff;box-shadow:0 4px 12px #7f1d1d66;cursor:pointer}
+.classroom-assistant.is-resting{width:70px;height:72px;right:2px;bottom:6px}
+.classroom-assistant.is-resting .assistant-character{right:0;bottom:0;transform:scale(1);opacity:.9}
+.classroom-assistant.is-resting .assistant-character:hover{transform:scale(1.06) translateY(1px);opacity:1}
+@keyframes assistantFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-1deg)}}
+@keyframes assistantBubbleIn{from{opacity:0;transform:translateY(18px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:900px){.classroom-assistant{right:4px;bottom:6px;width:min(86%,480px);height:clamp(108px,30vh,178px)}.assistant-explanation{right:58px;bottom:6px;width:min(82%,390px);max-height:calc(100% - 12px);padding:9px 12px 9px 34px;line-height:1.45}.assistant-character{width:70px;height:112px;bottom:0}}
+
+/* Compact explanation: two lines by default, expandable on demand. */
+.step-explanation{position:relative;margin:10px 0;padding:14px;border-right:4px solid #0ea5e9;border-radius:10px;background:#f0f9ff;color:#0c4a6e;font-weight:700;line-height:1.9}.step-explanation-text{transition:max-height .25s ease}.step-explanation.collapsed .step-explanation-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding-left:96px}.step-explanation button{border:1px solid #38bdf8;border-radius:9px;background:linear-gradient(135deg,#0369a1,#0891b2);color:#fff;padding:3px 10px;font-size:12px;font-weight:900;box-shadow:0 4px 12px #0284c755}.step-explanation.collapsed button{position:absolute;left:9px;bottom:10px}.step-explanation.collapsed:after{content:'';position:absolute;left:0;bottom:0;width:116px;height:2.35em;border-radius:0 0 10px 10px;background:linear-gradient(90deg,#f0f9ff 76%,transparent);pointer-events:none}.step-explanation.collapsed button{z-index:1}.step-explanation.expanded button{display:block;margin:9px 0 0 auto}
+
+/* Board music is available but starts muted; the enabled level is 60%. */
+.music-toggle{width:42px;height:42px;flex:none;border:1px solid #38bdf866;border-radius:12px;background:#0c4a6e;color:#7dd3fc;display:grid;place-items:center;box-shadow:0 0 16px #0ea5e933;transition:transform .18s,background .18s,color .18s}.music-toggle:active{transform:scale(.92)}.music-toggle.muted{border-color:#64748b66;background:#1e293b;color:#94a3b8;box-shadow:none}
+
+
+/* Choice feedback: hearts live only inside the answer dialog. */
+.choice-hearts{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:6px;min-width:64px;justify-content:center;padding:7px 11px;border-radius:999px;border:1px solid #fecdd3;background:#fff1f2;color:#e11d48;font-size:18px;font-weight:950;box-shadow:0 6px 18px #e11d4826}
+.choice-hearts svg{filter:drop-shadow(0 2px 3px #e11d4844)}
+.choice-hearts.heart-loss{animation:heart-loss .52s ease both}
+.choices-card.wrong{animation:answer-shake .48s ease}
+.choice-grid button.wrong{border-color:#ef4444!important;background:#fee2e2!important;color:#b91c1c!important;animation:wrong-pulse .5s ease}
+.choice-grid button.correct{border-color:#10b981!important;background:#d1fae5!important;color:#047857!important;animation:correct-pop .62s ease}
+@keyframes heart-loss{0%{transform:scale(1);filter:none}28%{transform:scale(1.28) rotate(-8deg);background:#fecdd3}55%{transform:scale(.9) rotate(7deg);filter:drop-shadow(0 0 10px #ef4444)}100%{transform:scale(1);filter:none}}
+@keyframes answer-shake{0%,100%{transform:translateX(0)}18%{transform:translateX(-10px)}36%{transform:translateX(9px)}54%{transform:translateX(-7px)}72%{transform:translateX(5px)}}
+@keyframes wrong-pulse{0%{transform:scale(1)}45%{transform:scale(.94);box-shadow:0 0 0 8px #ef44442b}100%{transform:scale(1)}}
+@keyframes correct-pop{0%{transform:scale(1)}42%{transform:scale(1.09);box-shadow:0 0 0 10px #10b9812b}100%{transform:scale(1)}}
+@media(max-width:520px){.choices-card{padding-top:62px}.choice-hearts{top:12px;right:14px}}
+
+/* Keep classroom controls and answer choices fully visible inside the iframe. */
+.classroom-embedded .inline-hint-bubble{padding:12px 42px 12px 14px}
+.classroom-embedded .inline-hint-bubble button{top:6px;right:6px;left:auto;box-shadow:0 4px 12px #7f1d1d66}
+
+/* Unified learning palette: clear blue actions, mint progress, quiet paper board. */
+:root{
+  --swm-primary:#087fe5;
+  --swm-navy:#071d3a;
+  --swm-mint:#43d5a0;
+  --swm-teal:#61c8bc;
+  --swm-soft:#ddf3ff;
+  --swm-paper:#fff8ea;
+  --swm-coral:#f4b7b3;
+  --swm-ink:#23313d;
+}
+body{
+  color:var(--swm-ink);
+  background-color:#f5fbff;
+  background-image:radial-gradient(#a2e8d766 1px,transparent 1px),linear-gradient(145deg,#f5fbff,#ddf3ff);
+  background-size:24px 24px,100% 100%;
+  background-attachment:fixed;
+}
+.game-header,.board-head{background:linear-gradient(115deg,var(--swm-navy),#0b2d6b)}
+.icon-button,.board-actions button{background:#0b2d6b}
+.hero-icon,.chapter-symbol,.header-back{background:linear-gradient(145deg,var(--swm-primary),#2da8f3)}
+.chapter-card:hover,.topic-list-button:hover,.exercise-list>button:hover,.file-grid button:hover{border-color:var(--swm-primary);background:#f0faff}
+.chapter-card strong,.board-step small,.progress b{color:#0870c9}
+.progress span,.complete{background:linear-gradient(90deg,var(--swm-primary),var(--swm-mint))}
+.classroom-question-strip{background:#ddf3ffe8;border-bottom-color:#a2e8d7}
+.classroom-question-strip button.active{border-color:var(--swm-teal);background:linear-gradient(135deg,var(--swm-primary),var(--swm-mint))}
+.classroom-drawing-pane .inline-board-title{background:linear-gradient(135deg,#071d3a,#087fe5,#43d5a0)}
+.classroom-drawing-pane .inline-canvas{
+  background-color:var(--swm-paper);
+  background-image:linear-gradient(#e8dfbd 1px,transparent 1px),linear-gradient(90deg,#e8dfbd 1px,transparent 1px);
+}
+.board-recent-step{border-color:#61c8bc;background:#ddf3ffed;color:#174e67;box-shadow:0 5px 14px #087fe522}
+.board-recent-step small{color:#0870c9}
+.classroom-explanation-card,.assistant-explanation,.step-explanation{border-color:var(--swm-primary);background:#f0faff;color:#164e68}
+.choice-grid button.correct{border-color:var(--swm-mint)!important;background:#dcfbee!important;color:#08705a!important}
+.choice-grid button.wrong{border-color:#e58c88!important;background:#fce7ea!important;color:#9a3e49!important}
+.inline-board-actions .compact-board-tools .tool-calculator{background:linear-gradient(145deg,#087fe5,#0b2d6b)}
+.inline-board-actions .compact-board-tools .tool-hint{background:linear-gradient(145deg,#43d5a0,#168a70)}
+.inline-board-actions .compact-board-tools .tool-help{background:linear-gradient(145deg,#61c8bc,#087fe5)}
+.subject-icon{background:linear-gradient(145deg,var(--swm-primary),#2da8f3)}
+.subject-card.chemistry .subject-icon,.hero-icon.chemistry{background:linear-gradient(145deg,var(--swm-mint),#168a70)}
+.classroom-embedded .modal-shade{padding:10px;overflow:hidden}
+.classroom-embedded .choices-card{max-height:calc(100% - 4px);overflow-y:auto;overscroll-behavior:contain;padding:20px 24px}
+.classroom-embedded .choices-card h2{margin:8px 0 14px}
+.classroom-embedded .choices-card>p{margin:6px 0 12px}
+.classroom-embedded .choice-grid{gap:8px}
+.classroom-embedded .choice-grid button{min-height:52px;padding:10px 14px}
+
+/* Previous steps touch the board ceiling and use less frame space without shrinking their text. */
+.classroom-embedded .board-recent-steps{top:0;left:0;right:0;grid-auto-columns:calc(50% - 3px);gap:6px;padding:0 4px 2px}
+.classroom-embedded .board-recent-step{min-height:58px;padding:3px 7px 2px;border-radius:0 0 11px 11px;box-shadow:0 4px 12px #1d4ed81f}
+.classroom-embedded .board-recent-step small{margin-bottom:0;line-height:1.25}
+.classroom-embedded .board-recent-step .equation{min-height:30px;line-height:1.05}
+@media(max-width:520px){
+  .classroom-embedded .choices-card{padding:58px 16px 14px}
+  .classroom-embedded .choices-card h2{margin:2px 0 8px}
+  .classroom-embedded .choices-card>p{margin:4px 0 8px}
+  .classroom-embedded .choice-grid button{min-height:48px;padding:8px 10px}
+}

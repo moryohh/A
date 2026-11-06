@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import katex from 'katex'
+import classroomAssistant from './assets/classroom-assistant-v1.png'
 import {
-  Apple, ArrowRight, BookOpen, Calculator, ChevronLeft, Eraser, Heart,
-  HelpCircle, Home, Lightbulb, Palette, Pen, Redo2, Share2, Sparkles,
-  Trash2, Undo2, X
+  Apple, ArrowRight, BookOpen, Calculator, ChevronDown, ChevronLeft, Eraser, Heart,
+  HelpCircle, Home, Lightbulb, Music2, Palette, Pen, Redo2, Share2, Sparkles,
+  Trash2, Undo2, VolumeX, X
 } from 'lucide-react'
-import { loadBoardFile } from './contentApi'
 
 // Some converted lesson files contain JSON-escaped LaTeX twice (for example
 // `\\\\frac` after parsing becomes `\\\\frac` instead of `\\frac`).  Collapse
@@ -154,10 +154,11 @@ function PracticeEquation({ step }) {
   return <div className="practice-equation" ref={hostRef} dir="ltr"><div className="practice-equation-content" ref={contentRef} style={{fontSize}}>{formulas.map((formula, index) => <div className="practice-equation-line" key={`${index}-${formula}`} dangerouslySetInnerHTML={{__html:renderFormula(formula)}} />)}</div></div>
 }
 
-function Header({ apples, hearts, onHome }) {
+function Header({ hearts, onHome, onBack, musicMuted, onToggleMusic }) {
   return <header className="game-header">
-    <div className="score"><span className="pill heart"><Heart size={17} fill="currentColor"/>{hearts}</span><span className="pill apple"><Apple size={17} fill="currentColor"/>{apples}</span></div>
-    <button className="icon-button" onClick={onHome}><Home size={18}/><span>الرئيسية</span></button>
+    <div className="score" aria-label="المحاولات المتبقية"><span className="pill heart"><Heart size={17} fill="currentColor"/>{hearts}</span></div>
+    <button type="button" className={`music-toggle ${musicMuted?'muted':''}`} onClick={onToggleMusic} aria-label={musicMuted?'تشغيل موسيقى الصبورة':'كتم موسيقى الصبورة'} aria-pressed={musicMuted} title={musicMuted?'تشغيل الموسيقى':'كتم الموسيقى'}>{musicMuted?<VolumeX size={20}/>:<Music2 size={20}/>}</button>
+    <div className="header-left">{onBack&&<button className="header-back" onClick={onBack} aria-label="رجوع"><ArrowRight size={19}/></button>}<button className="icon-button" onClick={onHome}><Home size={18}/><span>الرئيسية</span></button></div>
   </header>
 }
 
@@ -203,24 +204,84 @@ const shortExerciseTitle = problem => {
   return clean.split(/\s+/).slice(0, 7).join(' ') || 'تمرين'
 }
 
-function Exercises({ topic, subjectId, onBack, onOpen }) {
+// A few legacy page bundles contain review questions from the following
+// subject even though their filename still carries the previous topic id.
+// Keep the classroom navigator limited to questions that really belong to
+// the selected topic instead of exposing the whole mixed bundle.
+const belongsToSelectedTopic = (topicName, problem) => {
+  const normalizedTopic = String(topicName || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').toLowerCase()
+  if (!normalizedTopic.includes('حل المعادله التربيعيه')) return true
+  const title = String(problem?.title || problem?.question_text || '').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').toLowerCase()
+  return /معادل|تربيعي|جذر/.test(title)
+}
+
+const stableLessonOffset = (lessonId, length) => {
+  if (!lessonId || !length) return 0
+  let hash = 2166136261
+  for (const character of String(lessonId)) {
+    hash ^= character.codePointAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) % length
+}
+
+const CONTENT_INDEX_API='https://duha-content-index.rafos72171.workers.dev'
+const CONTENT_R2_API='https://duha-content-r2.rafos72171.workers.dev'
+const boardFileCache=new Map()
+async function loadBoardFile(file){
+  if(boardFileCache.has(file))return boardFileCache.get(file)
+  const promise=(async()=>{
+    try{
+      const indexResponse=await fetch(`${CONTENT_INDEX_API}/content?section=solve_with_me&q=${encodeURIComponent(file)}&limit=100`)
+      if(!indexResponse.ok)throw new Error('تعذر تحميل فهرس الصبورة')
+      const payload=await indexResponse.json()
+      const row=(payload.items||[]).find(item=>item.file_name===file||item.file_name.endsWith(`/${file}`))
+      if(!row)throw new Error(`ملف الصبورة غير مفهرس: ${file}`)
+      const response=await fetch(`${CONTENT_R2_API}/educational/${encodeURIComponent(row.source_id)}`)
+      if(!response.ok)throw new Error(`تعذر تحميل ملف الصبورة: ${file}`)
+      const envelope=await response.json()
+      return Object.prototype.hasOwnProperty.call(envelope,'content')?envelope.content:envelope
+    }catch(remoteError){
+      const localName=String(file).split('/').pop()
+      const response=await fetch(`./data/${encodeURIComponent(localName)}`)
+      if(!response.ok)throw remoteError
+      return response.json()
+    }
+  })()
+  boardFileCache.set(file,promise)
+  return promise
+}
+
+function Exercises({ topic, onBack, onOpen, onItems, embedded = false, classroom = false, requestedFile = '', requestedIndex = 0, requestedLessonId = '' }) {
   const [items,setItems]=useState([]), [failed,setFailed]=useState(false)
   useEffect(() => {
     let active=true; setItems([]); setFailed(false)
     Promise.all(topic.files.map(async item => {
-      const info=fileInfo(item), questions=await loadBoardFile(subjectId, info.file)
+      const info=fileInfo(item), questions=await loadBoardFile(info.file)
       return questions.map((problem,index)=>({ ...info, problem, questionIndex:index }))
-    })).then(groups=>{if(active)setItems(groups.flat())}).catch(()=>{if(active)setFailed(true)})
+        .filter(item=>belongsToSelectedTopic(topic.name,item.problem))
+    })).then(groups=>{if(active){const next=groups.flat();setItems(next);onItems?.(next)}}).catch(()=>{if(active)setFailed(true)})
     return()=>{active=false}
-  },[topic,subjectId])
-  return <main className="page exercises-page"><div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>الموضوع</small><h1>{topic.name}</h1></div></div>
+  },[topic])
+  useEffect(()=>{
+    if(!classroom||!items.length)return
+    const offset=requestedFile?0:stableLessonOffset(requestedLessonId,items.length)
+    const orderedItems=offset?[...items.slice(offset),...items.slice(0,offset)]:items
+    window.parent.postMessage({type:'classroom_exercises',items:orderedItems.map((item,index)=>({file:item.file,questionIndex:item.questionIndex,number:index+1,title:shortExerciseTitle(item.problem)}))},window.location.origin)
+    const selected=requestedFile
+      ? items.find(item=>item.file===requestedFile&&item.questionIndex===Number(requestedIndex)) || items[0]
+      : orderedItems[0]
+    if(selected)onOpen(selected.file,selected.questionIndex)
+  },[classroom,items,requestedFile,requestedIndex,requestedLessonId,onOpen])
+  return <main className="page exercises-page">{!embedded&&<div className="title-row"><button className="icon-button" onClick={onBack}><ArrowRight/></button><div><small>تمارين الدرس المحدد</small><h1>{topic.name}</h1></div></div>}
     {failed?<div className="loading">تعذّر تحميل قائمة التمارين</div>:!items.length?<div className="loading">جاري جمع التمارين…</div>:
     <div className="exercise-list">{items.map((item,order)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>onOpen(item.file,item.questionIndex)}>
       <span className="exercise-order">{order+1}</span><div className="exercise-name"><MathText>{shortExerciseTitle(item.problem)}</MathText><small>السؤال {item.problem.number || item.questionIndex+1}{item.problem.page_number ? ` • صفحة ${item.problem.page_number}` : ''}</small></div><ChevronLeft/>
     </button>)}</div>}
   </main>
 }
-function Choices({ input, onChoose, onClose }) {
+function Choices({ input, onChoose, onClose, hearts = 10, readOnly = false }) {
+  const [feedback,setFeedback]=useState(null)
   const shuffledChoices = useMemo(() => {
     const choices = [...(input?.allowed_keys || [])]
     for (let index = choices.length - 1; index > 0; index -= 1) {
@@ -229,8 +290,15 @@ function Choices({ input, onChoose, onClose }) {
     }
     return choices
   }, [input])
+  useEffect(()=>setFeedback(null),[input?.id])
   if (!input) return null
-  return <div className="modal-shade"><div className="choices-card"><button className="modal-x" onClick={onClose}><X/></button><h2>اختر الإجابة الصحيحة</h2><p><MathText>{input.label}</MathText></p><div className="choice-grid">{shuffledChoices.map((value, index) => <button key={`${value}-${index}`} onClick={() => onChoose(value)}><ChoiceText>{value}</ChoiceText></button>)}</div></div></div>
+  const pick=value=>{
+    if(readOnly||feedback)return
+    const correct=onChoose(value)
+    setFeedback({value,type:correct?'correct':'wrong'})
+    setTimeout(()=>setFeedback(null),correct?650:520)
+  }
+  return <div className={`modal-shade ${feedback?.type||''}`}><div className={`choices-card ${feedback?.type||''}`}><button className="modal-x" onClick={onClose} disabled={readOnly||Boolean(feedback)}><X/></button><div className={`choice-hearts ${feedback?.type==='wrong'?'heart-loss':''}`} aria-label={`${hearts} قلوب`}><Heart size={23} fill="currentColor"/><b>{hearts}</b></div><h2>{readOnly?'اختيار المعلم':'اختر الإجابة الصحيحة'}</h2><p><MathText>{input.label}</MathText></p><div className="choice-grid">{shuffledChoices.map((value, index) => <button key={`${value}-${index}`} className={feedback?.value===value?feedback.type:''} disabled={readOnly||Boolean(feedback)} onClick={() => pick(value)}><ChoiceText>{value}</ChoiceText></button>)}</div></div></div>
 }
 
 function CalculatorModal({ onClose }) {
@@ -238,12 +306,13 @@ function CalculatorModal({ onClose }) {
   const press = key => {
     if (key === 'C') return setValue('0')
     if (key === '=') { try { setValue(String(Function(`return (${value})`)())) } catch { setValue('خطأ') }; return }
-    setValue(v => v === '0' || v === 'خطأ' ? key : v + key)
+    const normalized = {'×':'*','÷':'/','−':'-'}[key] || key
+    setValue(v => v === '0' || v === 'خطأ' ? normalized : v + normalized)
   }
-  return <div className="calculator"><button onClick={onClose}><X size={16}/></button><div className="calc-display">{value}</div><div className="calc-grid">{['C','(',')','/','7','8','9','*','4','5','6','-','1','2','3','+','0','.','='].map(k => <button key={k} onClick={() => press(k)}>{k}</button>)}</div></div>
+  return <div className="calculator"><button className="calculator-close" onClick={onClose} aria-label="إغلاق الحاسبة"><X size={16}/></button><div className="calc-display">{value}</div><div className="calc-grid">{['C','÷','×','−','7','8','9','+','4','5','6','.','1','2','3','=','0'].map(k => <button key={k} onClick={() => press(k)}>{k}</button>)}</div></div>
 }
 
-function DrawingCanvas({ tool, color, size, strokes, setStrokes, history, setHistory, future, setFuture, canvasRef }) {
+function DrawingCanvas({ tool, color, size, strokes, setStrokes, history, setHistory, future, setFuture, canvasRef, readOnly = false }) {
   const drawing = useRef(null)
   const redraw = () => {
     try {
@@ -261,7 +330,7 @@ function DrawingCanvas({ tool, color, size, strokes, setStrokes, history, setHis
   }
   useEffect(redraw, [strokes])
   const point = event => { const r=canvasRef.current?.getBoundingClientRect(); if(!r||r.width<1||r.height<1)return null; return {x:Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.top)/r.height))} }
-  const down = event => { try{event.preventDefault();const first=point(event);if(!first)return;setHistory(h=>[...h,strokes]);setFuture([]);const s={erase:tool==='eraser',color,width:tool==='eraser'?54:size,points:[first]};drawing.current=s;setStrokes(v=>[...v,s])}catch(error){drawing.current=null;console.warn('Pointer start ignored safely:',error)} }
+  const down = event => { if(readOnly||tool==='none')return;try{event.preventDefault();const first=point(event);if(!first)return;setHistory(h=>[...h,strokes]);setFuture([]);const s={erase:tool==='eraser',color,width:tool==='eraser'?42:size,points:[first]};drawing.current=s;setStrokes(v=>[...v,s])}catch(error){drawing.current=null;console.warn('Pointer start ignored safely:',error)} }
   const move = event => { if(!drawing.current)return;try{event.preventDefault();const next=point(event);if(!next)return;const updatedStroke={...drawing.current,points:[...drawing.current.points,next]};drawing.current=updatedStroke;setStrokes(v=>[...v.slice(0,-1),updatedStroke])}catch(error){drawing.current=null;console.warn('Pointer move ignored safely:',error)} }
   const up = () => { drawing.current=null }
   return <canvas ref={canvasRef} className="draw-canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}/>
@@ -305,7 +374,7 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   },[])
   const undo=()=>{if(!history.length)return;setFuture(v=>[...v,strokes]);setStrokes(history.at(-1));setHistory(v=>v.slice(0,-1))}
   const redo=()=>{if(!future.length)return;setHistory(v=>[...v,strokes]);setStrokes(future.at(-1));setFuture(v=>v.slice(0,-1))}
-  const hint=()=>{if(!activeInput)return;if(apples<2)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-2);setBubble(activeInput.hint)}
+  const hint=()=>{if(!activeInput)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setBubble(activeInput.hint)}
   const exit=()=>{if(confirm('هل تريد الخروج؟ ستبدأ هذه المحاولة من الصفر.'))onExit()}
   return <div className="board-modal">
     <div className="board-head"><div className="board-actions"><button className="exit" onClick={exit}><X/></button><button onClick={()=>navigator.share?.({title:'السبورة'})}><Share2/></button><button className="calc" onClick={()=>setCalculator(true)}><Calculator/></button><button className="named-tool hint-tool" onClick={hint}><Lightbulb/><span>تلميح</span></button><button className="named-tool help-tool" onClick={help}><HelpCircle/><span>مساعدة</span></button></div><span className="pill apple"><Apple size={17} fill="currentColor"/>{apples}</span></div>
@@ -321,25 +390,24 @@ function Whiteboard({ problem, answers, activeId, onBlank, apples, setApples, he
   </div>
 }
 
-function InlineBoard({ anchorRef, onHint, onHelp, step }) {
-  const [tool,setTool]=useState('pen'), [color,setColor]=useState('#111827'), [size,setSize]=useState(4)
-  const [strokes,setStrokes]=useState([]), [history,setHistory]=useState([]), [future,setFuture]=useState([])
+function InlineBoard({ onHint, onHelp, hintsLeft = 3, helpsLeft = 4, step, recentSteps = [], answers = {}, activeId, onBlank, strokes, onStrokesChange, collapsed, onToggle, readOnly = false, hideCollapse = false }) {
+  const [tool,setTool]=useState('none')
+  const color='#2563eb', size=2
+  const [history,setHistory]=useState([]), [future,setFuture]=useState([])
   const [hintText,setHintText]=useState(null), [calculator,setCalculator]=useState(false)
+  const [locallyCollapsed,setLocallyCollapsed]=useState(Boolean(collapsed))
   const canvasRef=useRef(null)
+  useEffect(()=>setLocallyCollapsed(hideCollapse?false:Boolean(collapsed)),[collapsed,hideCollapse])
+  useEffect(()=>{setTool('none');setHintText(null);setCalculator(false)},[step?.step_id])
+  const setStrokes=value=>onStrokesChange?.(value)
   const hint=()=>{const text=onHint?.();if(text)setHintText(text)}
-  return <section className="inline-board" ref={anchorRef} aria-label="السبورة">
+  const toggleBoard=()=>{const next=!locallyCollapsed;setLocallyCollapsed(next);onToggle?.(next)}
+  return <section className="inline-board" aria-label="السبورة">
     <div className="inline-board-title inline-board-actions">
-      <button className="help" onClick={onHelp}><HelpCircle/><span>مساعدة</span></button>
-      <button className="hint" onClick={hint}><Lightbulb/><span>تلميح</span></button>
-      <button className="calc" onClick={()=>setCalculator(true)}><Calculator/><span>حاسبة</span></button>
+      {!hideCollapse&&<button type="button" className="board-collapse" onClick={toggleBoard} aria-label={locallyCollapsed?'إظهار الصبورة':'إخفاء الصبورة'}><ChevronDown className={locallyCollapsed?'':'open'}/></button>}
+      {(hideCollapse||!locallyCollapsed)&&<div className="compact-board-tools"><button className="mini-tool tool-calculator" onClick={()=>setCalculator(true)} aria-label="حاسبة" title="حاسبة"><Calculator/></button><button className="mini-tool tool-hint" onClick={hint} disabled={readOnly||hintsLeft<=0} aria-label={`تلميح — متبقي ${hintsLeft}`} title={`التلميحات المتبقية: ${hintsLeft}`}><Lightbulb/><small>{hintsLeft}</small></button><button className="mini-tool tool-help" onClick={onHelp} disabled={readOnly||helpsLeft<=0} aria-label={`مساعدة — متبقي ${helpsLeft}`} title={`المساعدات المتبقية: ${helpsLeft}`}><HelpCircle/><small>{helpsLeft}</small></button>{!readOnly&&<><button className={`mini-tool ${tool==='eraser'?'active':''}`} onClick={()=>setTool(value=>value==='eraser'?'none':'eraser')} aria-label="ممحاة"><Eraser/></button><button className={`pen-toggle ${tool==='pen'?'active':''}`} onClick={()=>setTool(value=>value==='pen'?'none':'pen')} aria-label={tool==='pen'?'إيقاف الرسم':'تشغيل الرسم'}><Pen/></button></>}{tool==='pen'&&<small className="drawing-mode-label">وضع الرسم مفعّل</small>}</div>}
     </div>
-    <div className="inline-canvas"><DrawingCanvas {...{tool,color,size,strokes,setStrokes,history,setHistory,future,setFuture,canvasRef}}/><PracticeEquation step={step}/>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>
-    <div className="inline-tools">
-      <button className={tool==='pen'?'selected':''} onClick={()=>setTool('pen')}><Pen/>قلم</button>
-      <button className={tool==='eraser'?'selected':''} onClick={()=>setTool('eraser')}><Eraser/>ممحاة</button>
-      <label><Palette/>اللون<input type="color" value={color} onChange={e=>setColor(e.target.value)}/></label>
-      <label className="range">السُمك<input type="range" min="2" max="18" value={size} onChange={e=>setSize(+e.target.value)}/></label>
-    </div>
+    {(hideCollapse||!locallyCollapsed)&&<div className={`inline-canvas ${tool==='pen'?'drawing-enabled':''}`}><DrawingCanvas {...{tool,color,size,strokes:strokes||[],setStrokes,history,setHistory,future,setFuture,canvasRef,readOnly}}/>{recentSteps.length>0&&<div className="board-recent-steps" aria-label="الخطوتان السابقتان">{recentSteps.map((previous,index)=><div className="board-recent-step" key={previous.step_id}><small>الخطوة {previous.order||index+1}</small><Equation step={previous} answers={answers} solved/></div>)}</div>}<div className="board-live-equation"><Equation step={step} answers={answers} activeId={activeId} onBlank={readOnly?undefined:onBlank} solved={false}/></div>{hintText&&<div className="inline-hint-bubble"><button onClick={()=>setHintText(null)}><X size={15}/></button><MathText>{hintText}</MathText></div>}</div>}
     {calculator&&<CalculatorModal onClose={()=>setCalculator(false)}/>} 
   </section>
 }
@@ -349,95 +417,216 @@ function QuestionImages({ problem }) {
   return images.length ? <div className="question-images">{images.map((url,index) => <img key={url} src={url} alt={`رسم السؤال ${index+1}`} loading="lazy" />)}</div> : null
 }
 
-function Solver({ file, subjectId, initialQuestionIndex = 0, onBack, apples, setApples, hearts, setHearts }) {
+function Solver({ file, progressScope = '', initialQuestionIndex = 0, exerciseItems = [], onSelectExercise, onBack, hintsLeft, setHintsLeft, helpsLeft, setHelpsLeft, hearts, setHearts, resetProgress = false, musicMuted = true, classroomRole = '', classroomCanAnswer = false }) {
   const [questions,setQuestions]=useState([]), [questionIndex,setQuestionIndex]=useState(initialQuestionIndex), [answers,setAnswers]=useState({}), [activeId,setActiveId]=useState(null), [choice,setChoice]=useState(null)
-  const boardRef=useRef(null)
+  const currentStepRef=useRef(null)
+  const questionsPaneRef=useRef(null), boardTouchY=useRef(null)
   const boardAudioRef=useRef(null)
   const [boardThemeStarted,setBoardThemeStarted]=useState(false)
-
+  const [explanationExpanded,setExplanationExpanded]=useState(false)
+  const [assistantOpen,setAssistantOpen]=useState(true)
+  const [collapsedSteps,setCollapsedSteps]=useState({})
+  const [collapsedBoards,setCollapsedBoards]=useState({})
+  const [boardStrokes,setBoardStrokes]=useState({})
   const startBoardTheme=()=>{
     let player=boardAudioRef.current
     if(!player){
       player=new Audio(`${window.location.origin}/audio/game-session-theme.mp3`)
-      player.preload='auto'
-      player.loop=true
-      player.volume=0.5
+      player.preload='auto';player.loop=true;player.volume=0.6
       boardAudioRef.current=player
     }
-    setBoardThemeStarted(true)
-    void player.play().catch(()=>{})
+    player.volume=0.6;player.muted=musicMuted;setBoardThemeStarted(true)
+    if(!musicMuted)void player.play().catch(()=>{})
   }
-
-  useEffect(()=>()=>{
+  useEffect(()=>()=>{const player=boardAudioRef.current;if(player){player.pause();player.currentTime=0}},[])
+  useEffect(()=>{
     const player=boardAudioRef.current
-    if(player){player.pause();player.currentTime=0}
-  },[])
-
+    if(!player)return
+    player.volume=0.6;player.muted=musicMuted
+    if(musicMuted)player.pause()
+    else if(boardThemeStarted)void player.play().catch(()=>{})
+  },[musicMuted,boardThemeStarted])
+  useEffect(()=>{loadBoardFile(file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,initialQuestionIndex])
+  const classroomProgressKey=`solve-classroom-progress:${progressScope}:${file}:${questionIndex}`
   useEffect(()=>{
-    if(!boardThemeStarted)return
-    const board=boardRef.current
-    const player=boardAudioRef.current
-    if(!board||!player)return
-    const observer=new IntersectionObserver(([entry])=>{
-      if(entry.isIntersecting)void player.play().catch(()=>{})
-      else player.pause()
-    },{threshold:0.15})
-    observer.observe(board)
-    return()=>observer.disconnect()
-  },[boardThemeStarted,activeId])
-  useEffect(()=>{loadBoardFile(subjectId,file).then(data=>{setQuestions(data);setQuestionIndex(Math.min(initialQuestionIndex,data.length-1))})},[file,subjectId,initialQuestionIndex])
+    if(resetProgress&&classroomRole==='student'&&!classroomCanAnswer){setAnswers({});return}
+    const storage=resetProgress?sessionStorage:localStorage
+    const key=resetProgress?classroomProgressKey:`xxx_react_progress_${file}_${questionIndex}`
+    try{setAnswers(JSON.parse(storage.getItem(key)||'{}'))}catch{setAnswers({})}
+  },[file,questionIndex,resetProgress,classroomRole,classroomCanAnswer,classroomProgressKey])
   useEffect(()=>{
-    try{setAnswers(JSON.parse(localStorage.getItem(`xxx_react_progress_${file}_${questionIndex}`)||'{}'))}catch{setAnswers({})}
-  },[file,questionIndex])
-  useEffect(()=>{
-    if(questions.length)localStorage.setItem(`xxx_react_progress_${file}_${questionIndex}`,JSON.stringify(answers))
-  },[answers,file,questionIndex,questions.length])
+    if(!questions.length)return
+    if(resetProgress){
+      if(classroomRole==='teacher'||classroomCanAnswer)sessionStorage.setItem(classroomProgressKey,JSON.stringify(answers))
+      return
+    }
+    localStorage.setItem(`xxx_react_progress_${file}_${questionIndex}`,JSON.stringify(answers))
+  },[answers,file,questionIndex,questions.length,resetProgress,classroomRole,classroomCanAnswer,classroomProgressKey])
   const problem=questions[questionIndex]
   const currentStep=useMemo(()=>problem?.steps.find(s=>s.inputs.some(i=>!answers[i.id])) || problem?.steps.at(-1),[problem,answers])
+  useEffect(()=>{setExplanationExpanded(false);setAssistantOpen(true)},[currentStep?.step_id])
   useEffect(()=>{setActiveId(currentStep?.inputs.find(i=>!answers[i.id])?.id||null)},[currentStep,answers])
-  useEffect(()=>{if(currentStep?.step_id)requestAnimationFrame(()=>boardRef.current?.scrollIntoView({behavior:'smooth',block:'center'}))},[currentStep?.step_id])
-  if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
-  const inputById=id=>problem.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
+  // A completed blank must never move the learner's screen automatically.
+  // In a live class the teacher controls the shared viewport explicitly.
+  const inputById=id=>problem?.steps.flatMap(s=>s.inputs).find(i=>i.id===id)
   const open=id=>{setActiveId(id);setChoice(inputById(id))}
-  const choose=value=>{if(value===choice.correct_value){startBoardTheme();setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)}else{setHearts(v=>Math.max(0,v-1))}}
-  const help=()=>{const input=inputById(activeId);if(!input)return;if(apples<4)return alert('لا تملك تفاحًا كافيًا');setApples(v=>v-4);setAnswers(v=>({...v,[input.id]:input.correct_value}))}
-  const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(apples<2){alert('لا تملك تفاحًا كافيًا');return null}setApples(v=>v-2);return input.hint}
-  const activeIndex=problem.steps.indexOf(currentStep)
-  const allInputs=problem.steps.flatMap(s=>s.inputs), solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
-  return <main className="solver"><aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>
-    <div className="solution-shell"><div className="solver-nav"><strong>التمرين {questionIndex + 1}</strong><div className="progress"><span style={{width:`${progress}%`}}/><b>{progress}%</b></div></div>
-    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{problem.steps.slice(0,activeIndex+1).map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]);return <div className={`solution-step ${done?'done':''}`} key={step.step_id}>{!done&&<h3>{step.title}</h3>}{!done&&<p><MathText>{step.explanation}</MathText></p>}<Equation step={step} answers={answers} activeId={activeId} onBlank={open} solved={done}/>{i===activeIndex&&<InlineBoard key={step.step_id} step={step} anchorRef={boardRef} onHint={boardHint} onHelp={help}/>}</div>})}</section>
+  const choose=value=>{
+    const correct=value===choice.correct_value
+    if(correct){
+      startBoardTheme()
+      setTimeout(()=>{setAnswers(v=>({...v,[choice.id]:value}));setChoice(null)},620)
+    }else{
+      const remaining=Math.max(0,hearts-1)
+      setHearts(remaining)
+      if(remaining===0)setTimeout(()=>{
+        setAnswers({});setActiveId(problem?.steps?.[0]?.inputs?.[0]?.id||null);setChoice(null)
+        setBoardStrokes({});setCollapsedSteps({});setCollapsedBoards({});setExplanationExpanded(false);setHearts(10)
+      },560)
+    }
+    return correct
+  }
+  const help=()=>{const input=inputById(activeId);if(!input)return;if(helpsLeft<=0)return alert('استخدمت جميع المساعدات الأربع لهذا الدرس');setHelpsLeft(value=>Math.max(0,value-1));setAnswers(value=>({...value,[input.id]:input.correct_value}))}
+  const boardHint=()=>{const input=inputById(activeId);if(!input)return null;if(hintsLeft<=0){alert('استخدمت جميع التلميحات الثلاثة لهذا الدرس');return null}setHintsLeft(value=>Math.max(0,value-1));return input.hint}
+  const activeIndex=problem?problem.steps.indexOf(currentStep):0
+  // Never reveal an unsolved future step. The current step appears only when
+  // the learner reaches it; completed steps remain as a compact text solution.
+  const displayedSteps=problem?problem.steps.slice(0,activeIndex+1):[]
+  useEffect(()=>{if(classroomRole)requestAnimationFrame(()=>{const pane=questionsPaneRef.current;if(pane)pane.scrollTo({top:pane.scrollHeight,behavior:'smooth'})})},[classroomRole,activeIndex])
+  // The classroom uses one working board for the active step. Once that step
+  // is solved it becomes a compact textual solution, and the same workspace
+  // moves to the next step instead of creating a board history for every step.
+  useEffect(()=>{
+    if(!problem)return
+    const activeStepId=problem.steps[activeIndex]?.step_id
+    setBoardStrokes(previous=>activeStepId&&previous[activeStepId]?{[activeStepId]:previous[activeStepId]}:{})
+  },[problem,activeIndex])
+  const allInputs=problem?problem.steps.flatMap(s=>s.inputs):[], solvedCount=allInputs.filter(i=>answers[i.id]).length, progress=allInputs.length?Math.round(solvedCount/allInputs.length*100):0
+  useEffect(()=>{
+    if(!classroomRole)return
+    const receive=event=>{
+      if(event.origin!==window.location.origin||event.data?.type!=='classroom_apply_presenter_state'||classroomRole!=='student'||classroomCanAnswer)return
+      const state=event.data.state||{}
+      if(state.answers&&typeof state.answers==='object')setAnswers(state.answers)
+      if(typeof state.activeId==='string'||state.activeId===null)setActiveId(state.activeId)
+      setExplanationExpanded(Boolean(state.explanationExpanded))
+      if(state.collapsedSteps)setCollapsedSteps(state.collapsedSteps)
+      if(state.collapsedBoards)setCollapsedBoards(state.collapsedBoards)
+      if(state.boardStrokes)setBoardStrokes(state.boardStrokes)
+      setChoice(state.choiceId?inputById(state.choiceId):null)
+      if(Number.isFinite(state.scrollY))requestAnimationFrame(()=>window.scrollTo({top:state.scrollY,behavior:'auto'}))
+    }
+    window.addEventListener('message',receive)
+    return()=>window.removeEventListener('message',receive)
+  },[classroomRole,classroomCanAnswer,problem])
+  const presenterState=()=>({answers,activeId,choiceId:choice?.id||null,explanationExpanded,collapsedSteps,collapsedBoards,boardStrokes,scrollY:window.scrollY||0,step:activeIndex+1,solved:solvedCount,total:allInputs.length})
+  useEffect(()=>{
+    if(classroomRole!=='teacher')return
+    const timer=setTimeout(()=>window.parent.postMessage({type:'classroom_presenter_state',state:presenterState()},window.location.origin),60)
+    return()=>clearTimeout(timer)
+  },[classroomRole,answers,activeId,choice,explanationExpanded,collapsedSteps,collapsedBoards,boardStrokes,activeIndex,solvedCount,allInputs.length])
+  useEffect(()=>{
+    if(classroomRole!=='teacher')return
+    let queued=false
+    const shareScroll=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;window.parent.postMessage({type:'classroom_presenter_state',state:presenterState()},window.location.origin)})}
+    window.addEventListener('scroll',shareScroll,{passive:true})
+    return()=>window.removeEventListener('scroll',shareScroll)
+  },[classroomRole,answers,activeId,choice,explanationExpanded,collapsedSteps,collapsedBoards,boardStrokes,activeIndex])
+  useEffect(()=>{
+    if(classroomRole!=='student')return
+    const latestAnswer=allInputs.reduce((value,input)=>answers[input.id]!==undefined&&answers[input.id]!==''?String(answers[input.id]):value,'')
+    window.parent.postMessage({type:'classroom_student_progress',progress:{step:activeIndex+1,solved:solvedCount,total:allInputs.length,answer:latestAnswer}},window.location.origin)
+  },[classroomRole,activeIndex,solvedCount,allInputs.length,activeId,answers])
+  if(!problem)return <div className="loading">جاري تحميل السؤال…</div>
+  const navigationItems=exerciseItems.length?exerciseItems:questions.map((item,index)=>({file,questionIndex:index,problem:item}))
+  const exerciseNavigation=!classroomRole&&<div className="classroom-question-strip" aria-label="تمارين الموضوع">{navigationItems.map((item,index)=>{const active=item.file===file&&Number(item.questionIndex)===Number(questionIndex);return <button key={`${item.file}-${item.questionIndex}-${index}`} className={active?'active':''} aria-label={`تمرين ${index+1}`} title={`تمرين ${index+1}`} onClick={()=>onSelectExercise?.(item,index)}>{index+1}</button>})}</div>
+  if(classroomRole){
+    const workingStep=problem.steps[activeIndex]||problem.steps.at(-1)
+    const recentSteps=problem.steps.slice(0,activeIndex).map((item,index)=>({...item,order:index+1})).reverse()
+    const explanation=workingStep.explanation || workingStep.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'
+    return <>{exerciseNavigation}<main className="classroom-landscape-board">
+      <section className="classroom-drawing-pane" aria-label="مساحة الحل والرسم" onClick={()=>{if(assistantOpen)setAssistantOpen(false)}} onWheel={event=>{if(questionsPaneRef.current)questionsPaneRef.current.scrollTop+=event.deltaY}} onTouchStart={event=>{boardTouchY.current=event.touches[0]?.clientY??null}} onTouchMove={event=>{const y=event.touches[0]?.clientY;if(y==null||boardTouchY.current==null||!questionsPaneRef.current)return;questionsPaneRef.current.scrollTop+=boardTouchY.current-y;boardTouchY.current=y}}>
+        <InlineBoard step={workingStep} recentSteps={recentSteps} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} hintsLeft={hintsLeft} helpsLeft={helpsLeft} strokes={boardStrokes[workingStep.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[workingStep.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[workingStep.step_id]:next}})} collapsed={false} onToggle={()=>{}} readOnly={classroomRole==='student'&&!classroomCanAnswer} hideCollapse/>
+        <aside className={`classroom-assistant ${assistantOpen?'is-open':'is-resting'}`} aria-label="المساعد التوضيحي">
+          {assistantOpen&&<div className="assistant-explanation" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}}>
+            <button type="button" className="assistant-close" onClick={event=>{event.stopPropagation();setAssistantOpen(false)}} aria-label="إخفاء المساعد"><X size={16}/></button>
+            <div className="assistant-explanation-head"><b>{workingStep.title}</b><small>الخطوة {activeIndex+1} من {problem.steps.length}</small></div>
+            <MathText>{explanation}</MathText>
+          </div>}
+          <button type="button" className="assistant-character" onClick={event=>{event.stopPropagation();setAssistantOpen(value=>!value)}} aria-label={assistantOpen?'تصغير المساعد':'إظهار التوضيح'} aria-expanded={assistantOpen}>
+            <img src={classroomAssistant} alt="مساعد تعليمي يشير إلى التوضيح" draggable="false"/>
+          </button>
+        </aside>
+      </section>
+      <section ref={questionsPaneRef} className="classroom-questions-pane" aria-label="السؤال وخطوات الحل">
+        <div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>
+        {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}
+      </section>
+    </main><Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'&&!classroomCanAnswer}/></>
+  }
+  return <>{exerciseNavigation}<main className="solver">{!resetProgress&&<aside><button onClick={onBack}><ArrowRight/>قائمة التمارين</button></aside>}
+    <div className="solution-shell">
+    <section className="solution"><div className="problem-card"><h1><MathText>{problem.title}</MathText></h1><QuestionImages problem={problem}/></div>{displayedSteps.map((step,i)=>{const done=step.inputs.every(x=>answers[x.id]),future=i>activeIndex,active=i===activeIndex,stepHidden=!classroomRole&&!done&&Boolean(collapsedSteps[step.step_id]),boardHidden=Boolean(collapsedBoards[step.step_id]);return <div ref={active?currentStepRef:null} className={`solution-step ${done?'done':''} ${future?'future-step':''} ${active?'active-step':''} ${stepHidden?'step-hidden':''}`} key={step.step_id}>{!classroomRole&&!done&&<button className="step-collapse" onClick={()=>setCollapsedSteps(v=>({...v,[step.step_id]:!v[step.step_id]}))} aria-label={stepHidden?'إظهار الخطوة':'إخفاء الخطوة'}><ChevronDown className={stepHidden?'':'open'}/></button>}{stepHidden?<b className="collapsed-step-title">{step.title}</b>:<><div className="step-copy">{!done&&<h3>{step.title} <small>من {problem.steps.length}</small></h3>}<Equation step={step} answers={answers} activeId={activeId} onBlank={classroomRole==='student'||future?undefined:open} solved={done}/>{active&&!done&&<div className={`step-explanation ${explanationExpanded?'expanded':'collapsed'}`}><div className="step-explanation-text"><MathText>{step.explanation || step.inputs?.find(input=>!answers[input.id])?.hint || 'تابع خطوات الحل، ثم اختر القيمة المناسبة للمربع.'}</MathText></div><button type="button" onClick={()=>setExplanationExpanded(value=>!value)} aria-expanded={explanationExpanded}>{explanationExpanded?'إخفاء الشرح ↑':'عرض مزيد'}</button></div>}</div>{active&&<InlineBoard step={step} answers={answers} activeId={activeId} onBlank={open} onHint={boardHint} onHelp={help} hintsLeft={hintsLeft} helpsLeft={helpsLeft} strokes={boardStrokes[step.step_id]||[]} onStrokesChange={updater=>setBoardStrokes(previous=>{const before=previous[step.step_id]||[];const next=typeof updater==='function'?updater(before):updater;return {[step.step_id]:next}})} collapsed={boardHidden} onToggle={()=>setCollapsedBoards(v=>({...v,[step.step_id]:!v[step.step_id]}))} readOnly={classroomRole==='student'} hideCollapse={Boolean(classroomRole)}/>}</>}</div>})}</section>
     {progress===100&&<div className="complete"><strong>أحسنت! أتممت الحل بنجاح 🎉</strong></div>}</div>
-    <Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)}/>
-  </main>
+    <Choices input={choice} onChoose={choose} onClose={()=>setChoice(null)} hearts={hearts} readOnly={classroomRole==='student'}/>
+  </main></>
 }
 
 export default function App(){
-  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState('subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[apples,setApples]=useState(100),[hearts,setHearts]=useState(10)
+  const params=useMemo(()=>new URLSearchParams(window.location.search),[])
+  const requestedSubject=String(params.get('subject')||'').toLowerCase()
+  const requestedTopic=String(params.get('topicTitle')||'').trim()
+  const requestedLessonId=String(params.get('lessonId')||'').trim()
+  const requestedExerciseFile=String(params.get('exerciseFile')||'').trim()
+  const requestedExerciseIndex=Number(params.get('exerciseIndex')||0)
+  const embeddedScience=params.get('embedded')==='1'&&(requestedSubject.includes('math')||requestedSubject.includes('رياض')||requestedSubject.includes('chem')||requestedSubject.includes('كيمي')||requestedSubject.includes('phys')||requestedSubject.includes('فيز'))
+  const classroom=params.get('classroom')==='1', classroomRole=params.get('role')||'', classroomCanAnswer=params.get('canAnswer')==='1'
+  const quotaKey=`solve-with-me-quotas:${requestedSubject}:${params.get('chapter')||1}:${params.get('lessonId')||params.get('lesson')||1}`
+  const readQuota=(name,fallback)=>{try{const stored=JSON.parse(sessionStorage.getItem(quotaKey)||'{}');return Number.isFinite(stored[name])?Math.max(0,Number(stored[name])):fallback}catch{return fallback}}
+  const [curriculum,setCurriculum]=useState([]),[subject,setSubject]=useState(null),[view,setView]=useState(embeddedScience?'loading':'subjects'),[chapter,setChapter]=useState(null),[topic,setTopic]=useState(null),[file,setFile]=useState(null),[questionIndex,setQuestionIndex]=useState(0),[exerciseItems,setExerciseItems]=useState([]),[hintsLeft,setHintsLeft]=useState(()=>readQuota('hints',3)),[helpsLeft,setHelpsLeft]=useState(()=>readQuota('helps',4)),[hearts,setHearts]=useState(10),[musicMuted,setMusicMuted]=useState(true)
   const chooseSubject=selected=>{setSubject(selected);setCurriculum([]);fetch(selected.curriculum).then(r=>r.json()).then(data=>{setCurriculum(data);setView('chapters')})}
   useEffect(()=>{
-    const params=new URLSearchParams(window.location.search)
-    const selected=subjects.find(item=>item.id===params.get('subject'))
+    const selected=subjects.find(item=>item.id===requestedSubject)||(requestedSubject.includes('math')||requestedSubject.includes('رياض')?subjects.find(item=>item.id==='math'):requestedSubject.includes('chem')||requestedSubject.includes('كيمي')?subjects.find(item=>item.id==='chemistry'):requestedSubject.includes('phys')||requestedSubject.includes('فيز')?subjects.find(item=>item.id==='physics'):null)
     if(!selected)return
     let cancelled=false
     fetch(selected.curriculum).then(r=>{if(!r.ok)throw new Error('Curriculum unavailable');return r.json()}).then(data=>{
       if(cancelled)return
-      setSubject(selected);setCurriculum(data);setView('chapters')
+      setSubject(selected);setCurriculum(data);setView(embeddedScience?'missing':'chapters')
       const number=Number(params.get('chapter'))
       const matched=data.find(ch=>Number(ch.id.match(/ch(\d+)/)?.[1])===number)
       if(!matched)return
-      setChapter(matched);setView('topics')
+      setChapter(matched);setView(embeddedScience?'missing':'topics')
       const lesson=Number(params.get('lesson'))
-      const found=matched.topics.find(t=>t.files.some(f=>(typeof f==='string'?f:f.file).match(new RegExp(`lesson${lesson}\\.json$`))))
+      const isMath=selected.id==='math'
+      const topicTokens=(value)=>String(value||'').toLowerCase().replace(/[ًٌٍَُِّْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').split(/[^\u0600-\u06ff\w]+/).map(token=>token.replace(/^و(?=.{3})/,'').replace(/^ال(?=.{3})/,'')).filter(token=>token.length>2&&!['فصل','استخدام','باستخدام','شرح','معادله','محاضره','صيغه','مسائل','وزاريات'].includes(token))
+      const requestedTokens=new Set(topicTokens(requestedTopic))
+      const titleMatchedTopic=requestedTokens.size
+        ? matched.topics.map(t=>{
+            const tokens=topicTokens(t.name)
+            const score=tokens.filter(token=>requestedTokens.has(token)).length
+            const relevance=(2*score)/Math.max(tokens.length+requestedTokens.size,1)
+            return {topic:t,score,relevance}
+          }).sort((a,b)=>b.relevance-a.relevance||b.score-a.score||topicTokens(a.topic.name).length-topicTokens(b.topic.name).length)[0]
+        : null
+      const found=titleMatchedTopic?.score>0
+        ? titleMatchedTopic.topic
+        : matched.topics.find(t=>t.files.some(f=>{
+        const file=typeof f==='string'?f:f.file
+        return isMath
+          ? new RegExp(`(?:^|_)ch${number}_t${lesson}(?:_|\.json$)`, 'i').test(file)
+          : new RegExp(`(?:^|_)lesson${lesson}\.json$`).test(file)
+      }))
       if(found){setTopic(found);setView('exercises')}
     }).catch(error=>console.error('Could not open lesson:',error))
     return()=>{cancelled=true}
-  },[])
+  },[embeddedScience,params,requestedSubject])
   const home=()=>{setView('subjects');setSubject(null);setChapter(null);setTopic(null);setFile(null);setQuestionIndex(0)}
-  return <><Header {...{apples,hearts}} onHome={home}/>
+  useEffect(()=>{sessionStorage.setItem(quotaKey,JSON.stringify({hints:hintsLeft,helps:helpsLeft}))},[quotaKey,hintsLeft,helpsLeft])
+  return <div className={classroom?'classroom-embedded':''}>{!classroom&&<Header {...{hearts,musicMuted}} onToggleMusic={()=>setMusicMuted(value=>!value)} onHome={home} onBack={embeddedScience?()=>setView('topics'):undefined}/>}
+    {view==='loading'&&<main className="page"><div className="loading">جاري فتح تمارين الدرس المحدد…</div></main>}
+    {view==='missing'&&<main className="page"><div className="loading">لا توجد تمارين مضافة لهذا الدرس حاليًا</div></main>}
     {view==='subjects'&&<SubjectPicker onChoose={chooseSubject}/>} 
     {view==='chapters'&&subject&&<Chapters curriculum={curriculum} subject={subject} onOpen={ch=>{setChapter(ch);setView('topics')}}/>}
     {view==='topics'&&<Topics chapter={chapter} onBack={()=>setView('chapters')} onOpen={selected=>{setTopic(selected);setView('exercises')}}/>}
-    {view==='exercises'&&<Exercises topic={topic} subjectId={subject?.id} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
-    {view==='solver'&&<Solver {...{file,apples,setApples,hearts,setHearts}} subjectId={subject?.id} initialQuestionIndex={questionIndex} onBack={()=>setView('exercises')}/>}</>
+    {view==='exercises'&&<Exercises topic={topic} embedded={embeddedScience} classroom={classroom} requestedFile={requestedExerciseFile} requestedIndex={requestedExerciseIndex} requestedLessonId={requestedLessonId} onItems={setExerciseItems} onBack={()=>setView('topics')} onOpen={(selectedFile,index)=>{setFile(selectedFile);setQuestionIndex(index);setView('solver')}}/>}
+    {view==='solver'&&<Solver {...{file,exerciseItems,hintsLeft,setHintsLeft,helpsLeft,setHelpsLeft,hearts,setHearts,musicMuted,classroomRole,classroomCanAnswer}} progressScope={quotaKey} resetProgress={embeddedScience} initialQuestionIndex={questionIndex} onSelectExercise={(item,index)=>{if(classroom){if(classroomRole==='teacher')window.parent.postMessage({type:'classroom_select_exercise',item:{file:item.file,questionIndex:item.questionIndex,number:index+1}},window.location.origin)}else{setFile(item.file);setQuestionIndex(item.questionIndex)}}} onBack={()=>setView('exercises')}/>}</div>
 }

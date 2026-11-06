@@ -1,0 +1,11 @@
+UI SFX Set by Kenney Vleugels (Kenney.nl)
+
+License: Creative Commons Zero (CC0 1.0 Universal)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+These selected sounds were sourced from:
+https://kenney.nl/assets/ui-audio
+
+The original WAV files were converted to mono MP3 for this web application.
+Credit is not required by the license, but the source is retained here for
+traceability.

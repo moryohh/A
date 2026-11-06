@@ -1,0 +1,149 @@
+name: Deploy online challenge preview
+
+on:
+  push:
+    branches: [preview-online-challenge]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages-online-challenge-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    name: Build and deploy isolated challenge preview
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Synchronize educational content to R2 and D1
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SYNC_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$SYNC_TOKEN"
+          python3 - "$SYNC_TOKEN" <<'PY'
+          import json, sys
+          from pathlib import Path
+          config = {
+            'name': 'duha-content-sync',
+            'main': str(Path.cwd() / 'cloudflare/duha-content-sync-worker.js'),
+            'compatibility_date': '2026-10-20',
+            'vars': {'SYNC_TOKEN': sys.argv[1]},
+            'r2_buckets': [{'binding': 'CONTENT_R2', 'bucket_name': 'duha-educational-content'}],
+            'd1_databases': [{'binding': 'CONTENT_DB', 'database_name': 'duha-content-index', 'database_id': '88f179a9-4cab-4649-8981-fece0c155ba2'}],
+          }
+          Path('/tmp/wrangler-content-sync.json').write_text(json.dumps(config))
+          PY
+          npx wrangler@4 deploy --config /tmp/wrangler-content-sync.json
+          CONTENT_SYNC_URL="https://duha-content-sync.rafos72171.workers.dev" CONTENT_SYNC_TOKEN="$SYNC_TOKEN" node scripts/sync-content-to-cloudflare.mjs
+
+      - name: Deploy read-only content APIs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npx wrangler@4 deploy --config cloudflare/wrangler.duha-content.toml
+          npx wrangler@4 deploy --config cloudflare/wrangler.duha-content-r2.toml
+
+      - name: Remove temporary content writer
+        if: always() && github.event_name == 'workflow_dispatch'
+        run: npx wrangler@4 delete duha-content-sync --force || true
+
+      - name: Verify content replicas
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          curl --fail --silent https://duha-content-r2.rafos72171.workers.dev/manifest-educational > /tmp/manifest.json
+          node -e "const m=require('/tmp/manifest.json'); if(m.count < 3500) process.exit(1); console.log('R2 educational records:',m.count)"
+          curl --fail --silent 'https://duha-content-index.rafos72171.workers.dev/content?section=solve_with_me&limit=1' > /tmp/index.json
+          node -e "const m=require('/tmp/index.json'); if(!m.items?.length) process.exit(1); console.log('D1 solve-with-me index verified')"
+
+      - name: Check TypeScript
+        run: npm run lint
+
+      - name: Build preview
+        run: npm run build
+        env:
+          VITE_C_OCR_API_URL: ${{ vars.VITE_C_OCR_API_URL }}
+          VITE_DEPLOY_TARGET: cloudflare
+          VITE_ONLINE_CHALLENGE_API_URL: https://duha-online-challenge.rafos72171.workers.dev
+          VITE_ENABLE_GUEST_PREVIEW: true
+
+      - name: Ensure isolated Pages project exists
+        run: npx wrangler@4 pages project create duha-challenge-preview --production-branch preview-online-challenge || true
+
+      - name: Deploy isolated preview and capture URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler@4 pages deploy dist --project-name duha-challenge-preview --branch preview-online-challenge --commit-dirty=true | tee /tmp/pages-deploy.log
+          PREVIEW_URL="$(grep -oE 'https://[a-z0-9]+\.duha-challenge-preview\.pages\.dev' /tmp/pages-deploy.log | tail -1)"
+          test -n "$PREVIEW_URL"
+          echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+          echo "Preview URL: $PREVIEW_URL"
+
+      - name: Deploy challenge Worker with exact Preview CORS
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source = json.loads(Path('cloudflare/online-challenge/wrangler.jsonc').read_text())
+          source['main'] = str(Path.cwd() / 'cloudflare/online-challenge/src/worker.js')
+          stable_preview = 'https://duha-challenge-preview.pages.dev'
+          branch_preview = 'https://preview-online-challenge.duha-challenge-preview.pages.dev'
+          dynamic_preview = __import__('os').environ['PREVIEW_URL']
+          legacy_previews = [
+              'https://442b9c76.duha-challenge-preview.pages.dev',
+              'https://8befce4f.duha-challenge-preview.pages.dev',
+              'https://1c1ae7f7.duha-challenge-preview.pages.dev',
+          ]
+          allowed_origins = ['https://a-1q1.pages.dev', stable_preview, branch_preview, dynamic_preview, *legacy_previews]
+          source['vars']['ALLOWED_ORIGINS'] = ','.join(allowed_origins)
+          source['vars']['PREVIEW_GUEST_ORIGINS'] = ','.join([stable_preview, branch_preview, dynamic_preview, *legacy_previews])
+          source['vars']['ALLOW_PREVIEW_GUESTS'] = 'true'
+          Path('/tmp/wrangler-preview.json').write_text(json.dumps(source))
+          PY
+          npx wrangler@4 deploy --config /tmp/wrangler-preview.json
+
+      - name: Verify Worker and Preview CORS
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --dump-header /tmp/challenge-headers.txt \
+              --header "Origin: $PREVIEW_URL" \
+              https://duha-online-challenge.rafos72171.workers.dev/health \
+              --output /tmp/challenge-health.json \
+              && grep -i "^access-control-allow-origin: $PREVIEW_URL" /tmp/challenge-headers.txt \
+              && grep -q '"ok":true' /tmp/challenge-health.json; then
+              exit 0
+            fi
+            echo "Worker propagation/CORS check attempt $attempt failed; retrying..."
+            sleep 5
+          done
+          curl --fail --silent --show-error --dump-header /tmp/stable-preview-headers.txt \
+            --header "Origin: https://duha-challenge-preview.pages.dev" \
+            https://duha-online-challenge.rafos72171.workers.dev/health \
+            --output /tmp/stable-preview-health.json
+          grep -i "^access-control-allow-origin: https://duha-challenge-preview.pages.dev" /tmp/stable-preview-headers.txt
+          grep -q '"ok":true' /tmp/stable-preview-health.json
+          echo "Worker health/CORS verification failed after retries"
+          cat /tmp/challenge-headers.txt || true
+          cat /tmp/challenge-health.json || true
+          exit 1

@@ -11,7 +11,6 @@ import {
   LessonSectionType,
   TeacherStory,
 } from '../types';
-import { SUBJECTS_CURRICULUM_DATA } from '../data/mockCurriculums';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
 import { fetchCloudflareContentIndex, fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
@@ -434,6 +433,94 @@ export function getArabicChapterTitle(num: number, rawTitle?: string): string {
   return `الفصل ${ordinal}`;
 }
 
+function flattenContentText(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(flattenContentText).join(' ');
+  if (typeof value === 'object') return Object.values(value).map(flattenContentText).join(' ');
+  return '';
+}
+
+function normalizeTopicText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه');
+}
+
+function topicWords(value: string): Set<string> {
+  const stopWords = new Set(['من', 'في', 'على', 'عن', 'الى', 'و', 'او', 'مع', 'هذا', 'هذه', 'ذلك', 'تلك', 'الفصل', 'الدرس']);
+  return new Set(
+    normalizeTopicText(value)
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 3 && !stopWords.has(word))
+  );
+}
+
+function chapterNumberFromText(value: string): number | undefined {
+  const text = normalizeTopicText(value);
+  const ordinal: Record<string, number> = {
+    الاول: 1, الاولى: 1, الثاني: 2, الثانيه: 2, الثالث: 3, الثالثه: 3,
+    الرابع: 4, الرابعه: 4, الخامس: 5, الخامسه: 5, السادس: 6, السادسه: 6,
+  };
+  const numeric = text.match(/(?:الفصل|chapter|ch)[\s_-]*(\d+)/i);
+  if (numeric) return Number(numeric[1]);
+  const named = text.match(/الفصل\s+(الاولى?|الثانيه?|الثالثه?|الرابعه?|الخامسه?|السادسه?)/i);
+  return named ? ordinal[named[1]] : undefined;
+}
+
+function videoMatchesLesson(vid: any, context: OpenLessonContext, curriculumJson?: any): boolean {
+  const title = String(vid?.title || '');
+  const summary = String(vid?.content_summary || '');
+  const detected = Array.isArray(vid?.detected_topics) ? vid.detected_topics.join(' ') : '';
+  const matched = Array.isArray(vid?.matched_topics) ? vid.matched_topics.join(' ') : '';
+  const metadata = `${title} ${summary} ${detected} ${matched}`;
+
+  // A video explicitly labelled with another chapter must never leak into this lesson.
+  const explicitChapter = chapterNumberFromText(metadata);
+  if (explicitChapter !== undefined && explicitChapter !== context.chapterNumber) return false;
+
+  // When the source includes curriculum metadata, require at least two meaningful
+  // topic words in common. This removes contaminated recommendations while keeping
+  // valid lecture/review videos that describe the same lesson in different wording.
+  if (curriculumJson) {
+    const curriculumWords = topicWords(flattenContentText(curriculumJson));
+    const videoWords = topicWords(metadata);
+    let overlap = 0;
+    videoWords.forEach((word) => { if (curriculumWords.has(word)) overlap += 1; });
+    // A curriculum-backed lesson must have topical evidence in the video
+    // metadata; never accept a generic or unrelated video merely because it
+    // belongs to the same teacher/chapter.
+    if (curriculumWords.size > 0) return overlap >= 2;
+  }
+  return true;
+}
+
+function collectMetadataValues(value: any, keyName: string, output = new Set<string>()): Set<string> {
+  if (!value || typeof value !== 'object') return output;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectMetadataValues(item, keyName, output));
+    return output;
+  }
+  Object.entries(value).forEach(([key, child]) => {
+    if (key.toLowerCase() === keyName && typeof child === 'string' && child.trim()) output.add(child.trim());
+    if (child && typeof child === 'object') collectMetadataValues(child, keyName, output);
+  });
+  return output;
+}
+
+function contentBelongsToLesson(content: any, context: OpenLessonContext): boolean {
+  const lessonIds = [...collectMetadataValues(content, 'lesson_id')];
+  if (!lessonIds.length) return true;
+  const expected = normalizeTopicText(context.lessonId);
+  return lessonIds.some((value) => {
+    const actual = normalizeTopicText(value);
+    return actual === expected || actual.startsWith(`${expected}_`) || expected.startsWith(`${actual}_`);
+  });
+}
+
 /**
  * ============================================================================
  * 1. getSubjectIndex (Stage 1: Subject Index & Metadata Only)
@@ -457,29 +544,32 @@ export async function getSubjectIndex(
   let rawRows: any[] = [];
   let fetchError: any = null;
 
-  // Trial path: use the Cloudflare D1 index first; retain Supabase as fallback.
+  // D1 is the fast, lightweight primary index. It is populated from the same
+  // canonical Supabase rows and contains no heavy JSON payloads.
   try {
-    const cloudRows = await fetchCloudflareContentIndex(normKey);
-    if (cloudRows.length > 0) {
-      rawRows = cloudRows.map((row) => {
-        const { chapter, segment } = extractChapterAndSegment(row.file_name || '');
-        return {
-          record_id: row.source_id,
-          subject_id: row.subject_id,
-          section_id: row.section_id,
-          file_name: row.file_name,
-          lesson_id: row.file_name?.split('/').pop()?.replace('.json', ''),
-          chapter_number: chapter || undefined,
-          lesson_number: segment || undefined,
-          title: row.title,
-          has_content: true,
-        };
-      });
+    const cloudflareRows = (await Promise.all(
+      dbSubjects.map((subject) => fetchCloudflareContentIndex(subject))
+    )).flat();
+    if (cloudflareRows.length > 0) {
+      rawRows = cloudflareRows.map((row) => ({
+        record_id: row.source_id,
+        subject_id: row.subject_id,
+        section_id: row.section_id,
+        file_name: row.file_name,
+        lesson_id: row.lesson_id,
+        chapter_number: row.chapter_number,
+        lesson_number: row.lesson_number,
+        title: row.title,
+        has_content: row.has_content,
+      }));
     }
   } catch (err) {
-    console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase fallback:', err);
+    console.warn('[getSubjectIndex] Cloudflare index unavailable; using Supabase:', err);
+    fetchError = err;
   }
 
+  // Supabase remains a safe fallback if Cloudflare is unavailable or has not
+  // finished a deployment yet.
   if (rawRows.length === 0 && supabase && isSupabaseConfigured()) {
     try {
       // 1. Try querying the dedicated View: `educational_content_index`
@@ -501,31 +591,9 @@ export async function getSubjectIndex(
         if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
           rawRows = rpcData;
         } else {
-          // 3. Fallback: Query educational_data selecting metadata ONLY (no content column!)
-          const { data: metaData, error: metaError } = await supabase
-            .from('educational_data')
-            .select('id, subject_id, section_id, file_name')
-            .in('subject_id', dbSubjects)
-            .limit(2000);
-
-          if (!metaError && metaData && metaData.length > 0) {
-            rawRows = metaData.map((row) => {
-              const { chapter, segment } = extractChapterAndSegment(row.file_name || '');
-              return {
-                record_id: row.id,
-                subject_id: row.subject_id,
-                section_id: row.section_id,
-                file_name: row.file_name,
-                lesson_id: row.file_name?.split('/').pop()?.replace('.json', '') || `les-${chapter || 1}-${segment || 1}`,
-                chapter_number: chapter || 1,
-                lesson_number: segment || 1,
-                title: formatArabicLessonTitle(row.file_name),
-                has_content: true,
-              };
-            });
-          } else {
-            fetchError = viewError || rpcError || metaError;
-          }
+          // Do not derive the lesson list from educational_data metadata. It
+          // contains legacy/test files and is the source of phantom lessons.
+          fetchError = viewError || rpcError;
         }
       }
     } catch (err) {
@@ -539,15 +607,49 @@ export async function getSubjectIndex(
   const chapterGroups: Record<number, { chapterNumber: number; title: string; lessons: LessonIndex[] }> = {};
 
   if (rawRows.length > 0) {
-    rawRows.forEach((row) => {
+    // Some mathematics index rows are topic records with a real lesson_id and
+    // record_id but no numeric lesson_number. Give those records a deterministic
+    // display ordinal within their chapter; the immutable IDs remain the source
+    // of truth and are never replaced by a guessed filename/number.
+    const topicOrdinals = new Map<string, number>();
+    const topicCounters: Record<number, number> = {};
+    rawRows
+      .filter((row) => normalizeSectionId(row.section_id) === 'lessons' && row.lesson_number == null && row.chapter_number != null)
+      .sort((a, b) => String(a.record_id || '').localeCompare(String(b.record_id || '')))
+      .forEach((row) => {
+        const chapter = Number(row.chapter_number);
+        topicCounters[chapter] = (topicCounters[chapter] || 0) + 1;
+        topicOrdinals.set(String(row.record_id), topicCounters[chapter]);
+      });
+
+    // The index view can return curriculum/game rows before the video's
+    // lessons row. Process lessons first so those rows attach to an existing
+    // canonical lesson instead of being silently discarded by the guard below.
+    const orderedRows = [...rawRows].sort((a, b) => {
+      const aIsLesson = normalizeSectionId(a.section_id || '') === 'lessons' ? 0 : 1;
+      const bIsLesson = normalizeSectionId(b.section_id || '') === 'lessons' ? 0 : 1;
+      return aIsLesson - bIsLesson;
+    });
+
+    orderedRows.forEach((row) => {
       if (row.file_name?.includes('organized_tree')) return;
 
       const rawFileName = row.file_name || '';
       const parsedPath = extractChapterAndSegment(rawFileName);
-      const chNum = Number(row.chapter_number) || parsedPath.chapter || 1;
-      const lesNum = Number(row.lesson_number) || parsedPath.segment || 1;
-      const rawSection = row.section_id || '';
-      const normalizedSection = normalizeSectionId(rawSection);
+      const normalizedSection = normalizeSectionId(row.section_id || '');
+      const isLessonRow = normalizedSection === 'lessons';
+      // Only lesson-section rows are allowed to create an item in the lesson
+      // list. MCQ/TF/PH/curriculum rows may attach files to an existing lesson,
+      // but must never create a phantom lesson from a legacy filename counter.
+      const chNum = row.chapter_number != null ? Number(row.chapter_number) : parsedPath.chapter || 0;
+      const indexedTopicOrdinal = row.record_id ? topicOrdinals.get(String(row.record_id)) : undefined;
+      const lesNum = row.lesson_number != null ? Number(row.lesson_number) : indexedTopicOrdinal || 0;
+      // The canonical index contains a preparatory segment 0 and a few legacy
+      // imported records with file counters (for example 2026/10525). Neither
+      // is a real lesson number in the curriculum UI.
+      if (!Number.isInteger(chNum) || chNum < 1 || !Number.isInteger(lesNum) || lesNum < 1 || lesNum > 999) {
+        return;
+      }
 
       const lessonKey = buildLessonKey(normKey, chNum, lesNum);
       const rawRecordId = row.record_id || row.id;
@@ -555,6 +657,8 @@ export async function getSubjectIndex(
         row.lesson_id ||
         rawFileName.split('/').pop()?.replace('.json', '') ||
         `${normKey}-ch${chNum}-les${lesNum}`;
+
+      if (!allLessonsMap[lessonKey] && !isLessonRow) return;
 
       if (!allLessonsMap[lessonKey]) {
         allLessonsMap[lessonKey] = {
@@ -569,7 +673,16 @@ export async function getSubjectIndex(
       }
 
       if (normalizedSection && rawRecordId) {
-        allLessonsMap[lessonKey].files[normalizedSection] = {
+        const existing = allLessonsMap[lessonKey].files[normalizedSection];
+        const candidatePriority = normalizedSection === 'lessons'
+          ? (rawFileName.includes('cleaned_json_files') ? 0 : rawFileName.includes('segment') ? 1 : 2)
+          : (rawFileName.includes(`_${normalizedSection}`) ? 0 : 1);
+        const existingPriority = existing
+          ? (normalizedSection === 'lessons'
+            ? (existing.fileName.includes('cleaned_json_files') ? 0 : existing.fileName.includes('segment') ? 1 : 2)
+            : (existing.fileName.includes(`_${normalizedSection}`) ? 0 : 1))
+          : Infinity;
+        if (!existing || candidatePriority < existingPriority) allLessonsMap[lessonKey].files[normalizedSection] = {
           recordId: String(rawRecordId),
           fileName: rawFileName,
         };
@@ -587,41 +700,6 @@ export async function getSubjectIndex(
         };
       }
       chapterGroups[chNum].lessons.push(lesson);
-    });
-  }
-
-  // 5. Fallback from local static mock curriculums if database has no records
-  if (Object.keys(chapterGroups).length === 0) {
-    const mockChapters = SUBJECTS_CURRICULUM_DATA[normKey] || [];
-    mockChapters.forEach((ch, chIdx) => {
-      const chNum = ch.number || chIdx + 1;
-      const lessonsList: LessonIndex[] = (ch.lessons || []).map((l, lIdx) => {
-        const lNum = l.number || lIdx + 1;
-        const lessonKey = buildLessonKey(normKey, chNum, lNum);
-        const lIndex: LessonIndex = {
-          lessonKey,
-          subjectId: normKey,
-          chapterNumber: chNum,
-          lessonNumber: lNum,
-          lessonId: l.id || `${normKey}-ch${chNum}-les${lNum}`,
-          title: formatArabicLessonTitle(l.title || `الدرس ${lNum}`),
-          files: {
-            lessons: { recordId: `mock-les-${l.id}`, fileName: `${l.id}.json` },
-            curriculum: { recordId: `mock-cur-${l.id}`, fileName: `curriculum_${l.id}.json` },
-            mcq: { recordId: `mock-mcq-${l.id}`, fileName: `mcq_${l.id}.json` },
-            true_false: { recordId: `mock-tf-${l.id}`, fileName: `tf_${l.id}.json` },
-            ph: { recordId: `mock-ph-${l.id}`, fileName: `ph_${l.id}.json` },
-          },
-        };
-        allLessonsMap[lessonKey] = lIndex;
-        return lIndex;
-      });
-
-      chapterGroups[chNum] = {
-        chapterNumber: chNum,
-        title: ch.title || getArabicChapterTitle(chNum),
-        lessons: lessonsList,
-      };
     });
   }
 
@@ -663,7 +741,8 @@ export async function getSubjectIndex(
 export function buildTeacherStoriesFromLessonJson(
   rawJson: any,
   context: OpenLessonContext,
-  subjectName = 'المادة'
+  subjectName = 'المادة',
+  curriculumJson?: any
 ): TeacherStory[] {
   let teachersList: any[] = [];
 
@@ -684,6 +763,7 @@ export function buildTeacherStoriesFromLessonJson(
     const videos: any[] = Array.isArray(t.videos) ? t.videos : [];
     for (const vid of videos) {
       if (!vid) continue;
+      if (!videoMatchesLesson(vid, context, curriculumJson)) continue;
       const rawVideoUrlOrId =
         vid.url ||
         vid.video_url ||
@@ -799,6 +879,15 @@ export async function getLessonContentBundle(
           const section = Object.entries(indexData?.files || {}).find(([, file]) => file.recordId === row.id)?.[0] || '';
           const fileName = Object.values(indexData?.files || {}).find((file) => file.recordId === row.id)?.fileName || '';
           return { id: row.id, subject_id: context.subjectId, section_id: section, file_name: fileName, content: row.content };
+        })
+        .filter((row) => {
+          // The lessons/video record is already selected by the immutable
+          // Supabase record_id. Its own lesson_id is the video-source mapping
+          // and must not be compared with a UI-generated fallback ID.
+          if (normalizeSectionId(row.section_id) === 'lessons') return true;
+          const matches = contentBelongsToLesson(row.content, context);
+          if (!matches) console.warn('[getLessonContentBundle] Ignoring non-video content with mismatched lesson_id:', row.id);
+          return matches;
         });
       // A partial R2 bundle is not reported as Cloudflare: missing sections may
       // be filled by Supabase below, so claiming a single source would be false.
@@ -808,56 +897,25 @@ export async function getLessonContentBundle(
     }
   }
 
-  if (rawSectionRows.length === 0 && supabase && isSupabaseConfigured()) {
+  if (supabase && isSupabaseConfigured()) {
     try {
-      if (recordIds.length > 0) {
+      const loadedRecordIds = new Set(rawSectionRows.map((row) => String(row.id)));
+      const missingRecordIds = recordIds.filter((id) => !loadedRecordIds.has(String(id)));
+      if (missingRecordIds.length > 0) {
         const { data, error } = await supabase
           .from('educational_data')
           .select('id, subject_id, section_id, file_name, content')
-          .in('id', recordIds);
+          .in('id', missingRecordIds);
 
         if (!error && data) {
           // recordIds come from the exact lesson index entry. Trust this relation even
           // when file_name uses a legacy/path naming convention without ch/les tokens.
-          rawSectionRows = data;
-        }
-      }
-
-      // If recordIds was missing or did not prove the exact lesson, query only the chapter
-      // and select the row whose filename contains both the exact chapter and lesson tokens.
-      const loadedSections = new Set(rawSectionRows.map((r) => normalizeSectionId(r.section_id)));
-      const requiredSections: LessonSectionType[] = ['lessons', 'curriculum', 'mcq', 'true_false', 'ph'];
-      const missingSections = requiredSections.filter((sec) => !loadedSections.has(sec));
-
-      if (missingSections.length > 0) {
-        const dbSubjects = getDbSubjectIds(context.subjectId);
-        for (const sec of missingSections) {
-          if (signal?.aborted) break;
-          const sectionAliases = sec === 'true_false'
-            ? ['true_false', 'tf', 'صح_خطأ', 'صح_ام_خطا']
-            : sec === 'ph'
-              ? ['ph', 'فلاش_كاردز', 'بطاقات']
-              : sec === 'mcq'
-                ? ['mcq', 'MCQ', 'mcqs', 'اختيارات', 'اختيار_من_متعدد']
-                : [sec];
-          let sectionQuery = supabase
-            .from('educational_data')
-            .select('id, subject_id, section_id, file_name, content')
-            .in('subject_id', dbSubjects)
-            .in('section_id', sectionAliases);
-
-          sectionQuery = sectionQuery.or(
-            `file_name.ilike.%ch${context.chapterNumber}%,file_name.ilike.%chapter${context.chapterNumber}%,file_name.ilike.%فصل%${context.chapterNumber}%`
-          );
-
-          const { data: candidateRows } = await sectionQuery.limit(100);
-          const exactRow = candidateRows?.find((row) =>
-            fileNameMatchesLesson(row.file_name, context.chapterNumber, context.lessonNumber) && row.content
-          );
-
-          if (exactRow) {
-            rawSectionRows.push(exactRow);
-          }
+          rawSectionRows = [...rawSectionRows, ...data].filter((row) => {
+            if (normalizeSectionId(row.section_id) === 'lessons') return true;
+            const matches = contentBelongsToLesson(row.content, context);
+            if (!matches) console.warn('[getLessonContentBundle] Ignoring non-video Supabase content with mismatched lesson_id:', row.id);
+            return matches;
+          });
         }
       }
     } catch (err) {
@@ -885,7 +943,7 @@ export async function getLessonContentBundle(
   // 3. Build teacher stories strictly for this lesson
   let teacherStories: TeacherStory[] = [];
   if (lessonsJson) {
-    teacherStories = buildTeacherStoriesFromLessonJson(lessonsJson, context);
+    teacherStories = buildTeacherStoriesFromLessonJson(lessonsJson, context, 'المادة', curriculumJson);
   }
 
   // 4. Construct EducationalLesson object

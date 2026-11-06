@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, ChevronLeft, Clock, Loader2, Play, RefreshCw, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronLeft, Clock, Loader2, Play, Presentation, RefreshCw, Users } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { fetchMathematicsTopics, fetchMathematicsLectures, MATH_CHAPTER_TITLES, MathTopicIndex, MathLecture } from '../services/mathematicsCoursesService';
+import { appSfx } from '../utils/appSfx';
 
-export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
+export function MathematicsCoursesView({ onBack, onOpenGames }: { onBack: () => void; onOpenGames?: (topic: MathTopicIndex) => void }) {
   const { theme } = useAppTheme();
   const [topics, setTopics] = useState<MathTopicIndex[]>([]);
   const [teacherId, setTeacherId] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
   }, [topic?.recordId, retry]);
 
   const goBack = () => {
+    appSfx.navigation();
     if (lecture) setLecture(null);
     else if (topic) setTopic(null);
     else if (chapter !== null) setChapter(null);
@@ -64,46 +66,67 @@ export function MathematicsCoursesView({ onBack }: { onBack: () => void }) {
   const duration = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const stageTitle = lecture ? 'مشاهدة المحاضرة' : topic ? topic.title : chapter ? MATH_CHAPTER_TITLES[chapter] : teacherId ? teacherName : 'اختر مدرس الرياضيات';
 
+  const stageKey = lecture ? `lecture-${lecture.id}` : topic ? `topic-${topic.topicId}` : chapter !== null ? `chapter-${chapter}` : teacherId ? `teacher-${teacherId}` : 'teachers';
+
   return <section dir="rtl" className="relative p-3 space-y-4 pb-8">
     <div className="flex items-center gap-3">
       <button type="button" onClick={goBack} aria-label="رجوع" className={`rounded-xl border p-2 ${theme.classes.cardBorder}`}><ArrowRight size={22} /></button>
       <div className="min-w-0"><p className={`text-xs ${theme.classes.textMuted}`}>الرياضيات • السادس العلمي</p><h1 className="font-black text-lg leading-relaxed">{stageTitle}</h1></div>
     </div>
     <nav aria-label="مسار الرياضيات" className={`flex flex-wrap items-center gap-1 text-xs leading-6 ${theme.classes.textMuted}`}>
-      <button onClick={() => { setTeacherId(null); setChapter(null); setTopic(null); setLecture(null); }}>المدرسون</button>
-      {teacherId && <><ChevronLeft size={13} /><button onClick={() => { setChapter(null); setTopic(null); setLecture(null); }}>{teacherName}</button></>}
-      {chapter !== null && <><ChevronLeft size={13} /><button onClick={() => { setTopic(null); setLecture(null); }}>الفصل {chapter}</button></>}
-      {topic && <><ChevronLeft size={13} /><button onClick={() => setLecture(null)}>{topic.title}</button></>}
+      <button onClick={() => { appSfx.navigation(); setTeacherId(null); setChapter(null); setTopic(null); setLecture(null); }}>المدرسون</button>
+      {teacherId && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setChapter(null); setTopic(null); setLecture(null); }}>{teacherName}</button></>}
+      {chapter !== null && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setTopic(null); setLecture(null); }}>الفصل {chapter}</button></>}
+      {topic && <><ChevronLeft size={13} /><button onClick={() => { appSfx.navigation(); setLecture(null); }}>{topic.title}</button></>}
     </nav>
 
     {(loading || loadingLectures) && <div role="status" className="flex justify-center items-center gap-2 py-12"><Loader2 className="animate-spin" size={24} />جارٍ تحميل {loadingLectures ? 'المحاضرات' : 'المدرسين'}…</div>}
     {error && <div role="alert" className={`${theme.classes.cardBg} rounded-2xl border p-5 text-center space-y-3`}><p>{error}</p><button onClick={() => setRetry((value) => value + 1)} className="inline-flex gap-2 items-center"><RefreshCw size={16} />إعادة المحاولة</button></div>}
-    {!loading && !loadingLectures && !error && <>
+    {!loading && !loadingLectures && !error && <div key={stageKey} className="ui-stage-enter space-y-3">
       {!teacherId && <div className="space-y-3">{teachers.map(([id, name]) => {
         const items = topics.filter((item) => item.teacherId === id);
-        return <button key={id} onClick={() => setTeacherId(id)} className={cardClass}>
+        return <button key={id} onClick={() => { appSfx.subjectSelect(); setTeacherId(id); }} className={cardClass}>
           <div className="rounded-2xl p-3" style={{ background: `${theme.colors.primary}15`, color: theme.colors.primary }}><Users size={26} /></div>
           <div className="flex-1"><h2 className="font-bold">{name}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{new Set(items.map((item) => item.chapterNumber)).size} فصول • {items.reduce((sum, item) => sum + item.videoCount, 0)} محاضرة</p></div><ChevronLeft size={18} />
         </button>;
       })}{teachers.length === 0 && <p className="text-center py-8">لا توجد شروحات رياضيات متاحة حالياً.</p>}</div>}
-      {teacherId && chapter === null && <div className="space-y-3">{chapters.map((number) => <button key={number} onClick={() => setChapter(number)} className={cardClass}>
+      {teacherId && chapter === null && <div className="space-y-3">{chapters.map((number) => <button key={number} onClick={() => { appSfx.chapterSelect(); setChapter(number); }} className={cardClass}>
         <BookOpen size={24} style={{ color: theme.colors.primary }} /><div className="flex-1"><h2 className="font-bold">الفصل {number} — {MATH_CHAPTER_TITLES[number]}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{teacherTopics.filter((item) => item.chapterNumber === number).length} موضوع</p></div><ChevronLeft size={18} />
       </button>)}</div>}
-      {chapter !== null && !topic && <div className="space-y-3">{chapterTopics.map((item) => <button key={item.topicId} onClick={() => setTopic(item)} className={cardClass}>
+      {chapter !== null && !topic && <div className="space-y-3">{chapterTopics.map((item) => <button key={item.topicId} onClick={() => { appSfx.lessonSelect(); setTopic(item); }} className={cardClass}>
         <BookOpen size={22} style={{ color: theme.colors.primary }} /><div className="flex-1 min-w-0"><h2 className="font-bold text-sm leading-relaxed">{item.title}</h2><p className={`text-xs mt-1 ${theme.classes.textMuted}`}>{item.videoCount} محاضرة</p></div><ChevronLeft size={18} />
       </button>)}</div>}
       {topic && <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => { appSfx.panelOpen(); onOpenGames?.(topic); }}
+          className="flex w-full items-center justify-between rounded-2xl border border-cyan-300/45 bg-gradient-to-l from-cyan-500/25 via-blue-700/20 to-emerald-500/20 p-4 text-right text-white shadow-[0_10px_30px_rgba(14,165,233,.18)] transition active:scale-[.98]"
+        >
+          <span><b className="block text-sm">الملزمة وحل معي</b><small className="mt-1 block text-[10px] text-cyan-100/80">افتح أدوات الدرس والدراسة الأونلاين</small></span>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300/15 text-cyan-100"><Presentation size={27}/></span>
+        </button>
         {lecture && <div className={`rounded-2xl overflow-hidden border ${theme.classes.cardBorder} ${theme.classes.cardBg}`}>
           <iframe key={lecture.id} className="aspect-video w-full bg-black" src={`https://www.youtube.com/embed/${lecture.youtubeId}?autoplay=1&rel=0&playsinline=1`} title={lecture.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
-          <div className="p-4 space-y-2"><h2 className="font-bold leading-relaxed">{lecture.title}</h2><p className={`text-xs ${theme.classes.textMuted}`}>{teacherName} • {duration(lecture.durationSeconds)}</p><a href={lecture.url} target="_blank" rel="noopener noreferrer" className="inline-block text-xs underline" style={{ color: theme.colors.primary }}>فتح في يوتيوب</a></div>
         </div>}
+        {lecture && topic && <section className={`rounded-2xl overflow-hidden border ${theme.classes.cardBorder} ${theme.classes.cardBg} p-2 space-y-2`}>
+          <h2 className="px-2 pt-1 font-black text-sm">الصبورة — حل معي</h2>
+          <iframe
+            key={`${topic.topicId}-${lecture.id}-board`}
+            src={`/solve-with-me/index.html?embedded=1&subject=math&chapter=${topic.chapterNumber}&topicTitle=${encodeURIComponent(topic.title)}`}
+            title={`صبورة حل معي: ${topic.title}`}
+            className="w-full rounded-xl border border-cyan-500/30 bg-slate-900"
+            style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}
+            allow="fullscreen; clipboard-write; web-share"
+            allowFullScreen
+          />
+        </section>}
         <h2 className="font-bold text-sm">محاضرات الموضوع بالترتيب</h2>
-        {lectures.map((item) => <button key={item.id} onClick={() => setLecture(item)} aria-pressed={lecture?.id === item.id} className={cardClass} style={lecture?.id === item.id ? { borderColor: theme.colors.primary } : undefined}>
+        {lectures.map((item) => <button key={item.id} onClick={() => { appSfx.boardSelect(); setLecture(item); }} aria-pressed={lecture?.id === item.id} className={cardClass} style={lecture?.id === item.id ? { borderColor: theme.colors.primary } : undefined}>
           <img src={item.thumbnailUrl} alt="" loading="lazy" className="w-24 aspect-video object-cover rounded-lg shrink-0" />
           <div className="flex-1 min-w-0"><p className="font-bold text-xs leading-relaxed">{item.title}</p><p className={`text-xs mt-2 flex gap-1 items-center ${theme.classes.textMuted}`}><Clock size={12} />{duration(item.durationSeconds)}</p></div><Play size={17} style={{ color: theme.colors.primary }} />
         </button>)}
         {lectures.length === 0 && <p className="text-center py-8">لا توجد محاضرات متاحة لهذا الموضوع.</p>}
       </div>}
-    </>}
+    </div>}
   </section>;
 }

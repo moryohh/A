@@ -20,6 +20,7 @@ import { fetchLessonCurriculum } from '../services/curriculumService';
 import { cleanTeacherName } from '../utils/cleanTeacherName';
 import { extractYoutubeId, formatArabicLessonTitle } from '../services/lessonsService';
 import { useAppTheme } from '../services/themeService';
+import { appSfx } from '../utils/appSfx';
 
 interface VideoPlayerCardProps {
   lesson: EducationalLesson;
@@ -47,6 +48,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [studyView, setStudyView] = useState<'booklet' | 'board'>('booklet');
+  const [, setHasBoardContent] = useState(false);
 
   // Curriculum State
   const [curriculumData, setCurriculumData] = useState<LessonBookletData | null>(null);
@@ -81,6 +83,7 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
     setProgress(0);
     setCurriculumData(null);
     setStudyView('booklet');
+    setHasBoardContent(false);
 
     let isMounted = true;
     setIsLoadingCurriculum(true);
@@ -113,6 +116,45 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
           setIsLoadingCurriculum(false);
         }
       });
+
+    // The board is a separate exercise bundle. Expose it only when the
+    // current chapter/lesson has a real non-empty exercise file.
+    const boardSubject = String(openLessonContext?.subjectId || lesson.category || '').toLowerCase();
+    const boardChapter = openLessonContext?.chapterNumber;
+    const boardLesson = openLessonContext?.lessonNumber;
+    const isMathBoard = boardSubject === 'mathematics' || boardSubject === 'math' || boardSubject.includes('رياض');
+    const boardIndexName = isMathBoard ? 'curriculum.json' : `${boardSubject}-curriculum.json`;
+    if ((isMathBoard || boardSubject === 'chemistry' || boardSubject === 'physics') && boardChapter && boardLesson) {
+      const base = `${import.meta.env.BASE_URL}solve-with-me/`;
+      fetch(`${base}${boardIndexName}`)
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error('board index unavailable')))
+        .then(async (chapters) => {
+          const chapter = Array.isArray(chapters)
+            ? chapters.find((candidate: any) => Number(String(candidate?.id || '').match(/ch(\d+)/)?.[1]) === boardChapter)
+            : null;
+          const files = (chapter?.topics || [])
+            .flatMap((topic: any) => topic?.files || [])
+            .map((entry: any) => typeof entry === 'string' ? entry : entry?.file)
+            .filter((file: unknown): file is string => Boolean(file))
+            .filter((file: string) => isMathBoard
+              ? new RegExp(`(?:^|_)ch${boardChapter}_t${boardLesson}(?:_|\.json$)`, 'i').test(file)
+              : new RegExp(`(?:^|_)lesson${boardLesson}\.json$`, 'i').test(file));
+          const results = await Promise.all(files.map(async (file: string) => {
+            try {
+              const response = await fetch(`${base}data/${encodeURIComponent(file)}`);
+              if (!response.ok) return false;
+              const data = await response.json();
+              return Array.isArray(data) ? data.length > 0 : Boolean(data && Object.keys(data).length);
+            } catch {
+              return false;
+            }
+          }));
+          if (isMounted) setHasBoardContent(results.some(Boolean));
+        })
+        .catch(() => {
+          if (isMounted) setHasBoardContent(false);
+        });
+    }
 
     return () => {
       isMounted = false;
@@ -346,46 +388,34 @@ export const VideoPlayerCard: React.FC<VideoPlayerCardProps> = ({
         </div>
       )}
 
-      {/* Lesson Title & Info Block with Clean Teacher Name */}
-      <div
-        className={`rounded-2xl p-3.5 sm:p-4 text-right shadow-lg space-y-1 border transition-all duration-300 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
-        style={{
-          boxShadow: `0 4px 20px ${theme.colors.glow}`,
-        }}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-md border transition-colors"
-            style={{
-              backgroundColor: `${theme.colors.primary}20`,
-              borderColor: `${theme.colors.primary}40`,
-              color: theme.colors.primary,
-            }}
-          >
-            {formatArabicLessonTitle(lesson.subtitle || 'السادس الإعدادي - العراق')}
-          </span>
-          <span className={`text-xs font-semibold ${theme.classes.textMuted}`}>
-            {cleanedTeacherName}
-          </span>
-        </div>
-        <h2 className={`text-base sm:text-lg font-bold leading-snug ${theme.classes.textMain}`}>
-          {formatArabicLessonTitle(lesson.title)}
-        </h2>
-        {lesson.description && (
-          <p className={`text-xs pt-0.5 leading-relaxed ${theme.classes.textMuted}`}>
-            {formatArabicLessonTitle(lesson.description)}
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3" dir="ltr" role="tablist" aria-label="أدوات الدراسة">
-        <button role="tab" id="booklet-tab" aria-selected={studyView === 'booklet'} aria-controls="study-panel" onClick={() => setStudyView('booklet')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'booklet' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><BookOpen size={22} className={studyView === 'booklet' ? 'animate-pulse' : ''} /> الملزمة</button>
-        <button role="tab" id="board-tab" aria-selected={studyView === 'board'} aria-controls="study-panel" onClick={() => setStudyView('board')} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 font-bold transition-all duration-300 active:scale-95 hover:-translate-y-0.5 ${studyView === 'board' ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_8px_24px_rgba(52,211,153,0.16)]' : 'border-white/15 text-gray-400 hover:border-white/30'}`}><Presentation size={22} className={studyView === 'board' ? 'animate-pulse' : ''} /> الصبورة — حل معي</button>
+      <div className="study-switcher mx-auto grid w-full max-w-[286px] grid-cols-2 gap-1.5 rounded-2xl border border-white/10 bg-slate-950/90 p-1.5 shadow-[0_8px_22px_rgba(2,6,23,0.38)]" dir="rtl" role="tablist" aria-label="أدوات الدراسة">
+        <button
+          role="tab"
+          id="board-tab"
+          aria-selected={studyView === 'board'}
+          aria-controls="study-panel"
+          onClick={() => { appSfx.boardSelect(); setStudyView('board'); }}
+          className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'board' ? 'study-switch-active study-switch-board border-cyan-300 bg-gradient-to-br from-cyan-800 to-indigo-950 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.55)]' : 'border-cyan-900/60 bg-gradient-to-br from-slate-900 to-cyan-950/70 text-cyan-400/65'}`}
+        >
+          <Presentation className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />
+          <span className="text-[11px] leading-none">الصبورة</span>
+        </button>
+        <button
+          role="tab"
+          id="booklet-tab"
+          aria-selected={studyView === 'booklet'}
+          aria-controls="study-panel"
+          onClick={() => { appSfx.bookletSelect(); setStudyView('booklet'); }}
+          className={`study-switch-button group flex h-[54px] items-center justify-center gap-2 rounded-xl border px-2 text-right font-black transition-all duration-300 active:scale-95 ${studyView === 'booklet' ? 'study-switch-active study-switch-booklet border-emerald-300 bg-gradient-to-br from-emerald-800 to-teal-950 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.5)]' : 'border-emerald-900/60 bg-gradient-to-br from-slate-900 to-emerald-950/70 text-emerald-400/65'}`}
+        >
+          <BookOpen className="study-switch-icon h-6 w-6 shrink-0" strokeWidth={2.4} />
+          <span className="text-[11px] leading-none">الملزمة</span>
+        </button>
       </div>
       <div id="study-panel" role="tabpanel" aria-labelledby={studyView === 'board' ? 'board-tab' : 'booklet-tab'}>
       {studyView === 'board' && <iframe
-        key={`${lesson.id}-board`}
-        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}`}
+        key={`${openLessonContext?.subjectId || lesson.category || 'subject'}:${openLessonContext?.chapterNumber || 'chapter'}:${openLessonContext?.lessonId || lesson.id || 'lesson'}:${openLessonContext?.lessonNumber || 'number'}-board`}
+        src={`${import.meta.env.BASE_URL}solve-with-me/index.html?build=lesson-scope-1&embedded=1&subject=${encodeURIComponent(openLessonContext?.subjectId || lesson.category || '')}&chapter=${openLessonContext?.chapterNumber || ''}&lesson=${openLessonContext?.lessonNumber || ''}&lessonId=${encodeURIComponent(openLessonContext?.lessonId || lesson.id || '')}&topicTitle=${encodeURIComponent(openLessonContext?.lessonTitle || lesson.title || '')}`}
         title="صبورة حل معي: السؤال والشرح وخطوات الحل"
         className="w-full rounded-2xl border border-emerald-500/30 bg-slate-900 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 shadow-[0_12px_36px_rgba(16,185,129,0.12)]"
         style={{ height: 'min(850px, 80dvh)', minHeight: 480 }}

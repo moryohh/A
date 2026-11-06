@@ -11,6 +11,14 @@ import {
   MapPin,
   MonitorCheck,
   UsersRound,
+  Swords,
+  Gamepad2,
+  DoorOpen,
+  Dice5,
+  Sparkles,
+  Radio,
+  GraduationCap,
+  ChevronDown,
 } from 'lucide-react';
 import { useAppTheme } from '../services/themeService';
 import { registerCourseReminder } from '../services/communityService';
@@ -21,11 +29,26 @@ import {
   MockCourse,
 } from '../data/mockCourses';
 import { CompetitionSnapshot, EducationalLesson } from '../types';
+import { getSubjectIndex } from '../services/lessonsService';
+import { fetchSolveWithMeTopics } from '../services/solveWithMeCatalog';
+import { fetchLessonGamesData, fetchMillionaireTeamQuestions } from '../services/gamesService';
+import { GRADE_6_SUBJECTS } from '../data/mockSubjects';
+import { appSfx } from '../utils/appSfx';
+
+const CHALLENGE_API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || '').replace(/\/$/, '');
+type ChallengeGame = 'millionaire' | 'millionaire_team' | 'true_false' | 'gibha_sah' | 'live_classroom';
+type ChallengeQuestion = { question: string; options: string[]; correctAnswer: number };
+type RoomStatus = 'waiting' | 'playing' | 'reconnecting' | 'ended';
+type ActiveRoom = { code: string; subject: string; chapter: number; lesson: number; lessonTitle: string; gameType: ChallengeGame; gameTitle: string; contentMode?: 'board' | 'booklet' | 'meet'; meetingUrl?: string; capacity?: number; players: number; createdAt: number; status?: RoomStatus; endedAt?: number; endsAt?: number; activePlayers?: Array<{ name?: string; avatar?: string; level?: number; activity?: string }> };
 
 interface SubscriptionsViewProps {
   onSelectLesson: (lesson: EducationalLesson) => void;
   onBack?: () => void;
   competitionSnapshot?: CompetitionSnapshot | null;
+  onOpenChallenge?: () => void;
+  onJoinChallenge?: (room: ActiveRoom) => void;
+  onCreateChallenge?: (config: { questions: ChallengeQuestion[]; lessonTitle: string; lessonId?: string; gameType: ChallengeGame; gameTitle: string; subject: string; chapterNumber: number; lessonNumber: number; contentMode?: 'board' | 'booklet' | 'meet'; meetingUrl?: string }) => void;
+  challengeTargetName?: string;
 }
 
 const STATUS_STYLES: Record<CourseStatus, { text: string; background: string; border: string }> = {
@@ -117,8 +140,136 @@ const getStatusMessage = (course: MockCourse) => {
   };
 };
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot }) => {
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, competitionSnapshot, onOpenChallenge, onJoinChallenge, onCreateChallenge, challengeTargetName }) => {
   const { theme } = useAppTheme();
+  const [activeSection, setActiveSection] = useState<'challenge' | 'courses'>('challenge');
+  const [challengeSubject, setChallengeSubject] = useState('');
+  const [challengeChapter, setChallengeChapter] = useState('');
+  const [challengeChapters, setChallengeChapters] = useState<Array<{ number: number; title: string }>>([]);
+  const [challengeGame, setChallengeGame] = useState<ChallengeGame | ''>('');
+  const [classroomContentMode, setClassroomContentMode] = useState<'board' | 'booklet' | 'meet'>('board');
+  const [liveBroadcastTitle, setLiveBroadcastTitle] = useState('');
+  const [classroomLessonId, setClassroomLessonId] = useState('');
+  const [challengeLessons, setChallengeLessons] = useState<Array<{ number: number; title: string; id: string }>>([]);
+  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [challengeBusy, setChallengeBusy] = useState(false);
+  const [challengeMessage, setChallengeMessage] = useState('');
+  const [animatedControl, setAnimatedControl] = useState<'section' | 'subject' | 'chapter' | 'game' | 'lesson' | 'create' | 'room' | null>(null);
+  const animationTimerRef = React.useRef<number | null>(null);
+
+  const animateControl = (control: typeof animatedControl, sound: () => void) => {
+    sound();
+    setAnimatedControl(control);
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+    animationTimerRef.current = window.setTimeout(() => setAnimatedControl(null), 420);
+  };
+
+  React.useEffect(() => () => {
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+  }, []);
+
+  const selectedChallengeSubject = GRADE_6_SUBJECTS.find((subject) => subject.id === challengeSubject);
+  const visibleRooms = activeRooms.filter((room) => {
+    const status = room.status || 'waiting';
+    const classroomCapacity = (room.capacity || 8) + 1;
+    const hasTime = !room.endsAt || room.endsAt > Date.now();
+    const available = hasTime && (status === 'waiting' || (room.gameType === 'live_classroom' && status === 'playing' && room.players < classroomCapacity));
+    return available &&
+      (!challengeSubject || room.subject === selectedChallengeSubject?.name || room.subject === challengeSubject) &&
+      (!challengeChapter || room.chapter === Number(challengeChapter)) &&
+      (!challengeGame || room.gameType === challengeGame);
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadRooms = async () => {
+      if (!CHALLENGE_API) return;
+      try {
+        const response = await fetch(`${CHALLENGE_API}/rooms`);
+        const payload = await response.json();
+        if (!cancelled) setActiveRooms(Array.isArray(payload.rooms) ? payload.rooms : []);
+      } catch (_) { if (!cancelled) setActiveRooms([]); }
+    };
+    loadRooms();
+    const timer = window.setInterval(loadRooms, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!challengeSubject) { setChallengeLessons([]); setChallengeChapters([]); setChallengeChapter(''); return; }
+    if (['mathematics', 'physics', 'chemistry'].includes(challengeSubject) && (!challengeGame || challengeGame === 'live_classroom')) {
+      fetchSolveWithMeTopics(challengeSubject).then((topics) => {
+        if (cancelled) return;
+        const chapterNumbers = [...new Set(topics.map((topic) => topic.chapterNumber))].sort((a, b) => a - b);
+        setChallengeChapters(chapterNumbers.map((number) => ({ number, title: `الفصل ${number}` })));
+        const selectedChapter = chapterNumbers.includes(Number(challengeChapter)) ? Number(challengeChapter) : chapterNumbers[0];
+        setChallengeChapter(selectedChapter ? String(selectedChapter) : '');
+        const lessons = topics.filter((topic) => topic.chapterNumber === selectedChapter).map((topic) => ({ number: topic.lessonNumber, title: topic.title, id: topic.id }));
+        setChallengeLessons(lessons);
+        setClassroomLessonId((current) => lessons.some((lesson) => lesson.id === current) ? current : '');
+      }).catch(() => {
+        if (!cancelled) { setChallengeLessons([]); setChallengeMessage('تعذر التحقق من تمارين حل معي. لم تُعرض عناوين غير مؤكدة.'); }
+      });
+      return () => { cancelled = true; };
+    }
+    getSubjectIndex(challengeSubject, selectedChallengeSubject?.name || 'المادة').then((index) => {
+      if (cancelled) return;
+      setChallengeChapters(index.chapters.map((item) => ({ number: item.chapterNumber, title: item.title })));
+      const chapter = index.chapters.find((item) => item.chapterNumber === Number(challengeChapter)) || index.chapters[0];
+      setChallengeChapter(chapter ? String(chapter.chapterNumber) : '');
+      const lessons = chapter?.lessons.map((lesson) => ({ number: lesson.lessonNumber, title: lesson.title, id: lesson.lessonId })) || [];
+      setChallengeLessons(lessons);
+      setClassroomLessonId((current) => lessons.some((lesson) => lesson.id === current) ? current : '');
+    }).catch(() => { if (!cancelled) setChallengeLessons([]); });
+    return () => { cancelled = true; };
+  }, [challengeSubject, challengeChapter, challengeGame, selectedChallengeSubject?.name]);
+
+  const createRandomChallenge = async () => {
+    if (!challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || !onCreateChallenge) return;
+    animateControl('create', () => appSfx.challenge());
+    setChallengeBusy(true); setChallengeMessage('جارٍ اختيار درس عشوائي وتجهيز أسئلته…');
+    try {
+      const selectedLesson = challengeLessons.find((lesson) => lesson.id === classroomLessonId)
+        || (challengeGame === 'live_classroom' ? challengeLessons[0] : challengeLessons[Math.floor(Math.random() * challengeLessons.length)]);
+      if (classroomContentMode === 'meet') {
+        const title = liveBroadcastTitle.trim();
+        if (!title) throw new Error('اكتب اسم التحدي أو عنوان البث.');
+        onCreateChallenge({ questions: [], lessonTitle: title, gameType: 'live_classroom', gameTitle: `بث مباشر — ${title}`, subject: selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: 1, contentMode: 'meet' });
+        setChallengeMessage('');
+        return;
+      }
+      const context = { subjectId: challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, lessonId: selectedLesson.id, lessonTitle: selectedLesson.title };
+      if (challengeGame === 'live_classroom') {
+        onCreateChallenge({ questions: [], lessonTitle: selectedLesson.title, lessonId: selectedLesson.id, gameType: challengeGame, gameTitle: classroomContentMode === 'board' ? 'حل معي — درس أونلاين' : 'الملزمة — غرفة دراسة أونلاين', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: selectedLesson.number, contentMode: classroomContentMode });
+        setChallengeMessage('');
+        return;
+      }
+      const shuffledLessons = [selectedLesson, ...challengeLessons.filter(lesson => lesson.id !== selectedLesson.id).sort(() => Math.random() - 0.5)];
+      let playableLesson = selectedLesson;
+      let questions: ChallengeQuestion[] = [];
+      for (const candidate of shuffledLessons) {
+        const candidateContext = { ...context, lessonNumber: candidate.number, lessonId: candidate.id, lessonTitle: candidate.title };
+        if (challengeGame === 'millionaire_team') {
+          const teamQuestions = await fetchMillionaireTeamQuestions(candidateContext, 20);
+          questions = teamQuestions.map((item) => ({ question: item.question, options: [...item.options], correctAnswer: item.correctAnswer }));
+          if (questions.length > 0) { playableLesson = candidate; break; }
+          continue;
+        }
+        const bundle = await fetchLessonGamesData(candidateContext);
+        const config: any = challengeGame === 'true_false' ? bundle.trueFalseConfig : bundle.gibhaSahConfig;
+        const sourceQuestions = Array.isArray(config?.questions) ? config.questions : [];
+        questions = challengeGame === 'true_false'
+            ? sourceQuestions.map((item: any) => ({ question: item.question, options: ['صح', 'خطأ'], correctAnswer: item.isCorrect ? 0 : 1 }))
+            : sourceQuestions.map((item: any) => ({ question: item.question, options: (config?.cards || []).map((card: any) => card.label), correctAnswer: Math.max(0, Number(item.correctCardNumber) - 1) }));
+        if (questions.length > 0) { playableLesson = candidate; break; }
+      }
+      if (questions.length < 1) throw new Error('لا توجد أسئلة لهذه اللعبة في دروس الفصل المحدد.');
+      onCreateChallenge({ questions: questions.slice(0, challengeGame === 'millionaire_team' ? 20 : 11), lessonTitle: playableLesson.title, gameType: challengeGame, gameTitle: challengeGame === 'millionaire_team' ? 'من سيربح المليون — لعب فرق' : challengeGame === 'true_false' ? 'صواب أم خطأ' : 'جبتها صح', subject: selectedChallengeSubject?.id || selectedChallengeSubject?.name || challengeSubject, chapterNumber: Number(challengeChapter), lessonNumber: playableLesson.number });
+      setChallengeMessage('');
+    } catch (error) { setChallengeMessage(error instanceof Error ? error.message : 'تعذر تجهيز الغرفة.'); }
+    finally { setChallengeBusy(false); }
+  };
   const [selectedCourse, setSelectedCourse] = useState<MockCourse | null>(null);
   const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [reminderMessage, setReminderMessage] = useState('');
@@ -126,6 +277,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   const [applicationMessage, setApplicationMessage] = useState('');
 
   const openCourseDialog = (course: MockCourse) => {
+    appSfx.panelOpen();
     setSelectedCourse(course);
     setReminderState('idle');
     setReminderMessage('');
@@ -134,6 +286,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
   };
 
   const closeCourseDialog = () => {
+    appSfx.panelClose();
     setSelectedCourse(null);
     setReminderState('idle');
     setReminderMessage('');
@@ -152,6 +305,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     const hasRequiredLevel = currentLevel >= requiredLevel;
 
     if (!hasRequiredRating || !hasRequiredLevel) {
+      appSfx.attention();
       const reasons = [
         !hasRequiredRating ? 'تقييمك الحالي ليس ذهبيًا.' : '',
         !hasRequiredLevel ? `مستواك الحالي ${currentLevel}، ويجب أن يصل إلى ${requiredLevel}.` : '',
@@ -162,6 +316,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     }
 
     setApplicationState('success');
+    appSfx.success();
     setApplicationMessage('تم استيفاء شروط التقديم مبدئيًا. تبدأ الدورة في 1/12.');
   };
 
@@ -172,8 +327,10 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
     try {
       const response = await registerCourseReminder(selectedCourse.id);
       setReminderState('success');
+      appSfx.notification();
       setReminderMessage(response.message || 'تم تسجيل تذكيرك بنجاح');
     } catch (error: any) {
+      appSfx.attention();
       setReminderState('error');
       setReminderMessage(error?.message || 'تعذر تسجيل التذكير حاليًا');
     }
@@ -181,6 +338,113 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
 
   return (
     <div className="space-y-4 p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] text-right select-none sm:p-4 animate-in fade-in duration-200">
+      {challengeTargetName && <div className="rounded-2xl border border-violet-300/50 bg-violet-500/15 p-3 text-center text-sm font-black text-violet-100"><Swords className="ml-2 inline h-5 w-5" />اختر لعبة لإنشاء غرفة وإرسال دعوتها إلى {challengeTargetName}</div>}
+      <section className={`rounded-3xl border p-2 ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="دوراتي والتحدي">
+          <button type="button" role="tab" aria-selected={activeSection === 'challenge'} onClick={() => { animateControl('section', () => appSfx.challenge()); setActiveSection('challenge'); }} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition-all duration-300 active:scale-95 ${animatedControl === 'section' && activeSection !== 'challenge' ? 'motion-safe:animate-pulse' : ''} ${activeSection === 'challenge' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'challenge' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
+            <Swords className={`h-5 w-5 transition-transform duration-300 ${activeSection === 'challenge' ? 'scale-110 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite]' : ''}`} /> التحدّي
+          </button>
+          <button type="button" role="tab" aria-selected={activeSection === 'courses'} onClick={() => { animateControl('section', () => appSfx.bookletSelect()); setActiveSection('courses'); }} className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-sm font-black transition-all duration-300 active:scale-95 ${animatedControl === 'section' && activeSection !== 'courses' ? 'motion-safe:animate-pulse' : ''} ${activeSection === 'courses' ? 'text-white shadow-lg' : theme.classes.textMuted}`} style={activeSection === 'courses' ? { background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})` } : undefined}>
+            <BookOpen className={`h-5 w-5 transition-transform duration-300 ${activeSection === 'courses' ? 'scale-110 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite]' : ''}`} /> دوراتي
+          </button>
+        </div>
+      </section>
+
+      {activeSection === 'challenge' && (
+        <div className="space-y-4">
+        <section className="relative overflow-hidden rounded-[28px] border p-4 shadow-xl sm:p-5" style={{ color: theme.colors.textPrimary, borderColor: theme.colors.border, background: `radial-gradient(circle at 50% -20%, ${theme.colors.primary}35, transparent 42%), linear-gradient(145deg, ${theme.colors.bgCard} 0%, ${theme.colors.bgCardSubtle} 62%, color-mix(in srgb, ${theme.colors.bgCardSubtle} 84%, ${theme.colors.secondary}) 100%)`, boxShadow: `0 24px 65px ${theme.colors.glow}` }}>
+          <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 15% 20%, white 0 1px, transparent 1.5px), radial-gradient(circle at 82% 15%, #67e8f9 0 1.5px, transparent 2px)', backgroundSize: '54px 54px, 78px 78px' }} />
+          <div className="pointer-events-none absolute -left-10 top-10 h-36 w-36 rounded-full blur-3xl" style={{ backgroundColor: `${theme.colors.primary}22` }} />
+          <div className="pointer-events-none absolute -right-12 bottom-0 h-40 w-40 rounded-full blur-3xl" style={{ backgroundColor: `${theme.colors.secondary}22` }} />
+          <div className="relative mb-4 flex flex-col items-center">
+            <div className="relative grid h-16 w-16 place-items-center rounded-full border motion-safe:animate-[pulse_2.4s_ease-in-out_infinite]" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}66`, background: `linear-gradient(135deg, ${theme.colors.primary}25, ${theme.colors.secondary}25)`, boxShadow: `0 0 34px ${theme.colors.glow}` }}>
+              <span className="absolute inset-1 rounded-full border border-white/10" />
+              <Swords className="h-8 w-8" />
+              <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-amber-300 motion-safe:animate-pulse" />
+            </div>
+            <h1 className="mt-2 text-xl font-black tracking-tight">إنشاء غرفة لعب</h1>
+            <p className="mt-1 text-[10px] font-bold" style={{ color: theme.colors.textSecondary }}>{challengeSubject === 'mathematics' ? 'اختر الفصل والموضوع ثم ابدأ درس حل معي' : 'اختر المادة والفصل واللعبة ثم ابدأ التحدّي'}</p>
+          </div>
+          <div className="relative space-y-2.5 rounded-3xl border p-2.5 shadow-inner backdrop-blur-sm" style={{ backgroundColor: `${theme.colors.bgCard}88`, borderColor: theme.colors.border }}>
+            <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'subject' ? 'scale-[1.015] ring-2 ring-sky-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <BookOpen className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'subject' ? 'scale-125 -rotate-6' : ''}`} style={{ color: theme.colors.primary }} />
+              <select value={challengeSubject} onChange={(event) => { animateControl('subject', () => appSfx.subjectSelect()); const subject = event.target.value; setChallengeSubject(subject); setChallengeChapter(''); setClassroomLessonId(''); setChallengeMessage(''); if (subject === 'mathematics') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else { setChallengeGame(''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}><option value="">اختر المادة</option>{GRADE_6_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'subject' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.primary }} />
+            </label>
+            <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'chapter' ? 'scale-[1.015] ring-2 ring-emerald-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <GraduationCap className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'chapter' ? 'scale-125 rotate-6' : ''}`} style={{ color: theme.colors.accent }} />
+              <select value={challengeChapter} onChange={(event) => { animateControl('chapter', () => appSfx.chapterSelect()); setChallengeChapter(event.target.value); }} disabled={!challengeChapters.length} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none disabled:opacity-45" style={{ color: theme.colors.textPrimary }}><option value="">اختر الفصل</option>{challengeChapters.map((chapter) => <option key={chapter.number} value={chapter.number}>الفصل {chapter.number}</option>)}</select>
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'chapter' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.accent }} />
+            </label>
+            {challengeSubject && <label className={`relative flex items-center overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 focus-within:ring-2 ${animatedControl === 'game' ? 'scale-[1.015] ring-2 ring-violet-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+              <Gamepad2 className={`mr-3 h-5 w-5 shrink-0 transition-transform ${animatedControl === 'game' ? 'scale-125 -rotate-12' : ''}`} style={{ color: theme.colors.secondary }} />
+              <select value={challengeGame === 'live_classroom' ? (classroomContentMode === 'meet' ? 'live_meet' : classroomContentMode === 'booklet' ? 'live_booklet' : 'live_board') : challengeGame} onChange={(event) => { animateControl('game', () => appSfx.gameSwitch()); const activity = event.target.value; setClassroomLessonId(''); setChallengeMessage(''); if (activity === 'live_meet') { setChallengeGame('live_classroom'); setClassroomContentMode('meet'); } else if (activity === 'live_board') { setChallengeGame('live_classroom'); setClassroomContentMode('board'); } else if (activity === 'live_booklet') { setChallengeGame('live_classroom'); setClassroomContentMode('booklet'); } else { setChallengeGame(activity as ChallengeGame | ''); setClassroomContentMode('board'); } }} className="h-14 w-full appearance-none bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
+                <option value="">اختر نوع اللعبة / النشاط</option>
+                <option value="live_meet">بث مباشر — Google Meet</option>
+                {['physics', 'chemistry'].includes(challengeSubject) && <option value="live_board">حل معي</option>}
+                {challengeSubject !== 'mathematics' && <option value="live_booklet">الملزمة</option>}
+                <option value="true_false">صواب أم خطأ</option>
+                <option value="millionaire_team">من سيربح المليون — جماعي 2 ضد 2</option>
+                <option value="gibha_sah">جبتها صح</option>
+              </select>
+              <ChevronDown className={`ml-3 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'game' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.secondary }} />
+            </label>}
+            {challengeSubject && challengeChapter && challengeGame === 'live_classroom' && classroomContentMode === 'meet' && <label className="flex items-center overflow-hidden rounded-2xl border shadow-sm" style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><Radio className="mr-3 h-5 w-5 text-rose-500"/><input value={liveBroadcastTitle} onChange={(event) => setLiveBroadcastTitle(event.target.value)} maxLength={80} placeholder="اسم التحدي أو عنوان البث" className="h-14 w-full bg-transparent px-3 text-xs font-bold outline-none" style={{ color: theme.colors.textPrimary }}/></label>}
+            {challengeSubject && challengeChapter && classroomContentMode !== 'meet' && (challengeSubject === 'mathematics' || Boolean(challengeGame)) && (
+              <div className="rounded-2xl border p-2.5" style={{ backgroundColor: theme.colors.bgCard, borderColor: theme.colors.border }}>
+                <p className="mb-2 text-center text-[11px] font-black" style={{ color: theme.colors.textSecondary }}>تحديد موضوع</p>
+                <label className={`mb-2 flex items-center overflow-hidden rounded-xl border transition-all duration-300 ${animatedControl === 'lesson' ? 'scale-[1.015] ring-2 ring-cyan-400/60 shadow-lg motion-safe:animate-pulse' : ''}`} style={{ backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}>
+                  <GraduationCap className={`mr-2 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'lesson' ? 'scale-125 rotate-6' : ''}`} style={{ color: theme.colors.primary }} />
+                  <select value={classroomLessonId} onChange={(event) => { animateControl('lesson', () => appSfx.lessonSelect()); setClassroomLessonId(event.target.value); }} className="h-12 w-full appearance-none bg-transparent px-2 text-[11px] font-bold outline-none" style={{ color: theme.colors.textPrimary }}>
+                    <option value="">تحديد موضوع</option>
+                    {challengeLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+                  </select>
+                  <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform ${animatedControl === 'lesson' ? 'rotate-180 scale-125' : ''}`} style={{ color: theme.colors.primary }} />
+                </label>
+              </div>
+            )}
+            <button type="button" disabled={challengeBusy || !challengeSubject || !challengeChapter || !challengeGame || !challengeLessons.length || (challengeGame === 'live_classroom' && classroomContentMode !== 'meet' && !classroomLessonId) || (classroomContentMode === 'meet' && !liveBroadcastTitle.trim())} onClick={() => void createRandomChallenge()} className={`group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/30 px-4 py-4 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${animatedControl === 'create' ? 'scale-[1.02] ring-4 ring-white/35 motion-safe:animate-pulse' : ''}`} style={{ background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.accent}, ${theme.colors.secondary})`, boxShadow: `0 12px 30px ${theme.colors.glow}` }}>
+              <span className={`pointer-events-none absolute -left-8 top-0 h-full w-16 skew-x-[-20deg] bg-white/30 blur-md transition-transform duration-700 ${animatedControl === 'create' ? 'translate-x-[520px]' : 'group-hover:translate-x-[420px]'}`} />
+              <Dice5 className={`h-5 w-5 ${challengeBusy ? 'animate-spin' : animatedControl === 'create' ? 'scale-125 rotate-180 transition-transform duration-500' : 'transition-transform group-hover:rotate-12 group-hover:scale-110'}`} />
+              {challengeBusy ? 'جارٍ تجهيز الدرس…' : classroomContentMode === 'meet' ? 'أنشئ رابط البث المباشر' : challengeGame === 'live_classroom' ? (classroomContentMode === 'booklet' ? 'ابدأ غرفة الملزمة الأونلاين' : 'ابدأ الدرس الأونلاين') : 'أنشئ غرفة من درس عشوائي'}
+            </button>
+            {challengeMessage && <p className="rounded-xl bg-amber-500/15 p-3 text-center text-xs leading-6 text-amber-100">{challengeMessage}</p>}
+          </div>
+        </section>
+        <section className={`overflow-hidden rounded-3xl border shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}>
+          <div className="relative overflow-hidden border-b px-4 py-4" style={{ color: theme.colors.textPrimary, borderColor: theme.colors.border, background: `linear-gradient(120deg, ${theme.colors.bgCardSubtle}, color-mix(in srgb, ${theme.colors.bgCardSubtle} 82%, ${theme.colors.primary}))` }}>
+            <div className="pointer-events-none absolute -left-8 -top-10 h-28 w-28 rounded-full bg-violet-400/20 blur-2xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="relative grid h-11 w-11 place-items-center rounded-2xl border" style={{ color: theme.colors.primary, borderColor: `${theme.colors.primary}66`, backgroundColor: `${theme.colors.primary}18`, boxShadow: `0 0 22px ${theme.colors.glow}` }}>
+                <DoorOpen className="h-6 w-6" />
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.9)] motion-safe:animate-ping" />
+              </div>
+              <div>
+                <h2 className="text-base font-black">الغرف المتاحة للدخول</h2>
+                <p className="text-[10px] font-bold" style={{ color: theme.colors.textSecondary }}>اختر غرفة نشطة وانضم إلى المنافسة</p>
+              </div>
+            </div>
+            <div className="absolute inset-x-4 bottom-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${theme.colors.primary}, ${theme.colors.secondary})` }} />
+          </div>
+          <div className="space-y-2 p-4">
+            {visibleRooms.length === 0 ? <p className={`rounded-2xl p-4 text-center text-xs ${theme.classes.textMuted}`} style={{ backgroundColor: theme.colors.bgCardSubtle }}>لا توجد غرف نشطة متاحة حاليًا.</p> : visibleRooms.map((room) => {
+              const status = room.status || 'waiting';
+              const ended = status === 'ended';
+              const classroomJoinable = room.gameType === 'live_classroom' && status === 'playing';
+              const statusLabel = status === 'waiting' ? 'بانتظار لاعب' : status === 'playing' ? 'جارية' : status === 'reconnecting' ? 'بانتظار العودة' : 'منتهية';
+              const attendance = room.gameType === 'live_classroom'
+                ? `${Math.max(0, room.players - 1)}/${room.capacity || 8} طالب`
+                : `${room.players}/${room.gameType === 'gibha_sah' || room.gameType === 'millionaire_team' ? 4 : 2} لاعبين`;
+              const remainingMinutes = room.endsAt ? Math.max(0, Math.ceil((room.endsAt - Date.now()) / 60000)) : null;
+              const activeLabel = room.contentMode === 'meet' ? '🔴 بث مباشر' : room.contentMode === 'booklet' ? 'الملزمة' : room.gameType === 'live_classroom' ? 'حل معي' : room.gameTitle || room.gameType;
+              return <button key={room.code} type="button" disabled={ended || (!classroomJoinable && (status === 'playing' || status === 'reconnecting'))} onClick={() => onJoinChallenge?.(room)} className="w-full rounded-2xl border p-3 text-right transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65" style={{ color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardSubtle, borderColor: theme.colors.border }}><span className="flex items-center justify-between"><b className="text-lg" style={{ color: theme.colors.primary }}>#{room.code}</b><span className={`rounded-full px-2 py-1 text-[10px] font-black ${ended ? 'bg-rose-500/20 text-rose-500' : status === 'waiting' || classroomJoinable ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>{classroomJoinable ? 'متاحة للدخول' : statusLabel}</span></span><span className="mt-1 block text-xs">{room.subject} — الفصل {room.chapter} — الدرس {room.lesson}</span><span className="mt-1 block text-xs" style={{ color: theme.colors.textSecondary }}>{activeLabel} · {room.lessonTitle} · {attendance}{remainingMinutes !== null && ` · متبقٍ ${remainingMinutes} د`}</span>{room.activePlayers?.length ? <span className="mt-2 flex items-center gap-1.5" aria-label="الأعضاء النشطون">{room.activePlayers.slice(0, 5).map((player, index) => <span key={`${room.code}-${index}`} className={`flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-1 text-[9px] ${index === 4 ? 'opacity-55' : ''}`}><img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt="" className="h-5 w-5 rounded-full object-cover"/><span className="max-w-20 truncate">{player.name || 'طالب'}</span></span>)}</span> : <span className="mt-2 block text-[10px]" style={{ color: theme.colors.textSecondary }}>لا يوجد نشاط حديث ظاهر بعد.</span>}</button>;
+            })}
+          </div>
+        </section>
+        </div>
+      )}
+
+      {activeSection === 'courses' && <>
       <section
         className={`relative overflow-hidden rounded-3xl border p-4 shadow-xl ${theme.classes.cardBg} ${theme.classes.cardBorder}`}
         style={{ boxShadow: `0 8px 28px ${theme.colors.glow}` }}
@@ -482,6 +746,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ onBack, co
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };

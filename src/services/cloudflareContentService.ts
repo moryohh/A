@@ -10,6 +10,10 @@ export interface CloudflareContentIndexItem {
   file_name: string;
   content_path: string;
   updated_at?: string | null;
+  lesson_id?: string | null;
+  chapter_number?: number | null;
+  lesson_number?: number | null;
+  has_content?: boolean | number | null;
 }
 
 export function isCloudflareContentConfigured(): boolean {
@@ -30,7 +34,13 @@ export async function fetchCloudflareEducationalRecord(recordId: string): Promis
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) throw new Error(`Cloudflare content HTTP ${response.status}`);
-  return response.json();
+  const payload = await response.json();
+  // The R2 Worker returns the source row envelope, while Supabase fallback
+  // returns the content column directly. Normalize both paths here so the
+  // lesson/game parsers never inspect the envelope as if it were lesson data.
+  return payload && Object.prototype.hasOwnProperty.call(payload, 'content')
+    ? payload.content
+    : payload;
 }
 
 export async function fetchCloudflareExactSection(

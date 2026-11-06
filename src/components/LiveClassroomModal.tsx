@@ -1,0 +1,2008 @@
+import { playVoice, unlockVoices, captureVoice } from '../utils/voiceAudio';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  Apple,
+  ArrowLeftRight,
+  BookOpen,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  EyeOff,
+  Eraser,
+  Flame,
+  Hand,
+  Inbox,
+  Grid2X2,
+  GraduationCap,
+  LockKeyhole,
+  Maximize2,
+  Minimize2,
+  Mic,
+  MicOff,
+  Radio,
+  Share2,
+  PenLine,
+  Presentation,
+  Snowflake,
+  Target,
+  TreePine,
+  Trophy,
+  Trash2,
+  Type,
+  UnlockKeyhole,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import { OpenLessonContext, SubjectChapter, TeacherStory } from "../types";
+import { getSupabaseClient } from "../lib/supabase";
+import { loadGuestSession } from "../services/guestPreviewService";
+import { fetchLessonCurriculum } from "../services/curriculumService";
+import { buildLessonKey, getLessonDetails, getSubjectIndex } from "../services/lessonsService";
+import { fetchSolveWithMeTopics } from "../services/solveWithMeCatalog";
+import { LessonBookletView } from "./LessonBookletView";
+import { PlantStageVideo } from "./PlantStageVideo";
+import { OnlineChallengeModal, type OnlineChallengeGameType } from "./OnlineChallengeModal";
+import { ScienceLaboratoryModal } from "./ScienceLaboratoryModal";
+import type { BookletItemQuestion, LessonBookletData } from "../data/lessonBooklet";
+
+const API = (import.meta.env.VITE_ONLINE_CHALLENGE_API_URL || "").replace(
+  /\/$/,
+  "",
+);
+const ARABIC_NUMBER_FORMATTER = new Intl.NumberFormat("ar-IQ", {
+  useGrouping: true,
+  maximumFractionDigits: 0,
+});
+const formatArabicNumber = (value: number) => ARABIC_NUMBER_FORMATTER.format(value);
+const remainingChallengeTime = (seconds: number) => {
+  if (seconds <= 0) return "اكتمل";
+  if (seconds >= 3600) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.ceil((seconds % 3600) / 60);
+    if (minutes === 60) return `بقي ${formatArabicNumber(hours + 1)} ساعة`;
+    return minutes
+      ? `بقي ${formatArabicNumber(hours)} س و${formatArabicNumber(minutes)} د`
+      : `بقي ${formatArabicNumber(hours)} ساعة`;
+  }
+  return `بقي ${formatArabicNumber(Math.ceil(seconds / 60))} دقيقة`;
+};
+const MEMBER_SPROUT_IMAGE = "data:image/webp;base64,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";
+const CAPACITIES = [2, 4, 8, 12, 20, 30, 50] as const;
+type Capacity = (typeof CAPACITIES)[number];
+type Point = { x: number; y: number };
+type Stroke = {
+  id: string;
+  owner: string;
+  color: string;
+  size: number;
+  points: Point[];
+  tool?: "pen" | "eraser" | "text";
+  text?: string;
+  fontSize?: number;
+};
+type Participant = {
+  id: string;
+  score?: number;
+  bot?: boolean;
+  name?: string;
+  avatar?: string;
+  level?: number;
+  connected: boolean;
+  handRaised?: boolean;
+  micAllowed?: boolean;
+  drawAllowed?: boolean;
+  answerFrozen?: boolean;
+  lastAnswer?: string;
+  progress?: { step?: number; solved?: number; total?: number; answer?: string } | null;
+  joinedAt?: number | null;
+  activity?: string;
+  activityAt?: number | null;
+  mission?: {
+    text: string;
+    target: number;
+    progress: number;
+    completed: boolean;
+    updatedAt: number;
+  } | null;
+};
+type ClassroomContent = {
+  subject?: string;
+  chapter?: number;
+  lesson?: number;
+  lessonId?: string;
+  lessonTitle?: string;
+  exerciseFile?: string;
+  exerciseIndex?: number;
+  exerciseNumber?: number;
+};
+type ClassroomState = {
+  type: "state";
+  status: string;
+  players: Participant[];
+  classroom: {
+    hostId: string;
+    capacity: Capacity;
+    answersLocked: boolean;
+    endsAt: number;
+    contentMode: "board" | "booklet";
+    content?: ClassroomContent;
+    strokes: Stroke[];
+    drawingVersion: number;
+    presenterId?: string;
+    presenterState?: Record<string, unknown> | null;
+    studyMode?: "teacher" | "together";
+    sharedMission?: string;
+    bookletIndex?: number;
+    bookletAnswerVisible?: boolean;
+    bookletShares?: Array<{ id: string; from: string; lessonId?: string; index: number; question: string; answer: string; createdAt: number }>;
+  };
+};
+type ActiveRoomPreview = {
+  code: string;
+  status?: string;
+  gameType?: string;
+  gameTitle?: string;
+  contentMode?: "board" | "booklet";
+  lessonTitle?: string;
+  subject?: string;
+  chapter?: number;
+  lesson?: number;
+  players?: number;
+  capacity?: number;
+  endsAt?: number;
+  endedAt?: number;
+};
+
+interface Props {
+  onClose: () => void;
+  lessonTitle: string;
+  category: string;
+  openLessonContext?: OpenLessonContext | null;
+  initialRoomCode?: string;
+  initialContentMode?: "board" | "booklet";
+  offlinePreview?: boolean;
+  offlineRole?: "teacher" | "student";
+  onJoinActiveRoom?: (room: ActiveRoomPreview) => void;
+}
+
+async function authorization() {
+  const guest = loadGuestSession();
+  if (guest) return `Guest ${guest.id}`;
+  const client = getSupabaseClient();
+  const { data } = (await client?.auth.getSession()) || {
+    data: { session: null },
+  };
+  if (!data.session?.access_token)
+    throw new Error("سجّل الدخول أولًا لإنشاء الفصل.");
+  return `Bearer ${data.session.access_token}`;
+}
+
+async function profile() {
+  const guest = loadGuestSession();
+  if (guest) return { name: guest.name, avatar: localStorage.getItem(`nahnu_maak_avatar_${guest.id}`) || "", level: 1 };
+  const client = getSupabaseClient();
+  const { data } = (await client?.auth.getSession()) || {
+    data: { session: null },
+  };
+  const meta = data.session?.user?.user_metadata || {};
+  return {
+    name: String(
+      meta.full_name ||
+        meta.name ||
+        data.session?.user?.email?.split("@")[0] ||
+        "طالب",
+    ),
+    avatar: String(localStorage.getItem(`nahnu_maak_avatar_${data.session?.user?.id}`) || meta.avatar_url || meta.picture || ""),
+    level: Number(meta.level || 1),
+  };
+}
+
+function isScienceBoard(subject: string) {
+  const value = subject.toLowerCase();
+  return (
+    value.includes("math") ||
+    value.includes("رياض") ||
+    value.includes("physics") ||
+    value.includes("فيز") ||
+    value.includes("chem") ||
+    value.includes("كيمي")
+  );
+}
+
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: "landscape") => Promise<void>;
+  unlock?: () => void;
+};
+
+async function enterClassroomLandscape() {
+  try {
+    if (!document.fullscreenElement)
+      await document.documentElement.requestFullscreen();
+  } catch {
+    // Some in-app browsers refuse fullscreen; orientation lock is still tried.
+  }
+  try {
+    await (screen.orientation as LockableScreenOrientation).lock?.("landscape");
+  } catch {
+    // Unsupported browsers keep the same two-column landscape canvas.
+  }
+}
+
+async function restoreClassroomDisplay() {
+  try {
+    (screen.orientation as LockableScreenOrientation).unlock?.();
+  } catch {
+    // Orientation locking is not available in every mobile browser.
+  }
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+  } catch {
+    // Fullscreen cleanup is best effort.
+  }
+  window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+}
+
+function BlankStudyBoard({ strokes, drawingVersion, canDraw, onShare }: {
+  strokes: Stroke[];
+  drawingVersion: number;
+  canDraw: boolean;
+  onShare: (strokes: Stroke[]) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [tool, setTool] = useState<"pen" | "eraser" | "text">("pen");
+  const [color, setColor] = useState("#173f5f");
+  const [size, setSize] = useState(4);
+  const [textValue, setTextValue] = useState("");
+  const [draft, setDraft] = useState<Point[]>([]);
+  const [privateStrokes, setPrivateStrokes] = useState<Stroke[]>([]);
+  const [canvasVersion, setCanvasVersion] = useState(0);
+
+  const normalizedPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
+    };
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let frame = 0;
+    const resize = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const nextWidth = Math.max(1, Math.round(rect.width * ratio));
+        const nextHeight = Math.max(1, Math.round(rect.height * ratio));
+        if (canvas.width === nextWidth && canvas.height === nextHeight) return;
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+        setCanvasVersion((value) => value + 1);
+      });
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const scale = Math.max(.55, Math.min(rect.width, rect.height) / 520);
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, rect.width, rect.height);
+    context.fillStyle = "#fffef9";
+    context.fillRect(0, 0, rect.width, rect.height);
+    [...strokes, ...privateStrokes, ...(draft.length > 1 ? [{ id: "draft", owner: "draft", color, size, points: draft, tool }] as Stroke[] : [])].forEach((stroke) => {
+      const first = stroke.points[0];
+      if (!first) return;
+      if (stroke.tool === "text" && stroke.text) {
+        context.fillStyle = stroke.color;
+        context.font = `700 ${Math.max(12, (stroke.fontSize || 24) * scale)}px Cairo, sans-serif`;
+        context.textAlign = "right";
+        context.textBaseline = "top";
+        context.fillText(stroke.text, first.x * rect.width, first.y * rect.height);
+        return;
+      }
+      if (stroke.points.length < 2) return;
+      context.strokeStyle = stroke.tool === "eraser" ? "#fffef9" : stroke.color;
+      context.lineWidth = Math.max(1, stroke.size * scale * (stroke.tool === "eraser" ? 3 : 1));
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.beginPath();
+      stroke.points.forEach((point, index) => index ? context.lineTo(point.x * rect.width, point.y * rect.height) : context.moveTo(point.x * rect.width, point.y * rect.height));
+      context.stroke();
+    });
+  }, [strokes, privateStrokes, drawingVersion, draft, color, size, tool, canvasVersion]);
+
+  return <div
+    className="relative isolate h-full min-h-44 overflow-hidden overscroll-contain bg-[#fffef9]"
+    onClick={(event) => event.stopPropagation()}
+    onContextMenu={(event) => event.preventDefault()}
+  >
+    <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-1 shadow-md" dir="rtl">
+      <button onClick={() => setTool("pen")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "pen" ? "bg-cyan-500 text-white" : "bg-slate-100 text-slate-600"}`} title="قلم"><PenLine className="h-4 w-4"/></button>
+      <button onClick={() => setTool("eraser")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "eraser" ? "bg-amber-400 text-slate-950" : "bg-slate-100 text-slate-600"}`} title="ممحاة"><Eraser className="h-4 w-4"/></button>
+      <button onClick={() => setTool("text")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tool === "text" ? "bg-violet-500 text-white" : "bg-slate-100 text-slate-600"}`} title="كتابة نص"><Type className="h-4 w-4"/></button>
+      {tool === "text" && <input value={textValue} onChange={(event) => setTextValue(event.target.value)} placeholder="اكتب ثم المس السبورة" className="h-8 min-w-28 flex-1 rounded-lg border border-slate-200 px-2 text-[10px] text-slate-800 outline-none"/>}
+      <input type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-8 w-8 shrink-0 rounded-lg" title="لون القلم"/>
+      <input type="range" min="2" max="18" value={size} onChange={(event) => setSize(Number(event.target.value))} className="w-20 shrink-0 accent-cyan-500" title={tool === "text" ? "حجم الخط" : "سمك القلم"}/>
+      {canDraw && <button onClick={() => setPrivateStrokes([])} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600" title="مسح رسمك المحلي"><Trash2 className="h-4 w-4"/></button>}
+      {canDraw && <button disabled={!privateStrokes.length} onClick={() => { onShare(privateStrokes); setPrivateStrokes([]); }} className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-cyan-600 px-2 text-[9px] font-black text-white disabled:opacity-40" title="مشاركة السبورة مع الأعضاء"><Share2 className="h-4 w-4"/>مشاركة</button>}
+    </div>
+    <canvas ref={canvasRef} className={`block h-full w-full touch-none select-none ${canDraw ? "cursor-crosshair" : "cursor-not-allowed"}`}
+      style={{ touchAction: "none", WebkitUserSelect: "none", userSelect: "none" }}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (!canDraw) return;
+        const point = normalizedPoint(event);
+        if (tool === "text") {
+          const value = textValue.trim();
+          if (!value) return;
+          setPrivateStrokes((current) => current.concat({ id: crypto.randomUUID(), owner: "", color, size, points: [point, point], tool: "text", text: value.slice(0, 120), fontSize: Math.max(14, size * 2.2) }));
+          setTextValue("");
+          return;
+        }
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setDraft([point]);
+      }}
+      onPointerMove={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (canDraw && draft.length) setDraft((points) => [...points, normalizedPoint(event)]);
+      }}
+      onPointerUp={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (draft.length) {
+          const points = [...draft, normalizedPoint(event)];
+          if (points.length > 1) setPrivateStrokes((current) => current.concat({ id: crypto.randomUUID(), owner: "", color, size, points, tool }));
+        }
+        setDraft([]);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setDraft([]);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}/>
+  </div>;
+}
+
+export const LiveClassroomModal: React.FC<Props> = ({
+  onClose,
+  lessonTitle,
+  category,
+  openLessonContext,
+  initialRoomCode,
+  initialContentMode,
+  offlinePreview = false,
+  offlineRole = "teacher",
+  onJoinActiveRoom,
+}) => {
+  const defaultMode: "board" | "booklet" =
+    initialContentMode ||
+    (isScienceBoard(openLessonContext?.subjectId || category)
+      ? "board"
+      : "booklet");
+  const offlineBooklet = offlinePreview && defaultMode === "booklet";
+  const offlineGuest = loadGuestSession();
+  const offlineHostAvatar = offlineGuest
+    ? localStorage.getItem(`nahnu_maak_avatar_${offlineGuest.id}`) || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`
+    : `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`;
+  const [capacity, setCapacity] = useState<Capacity>(8);
+  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [studyMode, setStudyMode] = useState<"teacher" | "together">("together");
+  const [sharedMissionDraft, setSharedMissionDraft] = useState("");
+  const [room, setRoom] = useState(offlineBooklet ? "OFFLINE" : "");
+  const [entry, setEntry] = useState("");
+  const offlineViewerId = offlineRole === "student" ? "offline-viewer" : "offline-host";
+  const [me, setMe] = useState(offlineBooklet ? offlineViewerId : "");
+  const [state, setState] = useState<ClassroomState | null>(() => offlineBooklet ? {
+    type: "state",
+    status: "playing",
+    players: [
+      { id: "offline-host", name: offlineGuest?.name || "محمد", avatar: offlineHostAvatar, connected: true, micAllowed: true, drawAllowed: true, joinedAt: Date.now() - 300000, mission: { text: "قراءة أربع صفحات", target: 4, progress: 2, completed: false, updatedAt: Date.now() } },
+      { id: "offline-viewer", name: offlineRole === "student" ? (offlineGuest?.name || "أنت") : "حسن", avatar: offlineHostAvatar, connected: true, micAllowed: false, drawAllowed: false, joinedAt: Date.now() - 295000, mission: { text: "مراجعة سؤالين", target: 2, progress: 1, completed: false, updatedAt: Date.now() } },
+      { id: "offline-abdullah", name: "عبدالله", avatar: `${import.meta.env.BASE_URL}avatars/avatar-fox-explorer.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 280000, mission: { text: "تلخيص التعاريف", target: 3, progress: 3, completed: true, updatedAt: Date.now() } },
+      { id: "offline-zahraa", name: "زهراء", avatar: `${import.meta.env.BASE_URL}avatars/avatar-panda-reader.jpg`, connected: true, micAllowed: false, handRaised: true, joinedAt: Date.now() - 240000, mission: { text: "حل ثلاثة أسئلة", target: 3, progress: 1, completed: false, updatedAt: Date.now() } },
+      { id: "offline-ahmed", name: "أحمد", avatar: `${import.meta.env.BASE_URL}avatars/avatar-cat-scientist.jpg`, connected: true, micAllowed: false, joinedAt: Date.now() - 180000, mission: { text: "مراجعة الفصل الأول", target: 5, progress: 4, completed: false, updatedAt: Date.now() } },
+    ],
+    classroom: {
+      hostId: "offline-host",
+      capacity: 8,
+      answersLocked: true,
+      endsAt: Date.now() + 45 * 60000,
+      contentMode: "booklet",
+      content: { subject: openLessonContext?.subjectId || category, chapter: openLessonContext?.chapterNumber || 1, lesson: openLessonContext?.lessonNumber || 1, lessonId: openLessonContext?.lessonId, lessonTitle },
+      strokes: [],
+      drawingVersion: 0,
+      presenterId: "offline-host",
+      presenterState: null,
+      studyMode: "together",
+      sharedMission: "نقرأ الصفحات 1–5 خلال 15 دقيقة",
+    },
+  } : null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [booklet, setBooklet] = useState<LessonBookletData | null>(null);
+  const [bookletLoading, setBookletLoading] = useState(false);
+  const [bookletError, setBookletError] = useState("");
+  const [color, setColor] = useState("#facc15");
+  const [size, setSize] = useState(4);
+  const [draft, setDraft] = useState<Point[]>([]);
+  const [seconds, setSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [bookletItemIndex, setBookletItemIndex] = useState(0);
+  const [bookletAnswerVisible, setBookletAnswerVisible] = useState(false);
+  const [personalContent, setPersonalContent] = useState<ClassroomContent | null>(null);
+  const [bookletPanelVisible, setBookletPanelVisible] = useState(true);
+  const [studyWorkspace, setStudyWorkspace] = useState<"plants" | "board" | "teachers">("plants");
+  const [biologyLabOpen, setBiologyLabOpen] = useState(false);
+  const [activeRoomsPreview, setActiveRoomsPreview] = useState<ActiveRoomPreview[]>([]);
+  const [roomToJoin, setRoomToJoin] = useState<ActiveRoomPreview | null>(null);
+  const [externalChallengeRoom, setExternalChallengeRoom] = useState<ActiveRoomPreview | null>(null);
+  const [lessonTeachers, setLessonTeachers] = useState<TeacherStory[]>([]);
+  const [selectedTeacherVideo, setSelectedTeacherVideo] = useState<TeacherStory | null>(null);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+  const [sharedInboxOpen, setSharedInboxOpen] = useState(false);
+  const [selectedSharedId, setSelectedSharedId] = useState<string | null>(null);
+  const [seenSharedIds, setSeenSharedIds] = useState<string[]>([]);
+  const pendingQuestionSharesRef = useRef(new Set<string>());
+  useEffect(() => { pendingQuestionSharesRef.current.clear(); }, [room]);
+  const [lessonMenuOpen, setLessonMenuOpen] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [roomSoundOn, setRoomSoundOn] = useState(true);
+  const [receivedAnswers, setReceivedAnswers] = useState<Record<string, string>>({});
+  const [lessonChoices, setLessonChoices] = useState<Array<{ lessonId: string; lessonNumber: number; title: string }>>([]);
+  const [speakerMenu, setSpeakerMenu] = useState(false);
+  const [exerciseMenu, setExerciseMenu] = useState(false);
+  const [membersMenuOpen, setMembersMenuOpen] = useState(false);
+  const [membersNotice, setMembersNotice] = useState(0);
+  const [canvasVersion, setCanvasVersion] = useState(0);
+  const [classroomExercises, setClassroomExercises] = useState<Array<{ file: string; questionIndex: number; number: number; title: string }>>([]);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [missionOpen, setMissionOpen] = useState(false);
+  const [missionText, setMissionText] = useState("");
+  const [missionTarget, setMissionTarget] = useState(4);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
+  const socketRef = useRef<WebSocket | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const meRef = useRef("");
+  const stateRef = useRef<ClassroomState | null>(null);
+  const roomSoundRef = useRef(true);
+  const audioPeersRef = useRef(new Map<string, RTCPeerConnection>());
+  const remoteAudiosRef = useRef(new Map<string, HTMLAudioElement>());
+  useEffect(() => unlockVoices(remoteAudiosRef.current), []);
+  const pendingIceRef = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const boardFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const studyWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
+  const membersMenuRef = useRef<HTMLDivElement | null>(null);
+  const previousMembersCountRef = useRef<number | null>(null);
+  const closingRef = useRef(false);
+  const workspaceFullscreenRef = useRef(false);
+  const historyEntryRef = useRef(false);
+  const previousOrientationRef = useRef<"portrait" | "landscape">("portrait");
+  const closeClassroomRef = useRef<() => void>(() => undefined);
+
+  const classroom = state?.classroom;
+  const isTeacher = classroom?.hostId === me;
+  const self = state?.players.find((player) => player.id === me);
+  const visibleStudentCount = (state?.players || []).filter((player) => player.id !== classroom?.hostId && !player.bot).length;
+  const activeMembers = (state?.players || []).filter((player) => player.connected && !player.bot);
+  const answerFor = (player: Participant) => receivedAnswers[player.id] || player.lastAnswer || "";
+  const canDraw = Boolean(isTeacher || self?.drawAllowed);
+  const sharedContent = classroom?.content || {
+    subject: openLessonContext?.subjectId || category,
+    chapter: openLessonContext?.chapterNumber || 1,
+    lesson: openLessonContext?.lessonNumber || 1,
+    lessonId: openLessonContext?.lessonId,
+    lessonTitle,
+  };
+  const currentContent = classroom?.studyMode === "together" && personalContent
+    ? personalContent
+    : sharedContent;
+  const currentSubjectKey = String(currentContent.subject || category).toLowerCase();
+  const isMathClassroom = currentSubjectKey.includes("math") || currentSubjectKey.includes("رياض");
+  const isBiologyClassroom = currentSubjectKey.includes("biology") || currentSubjectKey.includes("bio-") || currentSubjectKey.includes("أحياء") || currentSubjectKey.includes("احياء");
+  const biologyLabChapters = useMemo<SubjectChapter[]>(() => [1, 2, 3].map((number) => ({
+    id: `biology-chapter-${number}`,
+    number,
+    title: `الفصل ${["الأول", "الثاني", "الثالث"][number - 1]}`,
+    lessonsCount: 0,
+    completedLessonsCount: 0,
+    lessons: [],
+  })), []);
+
+  useEffect(() => { meRef.current = me; }, [me]);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => {
+    const previousCount = previousMembersCountRef.current;
+    previousMembersCountRef.current = activeMembers.length;
+    if (previousCount !== null && activeMembers.length > previousCount && !membersMenuOpen)
+      setMembersNotice(activeMembers.length);
+  }, [activeMembers.length, membersMenuOpen]);
+  useEffect(() => {
+    setPersonalContent(null);
+    setBookletItemIndex(0);
+    setBookletAnswerVisible(false);
+  }, [room]);
+  useEffect(() => {
+    roomSoundRef.current = roomSoundOn;
+    remoteAudiosRef.current.forEach((audio) => { audio.muted = !roomSoundOn; });
+  }, [roomSoundOn]);
+  useEffect(() => {
+    if (studyWorkspace === "board") setStudyWorkspace("plants");
+  }, [studyWorkspace]);
+  useEffect(() => {
+    const activeIds = new Set((state?.players || []).filter((player) => player.connected && !player.bot).map((player) => player.id));
+    audioPeersRef.current.forEach((peer, peerId) => {
+      if (activeIds.has(peerId)) return;
+      peer.close();
+      audioPeersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) audio.srcObject = null;
+      remoteAudiosRef.current.delete(peerId);
+      pendingIceRef.current.delete(peerId);
+    });
+    if (!micOn || !me) return;
+    (state?.players || [])
+      .filter((player) => player.id !== me && player.connected && !player.bot && !audioPeersRef.current.has(player.id))
+      .forEach((player) => { void negotiateAudio(player.id).catch(() => undefined); });
+  }, [state?.players, micOn, me]);
+
+  useEffect(() => {
+    setClassroomExercises([]);
+    setExerciseMenu(false);
+    setBookletItemIndex(0);
+    setBookletAnswerVisible(false);
+    setLessonMenuOpen(false);
+  }, [currentContent.lessonId, currentContent.lessonTitle]);
+
+  useEffect(() => {
+    const receiveExercises = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "classroom_select_exercise" && isTeacher) {
+        const item = event.data.item;
+        if (item?.file && socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({
+          type: "classroom_control",
+          action: "change_content",
+          contentMode: "board",
+          content: { ...currentContent, exerciseFile: item.file, exerciseIndex: Number(item.questionIndex || 0), exerciseNumber: Number(item.number || 1) },
+        }));
+        return;
+      }
+      if (event.data?.type === "classroom_presenter_state" && (isTeacher || classroom?.presenterId === me)) {
+        send({ type: "classroom_presenter_state", state: event.data.state });
+        return;
+      }
+      if (event.data?.type === "classroom_student_progress" && !isTeacher) {
+        send({ type: "classroom_progress", progress: event.data.progress });
+        return;
+      }
+      if (event.data?.type !== "classroom_exercises") return;
+      const items = Array.isArray(event.data.items) ? event.data.items : [];
+      setClassroomExercises(items);
+      if (isTeacher && !currentContent.exerciseFile && items[0] && socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({
+          type: "classroom_control",
+          action: "change_content",
+          contentMode: "board",
+          content: { ...currentContent, exerciseFile: items[0].file, exerciseIndex: items[0].questionIndex, exerciseNumber: 1 },
+        }));
+      }
+    };
+    window.addEventListener("message", receiveExercises);
+    return () => window.removeEventListener("message", receiveExercises);
+  }, [isTeacher, currentContent, classroom?.presenterId, me]);
+
+  useEffect(() => {
+    if (isTeacher || classroom?.presenterId === me || !classroom?.presenterState) return;
+    boardFrameRef.current?.contentWindow?.postMessage(
+      { type: "classroom_apply_presenter_state", state: classroom.presenterState },
+      window.location.origin,
+    );
+  }, [isTeacher, classroom?.presenterId, classroom?.presenterState, me]);
+
+  const send = (payload: unknown) => {
+    if (offlineBooklet) {
+      const message = payload as { type?: string; action?: string; targetId?: string; value?: unknown; content?: ClassroomState["classroom"]["content"]; text?: string; target?: number; progress?: number; raised?: boolean; stroke?: Stroke; strokes?: Stroke[]; index?: number; lessonId?: string; answerVisible?: boolean; question?: string; answer?: string };
+      setState((previous) => {
+        if (!previous) return previous;
+        const next: ClassroomState = {
+          ...previous,
+          players: previous.players.map((player) => ({ ...player, mission: player.mission ? { ...player.mission } : null })),
+          classroom: { ...previous.classroom, strokes: [...previous.classroom.strokes] },
+        };
+        const selfPlayer = next.players.find((player) => player.id === me);
+        if (message.type === "classroom_mission" && selfPlayer) {
+          const target = Math.max(1, Math.min(100, Number(message.target) || 1));
+          const progress = Math.max(0, Math.min(target, Number(message.progress) || 0));
+          selfPlayer.mission = { text: String(message.text || "").trim().slice(0, 100), target, progress, completed: progress >= target, updatedAt: Date.now() };
+        }
+        if (message.type === "raise_hand" && selfPlayer) selfPlayer.handRaised = Boolean(message.raised);
+        if (message.type === "classroom_booklet_navigation") {
+          next.classroom.bookletIndex = Math.max(0, Number(message.index) || 0);
+          next.classroom.bookletAnswerVisible = Boolean(message.answerVisible);
+        }
+        if (message.type === "classroom_booklet_share" && selfPlayer && message.question) {
+          next.classroom.bookletShares = [...(next.classroom.bookletShares || []), { id: crypto.randomUUID(), from: selfPlayer.id, lessonId: message.lessonId, index: Number(message.index) || 0, question: message.question, answer: message.answer || "", createdAt: Date.now() }].slice(-50);
+          selfPlayer.activity = "شارك سؤالاً";
+        }
+        if (message.type === "classroom_stroke" && message.stroke) {
+          next.classroom.strokes = next.classroom.strokes.slice(-299).concat(message.stroke);
+          next.classroom.drawingVersion += 1;
+        }
+        if (message.type === "classroom_board_share" && selfPlayer && Array.isArray(message.strokes)) {
+          next.classroom.strokes = next.classroom.strokes.concat(message.strokes.map((stroke) => ({ ...stroke, owner: selfPlayer.id }))).slice(-300);
+          next.classroom.drawingVersion += 1;
+          selfPlayer.activity = "شارك سبورته";
+          selfPlayer.activityAt = Date.now();
+        }
+        if (message.type === "classroom_control") {
+          const targetPlayer = next.players.find((player) => player.id === message.targetId);
+          if (message.action === "change_content" && message.content) {
+            const previousLesson = String(next.classroom.content?.lessonId || next.classroom.content?.lesson || "");
+            const incomingLesson = String(message.content.lessonId || message.content.lesson || "");
+            next.classroom.content = { ...next.classroom.content, ...message.content };
+            if (previousLesson !== incomingLesson) {
+              next.classroom.presenterState = null;
+              next.classroom.presenterId = next.classroom.hostId;
+              next.classroom.answersLocked = true;
+              next.players.forEach((player) => { player.progress = null; player.lastAnswer = ""; player.handRaised = false; });
+            }
+          }
+          if (message.action === "shared_mission") next.classroom.sharedMission = String(message.value || "").trim().slice(0, 120);
+          if (message.action === "mic_permission" && targetPlayer) targetPlayer.micAllowed = Boolean(message.value);
+          if (message.action === "select_speaker" && targetPlayer) next.players.forEach((player) => { player.micAllowed = player.id === targetPlayer.id; });
+          if (message.action === "select_presenter" && targetPlayer) next.classroom.presenterId = targetPlayer.id;
+          if (message.action === "restore_presenter") next.classroom.presenterId = next.classroom.hostId;
+          if (message.action === "answers_locked") next.classroom.answersLocked = Boolean(message.value);
+          if (message.action === "clear_drawing") { next.classroom.strokes = []; next.classroom.drawingVersion += 1; }
+        }
+        return next;
+      });
+      return;
+    }
+    if (socketRef.current?.readyState === WebSocket.OPEN)
+      socketRef.current.send(JSON.stringify(payload));
+  };
+
+  const sendAudioSignal = (targetId: string, signal: unknown) => {
+    if (!targetId || socketRef.current?.readyState !== WebSocket.OPEN) return;
+    socketRef.current.send(JSON.stringify({ type: "audio_signal", targetId, signal }));
+  };
+
+  const ensureAudioPeer = (peerId: string) => {
+    const existing = audioPeersRef.current.get(peerId);
+    if (existing) return existing;
+    const peer = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    audioPeersRef.current.set(peerId, peer);
+    streamRef.current?.getAudioTracks().forEach((track) => peer.addTrack(track, streamRef.current!));
+    peer.onicecandidate = (event) => {
+      if (event.candidate) sendAudioSignal(peerId, { candidate: event.candidate.toJSON() });
+    };
+    peer.ontrack = (event) => {
+      let audio = remoteAudiosRef.current.get(peerId);
+      if (!audio) {
+        audio = new Audio();
+        audio.autoplay = true;
+        audio.setAttribute('playsinline', '');
+        remoteAudiosRef.current.set(peerId, audio);
+      }
+      audio.volume = 1;
+      audio.muted = !roomSoundRef.current;
+      if (event.track.kind !== 'audio') return;
+      const incoming = event.streams[0] || new MediaStream([event.track]);
+      if (audio.srcObject !== incoming) audio.srcObject = incoming;
+      if (audio.paused) playVoice(audio);
+    };
+    peer.onconnectionstatechange = () => {
+      if (!["failed", "closed"].includes(peer.connectionState)) return;
+      peer.close();
+      audioPeersRef.current.delete(peerId);
+      const audio = remoteAudiosRef.current.get(peerId);
+      if (audio) audio.srcObject = null;
+      remoteAudiosRef.current.delete(peerId);
+      pendingIceRef.current.delete(peerId);
+    };
+    return peer;
+  };
+
+  const attachLocalAudio = (peer: RTCPeerConnection) => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    const sentTrackIds = new Set(peer.getSenders().map((sender) => sender.track?.id));
+    stream.getAudioTracks().forEach((track) => {
+      if (!sentTrackIds.has(track.id)) peer.addTrack(track, stream);
+    });
+  };
+
+  const negotiateAudio = async (peerId: string) => {
+    const peer = ensureAudioPeer(peerId);
+    if (peer.signalingState !== "stable") return;
+    attachLocalAudio(peer);
+    const description = await peer.createOffer();
+    await peer.setLocalDescription(description);
+    sendAudioSignal(peerId, { description: peer.localDescription });
+  };
+
+  const flushPendingIce = async (peerId: string, peer: RTCPeerConnection) => {
+    const candidates = pendingIceRef.current.get(peerId) || [];
+    pendingIceRef.current.delete(peerId);
+    for (const candidate of candidates) await peer.addIceCandidate(candidate).catch(() => undefined);
+  };
+
+  const handleAudioSignal = async (payload: { from?: string; targetId?: string; signal?: { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit } }) => {
+    const peerId = String(payload.from || "");
+    if (!peerId || peerId === meRef.current || (payload.targetId && payload.targetId !== meRef.current)) return;
+    const peer = ensureAudioPeer(peerId);
+    const description = payload.signal?.description;
+    if (description) {
+      if (description.type === "offer" && peer.signalingState !== "stable" && meRef.current < peerId) return;
+      if (description.type === "offer" && peer.signalingState !== "stable")
+        await peer.setLocalDescription({ type: "rollback" }).catch(() => undefined);
+      await peer.setRemoteDescription(description);
+      await flushPendingIce(peerId, peer);
+      if (description.type === "offer") {
+        attachLocalAudio(peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        sendAudioSignal(peerId, { description: peer.localDescription });
+      }
+      return;
+    }
+    const candidate = payload.signal?.candidate;
+    if (!candidate) return;
+    if (peer.remoteDescription) await peer.addIceCandidate(candidate).catch(() => undefined);
+    else pendingIceRef.current.set(peerId, [...(pendingIceRef.current.get(peerId) || []), candidate]);
+  };
+
+  useEffect(
+    () => () => {
+      closingRef.current = true;
+      socketRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+      remoteAudiosRef.current.forEach((audio) => { audio.srcObject = null; });
+      remoteAudiosRef.current.clear();
+      pendingIceRef.current.clear();
+      void restoreClassroomDisplay();
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!classroom?.endsAt) return;
+    const update = () =>
+      setSeconds(
+        Math.max(0, Math.ceil((classroom.endsAt - Date.now()) / 1000)),
+      );
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [classroom?.endsAt]);
+  useEffect(() => {
+    if (!room || classroom?.contentMode !== "booklet") return;
+    const startedAt = Date.now();
+    const update = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [room, classroom?.contentMode]);
+  useEffect(() => {
+    if (classroom?.contentMode !== "booklet") return;
+    setBookletLoading(true);
+    setBookletError("");
+    const context: OpenLessonContext = {
+      subjectId: currentContent.subject || category,
+      chapterNumber: Number(currentContent.chapter) || 1,
+      lessonNumber: Number(currentContent.lesson) || 1,
+      lessonId:
+        currentContent.lessonId || `lesson-${currentContent.lesson || 1}`,
+      lessonKey: buildLessonKey(currentContent.subject || category, Number(currentContent.chapter) || 1, Number(currentContent.lesson) || 1),
+      title: currentContent.lessonTitle || lessonTitle,
+      lessonTitle: currentContent.lessonTitle || lessonTitle,
+    };
+    fetchLessonCurriculum(context)
+      .then((result) => {
+        setBooklet(result.data);
+        setBookletError(result.error || "");
+      })
+      .finally(() => setBookletLoading(false));
+  }, [
+    classroom?.contentMode,
+    currentContent.subject,
+    currentContent.chapter,
+    currentContent.lesson,
+    currentContent.lessonId,
+  ]);
+  useEffect(() => {
+    if (classroom?.contentMode !== "booklet") return;
+    let cancelled = false;
+    setTeachersLoading(true);
+    setSelectedTeacherVideo(null);
+    const context: OpenLessonContext = {
+      subjectId: currentContent.subject || category,
+      chapterNumber: Number(currentContent.chapter) || 1,
+      lessonNumber: Number(currentContent.lesson) || 1,
+      lessonId: currentContent.lessonId || `lesson-${currentContent.lesson || 1}`,
+      lessonKey: buildLessonKey(currentContent.subject || category, Number(currentContent.chapter) || 1, Number(currentContent.lesson) || 1),
+      title: currentContent.lessonTitle || lessonTitle,
+      lessonTitle: currentContent.lessonTitle || lessonTitle,
+    };
+    getLessonDetails(context)
+      .then((result) => {
+        if (cancelled) return;
+        const teachers = (result.data?.teacherStories || []).filter((story) => Boolean(story.youtubeId));
+        setLessonTeachers(teachers);
+      })
+      .catch(() => { if (!cancelled) setLessonTeachers([]); })
+      .finally(() => { if (!cancelled) setTeachersLoading(false); });
+    return () => { cancelled = true; };
+  }, [classroom?.contentMode, currentContent.subject, currentContent.chapter, currentContent.lesson, currentContent.lessonId, currentContent.lessonTitle, category, lessonTitle]);
+  useEffect(() => {
+    if (!room || classroom?.contentMode !== "booklet" || offlineBooklet || !API) return;
+    let cancelled = false;
+    const loadRooms = async () => {
+      try {
+        const response = await fetch(`${API}/rooms`);
+        const payload = await response.json();
+        const now = Date.now();
+        const rooms = Array.isArray(payload?.rooms) ? payload.rooms.filter((item: ActiveRoomPreview) =>
+          (item.status === "waiting" || item.status === "playing") && (!item.endsAt || item.endsAt > now),
+        ).slice(0, 8) : [];
+        if (!cancelled) setActiveRoomsPreview(rooms);
+      } catch (_) { if (!cancelled) setActiveRoomsPreview([]); }
+    };
+    void loadRooms();
+    const timer = window.setInterval(loadRooms, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [room, classroom?.contentMode, offlineBooklet]);
+  useEffect(() => {
+    if (!room || (classroom?.studyMode === "teacher" && !isTeacher)) return;
+    let cancelled = false;
+    const subject = String(currentContent.subject || category).toLowerCase();
+    if (classroom?.contentMode === "board" && ["mathematics", "math", "physics", "chemistry"].includes(subject)) {
+      fetchSolveWithMeTopics(subject).then((topics) => {
+        if (!cancelled) setLessonChoices(topics
+          .filter((topic) => topic.chapterNumber === Number(currentContent.chapter))
+          .map((topic) => ({ lessonId: topic.id, lessonNumber: topic.lessonNumber, title: topic.title })));
+      }).catch(() => { if (!cancelled) setLessonChoices([]); });
+      return () => { cancelled = true; };
+    }
+    getSubjectIndex(currentContent.subject || category, category).then((index) => {
+      const chapter = index.chapters.find((item) => item.chapterNumber === Number(currentContent.chapter));
+      if (!cancelled) setLessonChoices((chapter?.lessons || []).map((lesson) => ({ lessonId: lesson.lessonId, lessonNumber: lesson.lessonNumber, title: lesson.title })));
+    }).catch(() => { if (!cancelled) setLessonChoices([]); });
+    return () => { cancelled = true; };
+  }, [room, isTeacher, classroom?.contentMode, classroom?.studyMode, currentContent.subject, currentContent.chapter, category]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.floor(rect.width * ratio));
+      const height = Math.max(1, Math.floor(rect.height * ratio));
+      if (canvas.width === width && canvas.height === height) return;
+      canvas.width = width;
+      canvas.height = height;
+      setCanvasVersion((value) => value + 1);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [room, classroom?.contentMode]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.min(devicePixelRatio || 1, 2);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    [
+      ...(classroom?.strokes || []),
+      ...(draft.length > 1
+        ? [{ id: "draft", owner: me, color, size, points: draft }]
+        : []),
+    ].forEach((stroke) => {
+      if (stroke.points.length < 2) return;
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.size;
+      ctx.beginPath();
+      stroke.points.forEach((point, index) => {
+        const x = point.x * rect.width,
+          y = point.y * rect.height;
+        if (!index) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+  }, [classroom?.drawingVersion, classroom?.strokes, draft, canvasVersion, me]);
+
+  async function connect(code: string) {
+    const response = await fetch(`${API}/rooms/${code}/connect`, {
+      method: "POST",
+      headers: {
+        Authorization: await authorization(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ profile: await profile() }),
+    });
+    if (!response.ok)
+      throw new Error(
+        response.status === 409 ? "الفصل ممتلئ." : "تعذر دخول الفصل.",
+      );
+    const data = await response.json();
+    const ws = new WebSocket(
+      `${API.replace(/^http/, "ws")}/rooms/${data.roomId}/ws?ticket=${encodeURIComponent(data.ticket)}`,
+    );
+    socketRef.current = ws;
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "welcome") {
+          meRef.current = payload.userId;
+          setMe(payload.userId);
+        }
+        if (payload.type === "state" && payload.gameType === "live_classroom") {
+          setState(payload);
+          setReceivedAnswers((current) => ({ ...current, ...Object.fromEntries((payload.players || []).filter((player: Participant) => player.lastAnswer).map((player: Participant) => [player.id, player.lastAnswer])) }));
+        }
+        if (payload.type === "classroom_answer" && payload.from) {
+          setReceivedAnswers((current) => ({ ...current, [payload.from]: String(payload.value || "") }));
+          setState((current) => current ? { ...current, players: current.players.map((player) => player.id === payload.from ? { ...player, lastAnswer: String(payload.value || "") } : player) } : current);
+        }
+        if (payload.type === "audio_signal") void handleAudioSignal(payload);
+      } catch {
+        /* ignore malformed messages */
+      }
+    };
+    ws.onclose = (event) => {
+      setMicOn(false);
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+      if (!closingRef.current || (event.code === 4001 && event.reason === "host_left")) onClose();
+    };
+    setRoom(code);
+  }
+
+  useEffect(() => {
+    if (!room || offlineBooklet || !API) return;
+    let cancelled = false;
+    const checkRoomEnded = async () => {
+      try {
+        const response = await fetch(`${API}/rooms`);
+        const payload = await response.json();
+        const current = Array.isArray(payload?.rooms)
+          ? payload.rooms.find((item: ActiveRoomPreview) => String(item.code) === String(room))
+          : null;
+        if (!cancelled && current?.endedAt && current.endedAt <= Date.now()) onClose();
+      } catch {
+        // WebSocket close handling remains the primary exit signal.
+      }
+    };
+    void checkRoomEnded();
+    const timer = window.setInterval(checkRoomEnded, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [room, offlineBooklet, onClose]);
+
+  function joinActiveRoom(activeRoom: ActiveRoomPreview) {
+    if (!activeRoom.code || activeRoom.code === room) return;
+    setRoomToJoin(activeRoom);
+  }
+
+  async function confirmJoinActiveRoom() {
+    if (!roomToJoin) return;
+    const target = roomToJoin;
+    setRoomToJoin(null);
+    if (room && API && !offlineBooklet) {
+      try {
+        await fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: await authorization() }, keepalive: true });
+      } catch {
+        // Closing the old socket still lets the room runtime finish cleanup.
+      }
+    }
+    // This socket is closing because the same screen is switching rooms, not
+    // because the user left the challenge hub.
+    closingRef.current = true;
+    socketRef.current?.close();
+    socketRef.current = null;
+    if (["millionaire", "millionaire_team", "true_false", "gibha_sah"].includes(String(target.gameType))) {
+      setExternalChallengeRoom(target);
+      return;
+    }
+    if (onJoinActiveRoom) {
+      onJoinActiveRoom(target);
+      return;
+    }
+    setRoom("");
+    setState(null);
+    setReceivedAnswers({});
+    closingRef.current = false;
+    setBusy(true);
+    setError("");
+    try {
+      await connect(String(target.code));
+      void enterClassroomLandscape();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "تعذر الانتقال إلى الغرفة.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function create() {
+    void enterClassroomLandscape();
+    setBusy(true);
+    setError("");
+    try {
+      const content = {
+        subject: openLessonContext?.subjectId || category,
+        chapter: openLessonContext?.chapterNumber || 1,
+        lesson: openLessonContext?.lessonNumber || 1,
+        lessonId: openLessonContext?.lessonId,
+        lessonTitle,
+      };
+      const response = await fetch(`${API}/rooms`, {
+        method: "POST",
+        headers: {
+          Authorization: await authorization(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gameType: "live_classroom",
+          gameTitle: "الفصل التعليمي المباشر",
+          questions: [
+            {
+              question: lessonTitle,
+              options: ["شرح مباشر", "متابعة"],
+              correctAnswer: 0,
+            },
+          ],
+          subject: content.subject,
+          chapter: content.chapter,
+          lesson: content.lesson,
+          lessonTitle,
+          capacity,
+          durationMinutes,
+          studyMode,
+          sharedMission: sharedMissionDraft,
+          contentMode: defaultMode,
+          content,
+        }),
+      });
+      const data = await response.json().catch(() => ({ error: "network_error" }));
+      if (!response.ok) {
+        if (data.error === "room_runtime_unavailable")
+          throw new Error("غرف الأونلاين متوقفة مؤقتًا بسبب بلوغ حصة Cloudflare. حاول لاحقًا.");
+        throw new Error("تعذر إنشاء الفصل.");
+      }
+      await connect(data.roomCode);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذر إنشاء الفصل.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function join() {
+    void enterClassroomLandscape();
+    setBusy(true);
+    setError("");
+    try {
+      await connect(entry.trim());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذر الانضمام.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (offlineBooklet || !initialRoomCode || room || busy) return;
+    setEntry(initialRoomCode);
+    setBusy(true);
+    void connect(initialRoomCode)
+      .catch((reason) =>
+        setError(reason instanceof Error ? reason.message : "تعذر الانضمام."),
+      )
+      .finally(() => setBusy(false));
+    // Join a selected classroom once when opened from the room hub.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRoomCode, offlineBooklet]);
+
+  useEffect(() => {
+    if (room) void enterClassroomLandscape();
+  }, [room, defaultMode]);
+
+  useEffect(() => {
+    if (!room) return;
+    const handleFullscreenExit = () => {
+      if (document.fullscreenElement || closingRef.current) return;
+      // On many Android browsers the system Back button exits fullscreen
+      // before it emits popstate. Treat that fullscreen exit as leaving the
+      // classroom, otherwise the landscape-only lesson remains open in
+      // portrait orientation.
+      closeClassroomRef.current();
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenExit);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenExit);
+  }, [room]);
+
+  const closeStudyFullscreen = () => {
+    if (!workspaceFullscreenRef.current) return;
+    workspaceFullscreenRef.current = false;
+    setWorkspaceExpanded(false);
+    void (screen.orientation as LockableScreenOrientation).lock?.(previousOrientationRef.current).catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
+  };
+
+  useEffect(() => {
+    if (!room) return;
+    const handleClassroomBack = (event: Event) => {
+      if (workspaceFullscreenRef.current) {
+        event.preventDefault();
+        closeStudyFullscreen();
+        return;
+      }
+      // Let the classroom finish its own cleanup and restore portrait only
+      // after the landscape view has been removed.
+      event.preventDefault();
+      closeClassroomRef.current();
+    };
+    window.addEventListener("duha-live-classroom-back", handleClassroomBack);
+    return () => window.removeEventListener("duha-live-classroom-back", handleClassroomBack);
+  }, [room]);
+
+  const openStudyFullscreen = () => {
+    if (workspaceFullscreenRef.current) {
+      closeStudyFullscreen();
+      return;
+    }
+    previousOrientationRef.current = screen.orientation?.type?.startsWith("landscape") ? "landscape" : "portrait";
+    workspaceFullscreenRef.current = true;
+    setWorkspaceExpanded(true);
+    void (screen.orientation as LockableScreenOrientation).lock?.("landscape").catch(() => undefined);
+    window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+  };
+
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!exerciseMenuRef.current?.contains(event.target as Node))
+        setExerciseMenu(false);
+      if (!membersMenuRef.current?.contains(event.target as Node))
+        setMembersMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+
+  const closeClassroom = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    const finishClose = () => {
+      socketRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      audioPeersRef.current.forEach((peer) => peer.close());
+      audioPeersRef.current.clear();
+      void restoreClassroomDisplay().finally(onClose);
+    };
+    if (room && API && !offlineBooklet) {
+      // Inform the server without keeping the landscape UI open while the
+      // request is in flight. This is especially important for hardware Back.
+      void authorization()
+        .then((token) => fetch(`${API}/rooms/${room}/leave`, { method: "POST", headers: { Authorization: token }, keepalive: true }))
+        .catch(() => undefined);
+    }
+    finishClose();
+  };
+  closeClassroomRef.current = closeClassroom;
+  async function toggleMic() {
+    if (!isTeacher && !self?.micAllowed) return;
+    if (micOn) {
+      streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
+      setMicOn(false);
+      send({ type: "audio_state", enabled: false });
+      return;
+    }
+    try {
+      if (!streamRef.current?.getAudioTracks().some((track) => track.readyState === "live"))
+        streamRef.current = await captureVoice();
+      streamRef.current.getAudioTracks().forEach((track) => { track.enabled = true; });
+      setMicOn(true);
+      send({ type: "audio_state", enabled: true });
+      const peers = (stateRef.current?.players || []).filter((player) => player.id !== meRef.current && player.connected && !player.bot);
+      await Promise.all(peers.map((player) => negotiateAudio(player.id).catch(() => undefined)));
+    } catch {
+      setError("تعذر تشغيل الميكروفون. تحقق من الإذن.");
+    }
+  }
+  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) / rect.width,
+      y: (event.clientY - rect.top) / rect.height,
+    };
+  };
+  const timerText = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const elapsedTimerText = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  const isBoardPresenter = Boolean(isTeacher || classroom?.presenterId === me);
+  const selectClassroomExercise = (item: { file: string; questionIndex: number; number: number }) => {
+    send({ type: "classroom_control", action: "change_content", contentMode: "board", content: { ...currentContent, exerciseFile: item.file, exerciseIndex: item.questionIndex, exerciseNumber: item.number } });
+    setExerciseMenu(false);
+  };
+  const canAnswer = Boolean(!isTeacher && !classroom?.answersLocked && !self?.answerFrozen);
+  const boardUrl = `${import.meta.env.BASE_URL}solve-with-me/index.html?build=live-solve-phase-2&embedded=1&classroom=1&role=${isBoardPresenter ? "teacher" : "student"}&canAnswer=${canAnswer ? "1" : "0"}&subject=${encodeURIComponent(currentContent.subject || category)}&chapter=${currentContent.chapter || 1}&lesson=${currentContent.lesson || 1}&lessonId=${encodeURIComponent(currentContent.lessonId || "")}&topicTitle=${encodeURIComponent(currentContent.lessonTitle || lessonTitle)}&exerciseFile=${encodeURIComponent(currentContent.exerciseFile || "")}&exerciseIndex=${Number(currentContent.exerciseIndex || 0)}`;
+  const activeExercisePosition = Math.max(0, classroomExercises.findIndex((item) => item.file === currentContent.exerciseFile && Number(item.questionIndex) === Number(currentContent.exerciseIndex || 0)));
+  const completedMissions = state?.players.filter((player) => player.mission?.completed).length || 0;
+  const treeStage = Math.min(12, Math.max(0, completedMissions * 2 + Math.floor(((state?.players.reduce((sum, player) => sum + (player.mission?.progress || 0), 0) || 0) / Math.max(1, state?.players.reduce((sum, player) => sum + (player.mission?.target || 0), 0) || 1)) * 5)));
+  const timedTreeStage = Math.min(12, Math.floor(elapsedSeconds / 60));
+  const currentLessonShareId = String(currentContent.lessonId || currentContent.lesson || "lesson");
+  const currentQuestionShareKey = `${currentLessonShareId}:${bookletItemIndex}`;
+  const mySharedQuestionKeys = new Set(
+    (classroom?.bookletShares || [])
+      .filter((share) => share.from === me)
+      .map((share) => `${share.lessonId || "lesson"}:${share.index}`),
+  );
+  const sharedQuestionLimitReached = mySharedQuestionKeys.size >= 20;
+  const timedChallenge = (label: string, icon: string, targetSeconds: number, reward: string) => ({
+    label,
+    icon,
+    reward,
+    complete: elapsedSeconds >= targetSeconds,
+    progress: Math.min(100, Math.round((elapsedSeconds / targetSeconds) * 100)),
+    detail: remainingChallengeTime(targetSeconds - elapsedSeconds),
+  });
+  const challengeCards = [
+    timedChallenge("تركيز ١٠ دقائق", "⏱️", 10 * 60, "براعم البداية"),
+    timedChallenge("تركيز ٣٠ دقيقة", "⏳", 30 * 60, "وسام المثابر"),
+    timedChallenge("ساعة من الإنجاز", "🕐", 60 * 60, "وسام التركيز"),
+    timedChallenge("ساعتان من التميّز", "🏆", 120 * 60, "كأس العزيمة"),
+    {
+      label: "شارك المعرفة",
+      icon: "📚",
+      reward: "وسام المتعاون",
+      complete: mySharedQuestionKeys.size > 0,
+      progress: mySharedQuestionKeys.size > 0 ? 100 : 0,
+      detail: mySharedQuestionKeys.size > 0
+        ? `شاركت ${formatArabicNumber(mySharedQuestionKeys.size)} من ${formatArabicNumber(20)} سؤالًا`
+        : "شارك سؤالًا واحدًا مع زملائك",
+    },
+  ];
+  const completedChallengeCount = challengeCards.filter((challenge) => challenge.complete).length;
+  const achievementProgress = Math.round((completedChallengeCount / challengeCards.length) * 100);
+  const nextChallenge = challengeCards.find((challenge) => !challenge.complete) || null;
+  const challengeLeaderboard = (state?.players || [])
+    .filter((player) => !player.bot)
+    .map((player) => ({
+      ...player,
+      challengePoints: Math.max(0, Number(player.score) || 0)
+        + Math.max(0, Number(player.mission?.progress) || 0) * 10
+        + (player.mission?.completed ? 50 : 0),
+    }))
+    .sort((a, b) => b.challengePoints - a.challengePoints || (a.joinedAt || 0) - (b.joinedAt || 0));
+  const bookletQuestions = useMemo(() => (booklet?.pages || [])
+    .flatMap((page) => page.items || [])
+    .filter((item): item is BookletItemQuestion => item.type === "question"), [booklet]);
+  const bookletQuestion = bookletQuestions[Math.min(bookletItemIndex, Math.max(0, bookletQuestions.length - 1))];
+  const incomingShares = (classroom?.bookletShares || []).filter((share) => share.from !== me);
+  const selectedSharedQuestion = selectedSharedId ? incomingShares.find((share) => share.id === selectedSharedId) || null : null;
+  const unreadSharedCount = incomingShares.filter((share) => !seenSharedIds.includes(share.id)).length;
+  const isTimeFinished = Boolean(classroom?.endsAt && (seconds <= 0 || state?.status === "ended"));
+  const teacherControlledStudy = classroom?.studyMode === "teacher";
+  const canNavigateBooklet = !teacherControlledStudy || isTeacher;
+  const canChangeLesson = !teacherControlledStudy || isTeacher || offlineBooklet;
+  const lessonGoalText = classroom?.sharedMission || self?.mission?.text || "إنجاز هدف الدرس";
+  const lessonGoalTarget = Math.max(1, Number(self?.mission?.target || bookletQuestions.length || 1));
+  const lessonGoalProgress = Math.min(lessonGoalTarget, Number(self?.mission?.progress || (bookletQuestions.length ? Math.min(bookletItemIndex, bookletQuestions.length) : 0)));
+  const lessonGoalRemaining = Math.max(0, lessonGoalTarget - lessonGoalProgress);
+  const sharedSenderName = (playerId: string) => state?.players.find((player) => player.id === playerId)?.name || "طالب";
+  const openSharedInbox = () => {
+    setSelectedSharedId(null);
+    setSharedInboxOpen(true);
+    setSeenSharedIds((current) => Array.from(new Set([...current, ...incomingShares.map((share) => share.id)])));
+  };
+  const closeSharedInbox = () => {
+    setSelectedSharedId(null);
+    setSharedInboxOpen(false);
+  };
+  useEffect(() => {
+    if (classroom?.studyMode !== "teacher") return;
+    setBookletItemIndex(Math.max(0, Math.min(bookletQuestions.length - 1, Number(classroom?.bookletIndex) || 0)));
+  }, [classroom?.bookletIndex, classroom?.studyMode, bookletQuestions.length]);
+  useEffect(() => { if (classroom?.studyMode === "teacher") setBookletAnswerVisible(Boolean(classroom?.bookletAnswerVisible)); }, [classroom?.bookletAnswerVisible, classroom?.studyMode]);
+  const navigateBooklet = (index: number, answerVisible = false) => {
+    const nextIndex = Math.max(0, Math.min(bookletQuestions.length - 1, index));
+    setBookletItemIndex(nextIndex);
+    setBookletAnswerVisible(answerVisible);
+    if (classroom?.studyMode === "teacher" && isTeacher) send({ type: "classroom_booklet_navigation", index: nextIndex, answerVisible });
+  };
+  const selectLesson = (lesson: { lessonId: string; lessonNumber: number; title: string }) => {
+    const nextContent: ClassroomContent = {
+      ...currentContent,
+      lessonId: lesson.lessonId,
+      lesson: lesson.lessonNumber,
+      lessonTitle: lesson.title,
+      exerciseFile: "",
+      exerciseIndex: 0,
+      exerciseNumber: 1,
+    };
+    setLessonMenuOpen(false);
+    setBookletItemIndex(0);
+    setBookletAnswerVisible(false);
+    if (classroom?.studyMode === "teacher") {
+      if (isTeacher) send({ type: "classroom_control", action: "change_content", contentMode: "booklet", content: nextContent });
+      return;
+    }
+    setPersonalContent(nextContent);
+  };
+  const shareCurrentQuestion = () => {
+    if (!bookletQuestion || sharedQuestionLimitReached || (!offlineBooklet && pendingQuestionSharesRef.current.has(currentQuestionShareKey))) return;
+    if (!offlineBooklet) pendingQuestionSharesRef.current.add(currentQuestionShareKey);
+    send({ type: "classroom_booklet_share", lessonId: currentLessonShareId, index: bookletItemIndex, question: bookletQuestion.question, answer: bookletQuestion.answer });
+  };
+  const currentQuestionShared = Boolean(!offlineBooklet && (pendingQuestionSharesRef.current.has(currentQuestionShareKey) || mySharedQuestionKeys.has(currentQuestionShareKey)));
+  const saveMission = (progress = 0) => {
+    const text = missionText.trim();
+    if (!text) return;
+    send({ type: "classroom_mission", text, target: missionTarget, progress });
+    setMissionOpen(false);
+  };
+  const updateMissionProgress = (next: number) => {
+    if (!self?.mission) return;
+    send({ type: "classroom_mission", text: self.mission.text, target: self.mission.target, progress: Math.max(0, Math.min(self.mission.target, next)) });
+  };
+  const inviteStudents = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?classroom=${encodeURIComponent(room)}#nahnu-maak-app`;
+    const shareData = { title: "انضم إلى درس حل معي", text: `رمز الفصل: ${room}`, url };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 1800);
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url);
+        setInviteCopied(true);
+        window.setTimeout(() => setInviteCopied(false), 1800);
+      } catch {
+        setError(`شارك رمز الفصل مع الطلاب: ${room}`);
+      }
+    }
+  };
+
+  if (!room)
+    return (
+      <div
+        className="classroom-setup-overlay fixed inset-0 z-[100] overflow-y-auto bg-[#071d3a] p-4 font-cairo text-white"
+        dir="rtl"
+      >
+        <div className="classroom-setup-card mx-auto mt-8 max-w-lg rounded-3xl border border-cyan-400/35 bg-slate-950/80 p-5 shadow-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-black text-cyan-100">
+                {defaultMode === "board"
+                  ? `حل معي — ${isScienceBoard(category) ? (String(category).toLowerCase().includes("physics") || String(category).includes("فيز") ? "درس فيزياء" : String(category).toLowerCase().includes("chem") || String(category).includes("كيمي") ? "درس كيمياء" : "درس رياضيات") : category} أونلاين`
+                  : "الملزمة — غرفة دراسة أونلاين"}
+              </h2>
+              <p className="mt-1 text-xs text-slate-300">
+                {defaultMode === "board"
+                  ? "صبورة حل معي المباشرة للمدرس والطلاب"
+                  : "شرح الملزمة مباشرة للمدرس والطلاب"}
+              </p>
+            </div>
+            <button onClick={closeClassroom} className="classroom-pressable classroom-setup-close rounded-full bg-white/10 p-2">
+              <X />
+            </button>
+          </div>
+          <label className="mt-5 block text-xs font-black">عدد الطلاب</label>
+          <div className="classroom-setup-section mt-2 rounded-2xl border border-cyan-300/20 bg-white/5 p-4">
+            <div className="mb-3 flex items-center justify-between"><span className="text-xs text-slate-300">اسحب لتحديد السعة</span><b className="rounded-xl bg-cyan-400 px-4 py-2 text-xl text-slate-950">{capacity} طالب</b></div>
+            <input aria-label="عدد الطلاب" aria-valuetext={`${capacity} طالب`} type="range" min="0" max={CAPACITIES.length - 1} step="1" value={CAPACITIES.indexOf(capacity)} onChange={(event) => setCapacity(CAPACITIES[Number(event.target.value)])} className="w-full accent-cyan-400" />
+            <div className="mt-2 flex justify-between text-[10px] font-black text-slate-400" dir="ltr">{CAPACITIES.map((value) => <span key={value}>{value}</span>)}</div>
+          </div>
+          <label className="mt-4 block text-xs font-black">مدة الدرس</label>
+          <select
+            value={durationMinutes}
+            onChange={(event) => setDurationMinutes(Number(event.target.value))}
+            className="classroom-setup-field mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
+          >
+            <option value={5}>5 دقائق</option>
+            <option value={10}>10 دقائق</option>
+            <option value={20}>20 دقيقة</option>
+            <option value={30}>30 دقيقة</option>
+            <option value={60}>60 دقيقة</option>
+            <option value={120}>ساعتان</option>
+          </select>
+          {defaultMode === "booklet" && <>
+            <label className="mt-4 block text-xs font-black">نوع الغرفة</label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setStudyMode("together")} className={`classroom-pressable classroom-setup-choice rounded-2xl border p-3 text-right ${studyMode === "together" ? "is-selected is-together border-emerald-300 bg-emerald-400/20 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">ندرس معًا</b><small>مهام شخصية وتركيز جماعي</small></button>
+              <button type="button" onClick={() => setStudyMode("teacher")} className={`classroom-pressable classroom-setup-choice rounded-2xl border p-3 text-right ${studyMode === "teacher" ? "is-selected is-teacher border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/10 bg-white/5 text-slate-300"}`}><b className="block text-sm">مع مدرس</b><small>شرح وتحكم كامل للمضيف</small></button>
+            </div>
+            <label className="mt-4 block text-xs font-black">المهمة المشتركة (اختياري)</label>
+            <input value={sharedMissionDraft} maxLength={120} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="مثال: نقرأ الصفحات 1–5 خلال 15 دقيقة" className="classroom-setup-field mt-2 w-full rounded-xl border border-white/15 bg-slate-900 p-3 text-sm" />
+          </>}
+          <button
+            disabled={busy}
+            onClick={create}
+            className="classroom-pressable classroom-setup-primary mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-400 py-4 font-black text-slate-950 disabled:opacity-50"
+          >
+            إنشاء الفصل كمدرس
+          </button>
+          <div className="my-5 flex items-center gap-3 text-xs text-slate-500">
+            <span className="h-px flex-1 bg-white/10" />
+            أو الانضمام
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={entry}
+              onChange={(event) =>
+                setEntry(event.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              placeholder="رمز الفصل"
+              className="classroom-setup-field min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-center text-xl tracking-[.35em]"
+            />
+            <button
+              disabled={busy || entry.length < 4}
+              onClick={join}
+              className="classroom-pressable classroom-setup-join rounded-xl bg-blue-600 px-5 py-3 font-black disabled:opacity-40"
+            >
+              دخول
+            </button>
+          </div>
+          {error && (
+            <p className="mt-3 rounded-xl bg-rose-500/20 p-3 text-center text-xs text-rose-200">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
+  if (externalChallengeRoom) return <OnlineChallengeModal
+    onClose={onClose}
+    questions={[]}
+    lessonTitle={externalChallengeRoom.lessonTitle || "غرفة تحدٍ نشطة"}
+    gameType={externalChallengeRoom.gameType as OnlineChallengeGameType}
+    gameTitle={externalChallengeRoom.gameTitle || "التحدّي الجماعي"}
+    subject={externalChallengeRoom.subject}
+    chapterNumber={externalChallengeRoom.chapter}
+    lessonNumber={externalChallengeRoom.lesson}
+    initialRoomCode={String(externalChallengeRoom.code)}
+  />;
+
+  if (classroom?.contentMode === "booklet")
+    return (
+      <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071d3a] font-cairo text-white" dir="rtl">
+        <header className="grid min-h-14 shrink-0 grid-cols-[auto_minmax(150px,1fr)_auto] items-center gap-2 border-b border-white/10 bg-[#0b2d6b] px-2 py-1.5 shadow-lg sm:px-3" dir="ltr">
+          <div className="flex min-w-0 items-center gap-1" dir="rtl">
+            <button onClick={() => setRoomSoundOn((enabled) => !enabled)} className={`grid h-10 w-10 place-items-center rounded-xl border ${roomSoundOn ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-400"}`} aria-label={roomSoundOn ? "كتم سماعة الغرفة" : "تشغيل سماعة الغرفة"}>{roomSoundOn ? <Volume2 className="h-4 w-4"/> : <VolumeX className="h-4 w-4"/>}</button>
+            <button onClick={() => void toggleMic()} className={`grid h-10 w-10 place-items-center rounded-xl border ${micOn ? "border-emerald-300 bg-emerald-400 text-slate-950" : "border-white/15 bg-white/5 text-slate-200"}`} aria-label={micOn ? "إغلاق الميكروفون" : "تشغيل الميكروفون"}>{micOn ? <Mic className="h-4 w-4"/> : <MicOff className="h-4 w-4"/>}</button>
+            {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50 transition active:scale-95" aria-label="دعوة الطلاب" title="دعوة الطلاب"><Share2 className="h-4 w-4"/></button>}
+            {!offlineBooklet && <span className="rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-[11px] font-black text-cyan-100" title="رمز الغرفة">#{room}</span>}
+            <button onClick={openSharedInbox} className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-cyan-50" aria-label={`صندوق الأسئلة المشتركة${unreadSharedCount ? `، ${unreadSharedCount} جديد` : ""}`} title="صندوق الأسئلة المشتركة"><Inbox className="h-5 w-5"/>{unreadSharedCount > 0 && <span className="absolute -left-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[8px] font-black text-white">{Math.min(99, unreadSharedCount)}</span>}</button>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-center gap-3" dir="rtl">
+            <button onClick={() => setAchievementsOpen(true)} className="flex h-11 shrink-0 items-center gap-2 rounded-2xl border border-amber-200/60 bg-gradient-to-l from-amber-400/30 to-amber-700/35 px-4 text-amber-50 shadow-[0_0_14px_rgba(251,191,36,.18)]" aria-label="تحدياتي" title="تحدياتي"><Target className="h-5 w-5"/><span className="text-xs font-black">تحدياتي</span></button>
+            <div className="text-center"><span className="block text-[8px] font-black text-amber-200">الوقت المتبقي</span><strong className="block font-mono text-lg tracking-[.12em] text-white">{timerText}</strong></div>
+          </div>
+
+          <div className="flex items-center justify-end" dir="rtl">
+            <button onClick={closeClassroom} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-500 shadow-[0_0_18px_rgba(244,63,94,.3)]" aria-label="إغلاق الغرفة"><X className="h-6 w-6"/></button>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-auto" dir="ltr">
+          <div className={`relative grid min-h-full min-w-0 grid-cols-1 content-start gap-1.5 p-1.5 sm:gap-2 sm:p-2 min-[600px]:h-full min-[600px]:min-h-[360px] ${bookletPanelVisible ? "min-[600px]:grid-cols-[clamp(105px,14vw,210px)_minmax(360px,1fr)_clamp(145px,19vw,280px)]" : "min-[600px]:grid-cols-[clamp(105px,14vw,210px)_minmax(360px,1fr)]"}`}>
+            {!bookletPanelVisible && <button onClick={() => setBookletPanelVisible(true)} className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/40 bg-[#e9e2cf] text-emerald-800 shadow-lg" aria-label="إظهار الملزمة" title="إظهار الملزمة"><Eye className="h-4 w-4"/></button>}
+            <aside className="relative max-h-48 min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b2d4b] p-2 min-[600px]:max-h-none" dir="rtl">
+              <div className="mb-2 flex items-center justify-between gap-1"><b className="text-[10px] text-cyan-100">الغرف النشطة</b><span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]"/></div>
+              <div className="space-y-2 overflow-y-auto overscroll-contain">
+                {(activeRoomsPreview.length ? activeRoomsPreview : [{ code: room, status: "playing", gameType: "live_classroom", gameTitle: "الملزمة — غرفة دراسة" }]).map((activeRoom) => {
+                  const active = activeRoom.code === room;
+                  const logo = activeRoom.gameType === "millionaire" || activeRoom.gameType === "millionaire_team" ? "🏆" : activeRoom.gameType === "true_false" ? "✅" : activeRoom.gameType === "gibha_sah" ? "🎯" : "📚";
+                  const title = activeRoom.gameTitle || activeRoom.lessonTitle || "غرفة تحدٍ";
+                  return <button key={activeRoom.code} type="button" disabled={active} onClick={() => joinActiveRoom(activeRoom)} className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2.5 text-right transition ${active ? "cursor-default border-amber-300/50 bg-amber-400/10" : "border-white/10 bg-white/5 hover:border-cyan-300/50 hover:bg-cyan-400/10"}`} aria-label={active ? `أنت داخل ${title}` : `الانضمام إلى ${title}`}>
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/20 text-xl">{logo}</span>
+                    <span className="min-w-0 flex-1"><b className="block line-clamp-2 text-[9px] leading-4 text-white">{title}</b><small className="mt-1 flex items-center gap-1 text-[8px] font-black text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400"/>{active ? "أنت هنا" : "متاح"}</small></span>
+                  </button>;
+                })}
+              </div>
+            </aside>
+
+            <main className="order-3 flex min-h-[55dvh] flex-col overflow-hidden bg-[#fff8ea] p-2 min-[600px]:min-h-0" dir="rtl">
+              <div className="mx-auto grid h-full w-full grid-cols-1 content-start justify-items-center gap-x-2 gap-y-5 overflow-y-auto px-1 min-[900px]:grid-cols-2">
+                {[...(state?.players || [])].filter((player) => player.connected || offlineBooklet).sort((a, b) => ((b.mission?.progress || 0) / Math.max(1, b.mission?.target || 1)) - ((a.mission?.progress || 0) / Math.max(1, a.mission?.target || 1))).map((player) => {
+                  const progress = player.mission?.progress || 0;
+                  const target = Math.max(1, player.mission?.target || 1);
+                  const ageStage = Math.floor(Math.max(0, Date.now() - Number(player.joinedAt || Date.now())) / 60000);
+                  const personalStage = Math.min(12, 1 + ageStage + Math.floor((progress / target) * 3));
+                  return <div key={player.id} className="flex w-full min-w-0 flex-col items-center justify-center bg-transparent p-0">
+                    <PlantStageVideo stage={personalStage} compact bare sound={player.id === me} volume={0.5} className="!h-[88px] !w-[104px]" />
+                    <b className="mt-1 max-w-full truncate text-[10px] text-emerald-950">{player.name || "طالب"}</b>
+                  </div>;
+                })}
+              </div>
+            </main>
+
+            {bookletPanelVisible && <aside className="order-2 grid min-h-[65dvh] min-w-0 grid-rows-[58px_minmax(0,1fr)] overflow-hidden rounded-2xl border-4 border-[#61c8bc] bg-[#fff8ea] text-[#23313d] shadow-xl min-[600px]:min-h-0" dir="rtl">
+              <div className="booklet-toolbar flex items-center justify-between gap-2 border-b border-[#a2e8d7] bg-[#ddf3ff] px-2 py-2">
+                <div className="flex shrink-0 items-center gap-1">
+                  <button disabled={!canNavigateBooklet || bookletItemIndex <= 0 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex - 1)} className="booklet-action booklet-action-prev flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white/70 px-2 text-[9px] font-black text-slate-700 disabled:opacity-35" aria-label="السؤال السابق"><ChevronRight className="h-3.5 w-3.5"/>السابق</button>
+                  <div className="relative z-30">
+                    <button disabled={!canChangeLesson || studyWorkspace === "teachers"} onClick={() => setLessonMenuOpen((open) => !open)} className="booklet-action booklet-action-lesson relative grid h-9 w-9 place-items-center rounded-xl border border-cyan-700/20 bg-white/70 text-cyan-800 disabled:opacity-35" aria-label="تبديل الدرس" title={canChangeLesson ? "تبديل الدرس" : "المدرس يتحكم بالتنقل في هذه الغرفة"}><BookOpen className="h-4 w-4"/><ArrowLeftRight className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600"/></button>
+                    {lessonMenuOpen && <div className="absolute right-0 top-11 max-h-[70dvh] w-56 overflow-y-auto rounded-2xl border border-white/15 bg-[#102832]/95 p-2 text-white shadow-2xl backdrop-blur" dir="rtl">
+                      <b className="mb-2 block px-1 text-[10px] text-cyan-100">انتقل إلى درس آخر</b>
+                      <div className="grid grid-cols-2 gap-1.5">{lessonChoices.map((lesson, index) => {
+                        const active = lesson.lessonId === currentContent.lessonId || lesson.lessonNumber === Number(currentContent.lesson);
+                        const colors = ["from-cyan-400 to-blue-500", "from-violet-400 to-fuchsia-500", "from-amber-300 to-orange-500", "from-emerald-300 to-teal-500", "from-rose-400 to-pink-500"];
+                        return <button key={lesson.lessonId} onClick={() => selectLesson(lesson)} className={`flex min-h-12 items-center gap-2 rounded-xl border px-2 py-1.5 text-right ${active ? "border-white/70 bg-white/15" : "border-white/10 bg-white/5 hover:bg-white/10"}`} title={lesson.title}><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${colors[index % colors.length]} text-[10px] font-black text-slate-950`}>{lesson.lessonNumber}</span><span className="line-clamp-2 text-[8px] font-bold leading-4">{lesson.title || `الدرس ${lesson.lessonNumber}`}</span></button>;
+                      })}</div>
+                      {!lessonChoices.length && <p className="py-3 text-center text-[9px] text-slate-400">جارٍ تحميل الدروس…</p>}
+                    </div>}
+                  </div>
+                  <button disabled={!canNavigateBooklet || bookletItemIndex >= bookletQuestions.length - 1 || studyWorkspace === "teachers"} onClick={() => navigateBooklet(bookletItemIndex + 1)} className="booklet-action booklet-action-next flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-emerald-700 px-2 text-[9px] font-black text-white disabled:opacity-35" aria-label="السؤال التالي">التالي<ChevronLeft className="h-3.5 w-3.5"/></button>
+                </div>
+                <div className="flex min-w-0 items-center justify-center gap-1">
+                  <button onClick={() => { setStudyWorkspace((current) => current === "teachers" ? "plants" : "teachers"); setSelectedTeacherVideo(null); }} className={`booklet-action booklet-action-video flex h-9 items-center gap-1 rounded-xl border px-2 text-[9px] font-black transition ${studyWorkspace === "teachers" ? "is-active border-red-300 bg-red-600 text-white" : "border-red-200 bg-white/80 text-red-700"}`} aria-label="فيديوهات مدرسين هذا الدرس" title="فيديوهات مدرسين هذا الدرس"><Presentation className="h-4 w-4"/><span className="hidden min-[900px]:inline">الفيديوهات</span></button>
+                  {classroom?.studyMode === "together" && studyWorkspace !== "teachers" ? <button onClick={shareCurrentQuestion} disabled={!bookletQuestion || currentQuestionShared || sharedQuestionLimitReached} className="booklet-action booklet-action-share flex h-9 items-center gap-1 rounded-xl border border-emerald-700/20 bg-white/80 px-2 text-[8px] font-black text-emerald-800 disabled:opacity-40" aria-label={currentQuestionShared ? "تمت مشاركة هذا السؤال" : sharedQuestionLimitReached ? "وصلت إلى الحد الأقصى: 20 سؤالًا" : "مشاركة السؤال مع الأعضاء"}><Share2 className="h-4 w-4"/>{currentQuestionShared ? "تمت" : sharedQuestionLimitReached ? "20/20" : "مشاركة"}</button> : null}
+                  <span className="text-[9px] text-slate-500">{bookletQuestions.length ? `${Math.min(bookletItemIndex + 1, bookletQuestions.length)}/${bookletQuestions.length}` : "—"}</span>
+                </div>
+                <button onClick={() => setBookletPanelVisible(false)} className="booklet-action booklet-action-hide grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-emerald-700/20 bg-white/70 text-emerald-800" aria-label="إخفاء الملزمة" title="إخفاء الملزمة"><EyeOff className="h-4 w-4"/></button>
+              </div>
+              <div className="min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3">
+                {studyWorkspace === "teachers" ? <div className="flex h-full min-h-[300px] flex-col overflow-hidden rounded-xl bg-white">
+                  <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white p-2" dir="rtl"><div className="flex min-w-max items-start gap-3">{teachersLoading ? <p className="px-8 py-5 text-xs text-slate-500">جارٍ تحميل المدرسين…</p> : lessonTeachers.length ? lessonTeachers.map((story) => <button key={story.id} onClick={() => setSelectedTeacherVideo(story)} className="w-20 shrink-0 text-center"><span className={`mx-auto block h-14 w-14 overflow-hidden rounded-full border-2 bg-slate-100 shadow-md ${selectedTeacherVideo?.id === story.id ? "border-red-500 ring-2 ring-red-200" : "border-white"}`}><img src={story.storyImage || `https://img.youtube.com/vi/${story.youtubeId}/hqdefault.jpg`} alt={story.teacherName} className="h-full w-full object-cover"/></span><b className="mt-1 block truncate text-[9px] text-slate-900">{story.teacherName || "مدرس المادة"}</b></button>) : <p className="px-5 py-4 text-xs text-slate-500">لا توجد فيديوهات مرتبطة بهذا الدرس حاليًا.</p>}</div></div>
+                  <div className="min-h-0 flex-1 bg-slate-950">{selectedTeacherVideo?.youtubeId ? <iframe key={`${me || "local"}-${selectedTeacherVideo.youtubeId}`} className="h-full min-h-[260px] w-full border-0 bg-black" src={`https://www.youtube.com/embed/${selectedTeacherVideo.youtubeId}?autoplay=0&rel=0&playsinline=1`} title={`شرح ${selectedTeacherVideo.teacherName}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/> : <div className="grid h-full min-h-[260px] place-items-center p-4 text-center text-slate-300"><div><Presentation className="mx-auto mb-2 h-9 w-9 text-red-400"/><b className="block text-xs">اختر مدرسًا لعرض الفيديو هنا</b></div></div>}</div>
+                </div> : bookletLoading ? <p className="text-center text-xs text-slate-500">جارٍ تحميل السؤال…</p> : bookletQuestion ? <>
+                  <div className="mb-3 flex items-center gap-2">
+                    <button onClick={() => navigateBooklet(bookletItemIndex, !bookletAnswerVisible)} className="booklet-action booklet-action-answer rounded-lg bg-emerald-800 px-3 py-1.5 text-[9px] font-black text-white">{bookletAnswerVisible ? "إخفاء الجواب" : "إظهار الجواب"}</button>
+                  </div>
+                  <span className="mb-2 text-[9px] font-black text-emerald-700">السؤال {bookletItemIndex + 1}</span>
+                  <p className="text-base font-black leading-8 min-[1000px]:text-xl min-[1000px]:leading-10">{bookletQuestion.question}</p>
+                  {bookletAnswerVisible && <div className="mt-4 rounded-xl border border-emerald-700/15 bg-white/70 p-4 text-sm font-bold leading-7 text-emerald-950 min-[1000px]:text-base">{bookletQuestion.answer}</div>}
+                </> : <p className="text-center text-xs leading-6 text-slate-500">لا توجد أسئلة مفردة في ملزمة هذا الدرس.</p>}
+              </div>
+            </aside>}
+          </div>
+        </div>
+        {isTimeFinished && <div className="absolute inset-0 z-40 grid place-items-center bg-slate-950/35 p-4" role="status"><section className="w-full max-w-sm rounded-3xl border border-amber-200/70 bg-[#fffdf7] p-5 text-right text-[#24332e] shadow-2xl" dir="rtl"><b className="block text-base text-amber-900">انتهى وقت الدرس</b><p className="mt-2 text-xs leading-6 text-slate-600">توقف التحدي عند انتهاء الوقت. راجع هدف الدرس وما تبقى منه.</p><div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><b className="block text-xs text-emerald-900">{lessonGoalText}</b><span className="mt-1 block text-[10px] font-black text-emerald-700">أنجزت {lessonGoalProgress} من {lessonGoalTarget} · المتبقي {lessonGoalRemaining}</span></div></section></div>}
+        {roomToJoin && <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/65 p-4" onClick={() => setRoomToJoin(null)} role="presentation"><section onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-cyan-200/50 bg-[#102832] p-5 text-right text-white shadow-2xl" dir="rtl"><b className="block text-base">الانتقال إلى غرفة أخرى</b><p className="mt-2 text-xs leading-6 text-cyan-50">هل تريد مغادرة الغرفة الحالية والانضمام إلى «{roomToJoin.gameTitle || roomToJoin.lessonTitle || `الغرفة #${roomToJoin.code}`}»؟</p><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={confirmJoinActiveRoom} className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black">تأكيد الانضمام</button><button onClick={() => setRoomToJoin(null)} className="rounded-xl bg-white/10 px-4 py-3 text-xs font-black">إلغاء</button></div></section></div>}
+        {sharedInboxOpen && <div className="absolute inset-0 z-50 grid place-items-start bg-slate-950/50 p-3 pt-16 sm:place-items-center sm:p-6" onClick={closeSharedInbox} role="presentation"><section onClick={closeSharedInbox} className="max-h-[78dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-200 bg-[#fffdf7] p-4 text-right text-[#24332e] shadow-2xl" dir="rtl"><div className="mb-3 flex items-center justify-between"><div><b className="flex items-center gap-2 text-sm"><Inbox className="h-5 w-5 text-cyan-700"/>صندوق الأسئلة المشتركة</b><small className="text-[9px] text-slate-500">الأسئلة التي شاركها زملاؤك داخل الغرفة</small></div><button onClick={(event) => { event.stopPropagation(); closeSharedInbox(); }} className="flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-[10px] font-black text-white" aria-label="الخروج من صندوق الأسئلة"><X className="h-4 w-4"/>خروج</button></div>{selectedSharedQuestion ? <article className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-xs text-cyan-800">شارك السؤال: {sharedSenderName(selectedSharedQuestion.from)}</b><button onClick={(event) => { event.stopPropagation(); setSelectedSharedId(null); }} className="rounded-lg bg-white px-2 py-1 text-[9px] font-black text-slate-600">رجوع للبريد</button></div><small className="font-black text-emerald-700">السؤال {selectedSharedQuestion.index + 1}</small><p className="mt-2 text-base font-black leading-8">{selectedSharedQuestion.question}</p><div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 text-sm font-bold leading-7">{selectedSharedQuestion.answer || "لا توجد إجابة مسجلة."}</div></article> : incomingShares.length ? <div className="space-y-2">{incomingShares.slice().reverse().map((share) => <button key={share.id} onClick={(event) => { event.stopPropagation(); setSelectedSharedId(share.id); }} className="w-full rounded-2xl border border-cyan-100 bg-white p-3 text-right transition hover:border-cyan-400 hover:bg-cyan-50"><span className="flex items-center justify-between gap-2"><b className="text-[10px] text-cyan-800">{sharedSenderName(share.from)}</b><small className="text-[8px] text-slate-400">السؤال {share.index + 1}</small></span><p className="mt-1 line-clamp-2 text-xs font-bold leading-6 text-slate-700">{share.question}</p></button>)}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-8 text-center"><Inbox className="mx-auto h-9 w-9 text-slate-300"/><b className="mt-2 block text-xs text-slate-500">لا توجد أسئلة مشتركة بعد</b></div>}</section></div>}
+        {achievementsOpen && (
+          <div className="absolute inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-[2px]" onClick={() => setAchievementsOpen(false)} role="presentation">
+            <section onClick={(event) => event.stopPropagation()} className="h-full w-[min(410px,94vw)] overflow-y-auto rounded-l-[2rem] border-l border-amber-200/50 bg-[#fffdf7] text-right text-[#24332e] shadow-2xl" dir="rtl">
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#071d2c] via-[#103c3a] to-[#7c5312] px-5 pb-5 pt-4 text-white">
+                <div className="absolute -left-10 -top-12 h-36 w-36 rounded-full bg-amber-300/15 blur-2xl" />
+                <div className="absolute -bottom-14 right-8 h-32 w-32 rounded-full bg-emerald-300/15 blur-2xl" />
+                <div className="relative flex items-start justify-between gap-3">
+                  <div>
+                    <span className="mb-1 flex items-center gap-1 text-[9px] font-black text-amber-200"><Flame className="h-3.5 w-3.5"/>رحلة إنجازك اليوم</span>
+                    <b className="block text-xl">تحدياتي</b>
+                    <small className="text-[10px] text-emerald-100/80">كل دقيقة تركيز تقرّبك من إنجاز جديد</small>
+                  </div>
+                  <button onClick={() => setAchievementsOpen(false)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="إغلاق"><X className="h-5 w-5"/></button>
+                </div>
+
+                <div className="relative mt-5 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-inner backdrop-blur">
+                  <div className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#fbbf24 ${achievementProgress}%, rgba(255,255,255,.14) 0)` }}>
+                    <div className="grid h-[66px] w-[66px] place-items-center rounded-full bg-[#0d2d31] text-center shadow-inner">
+                      <strong className="text-lg text-amber-300">{formatArabicNumber(achievementProgress)}٪</strong>
+                      <span className="-mt-2 text-[8px] text-emerald-100">من الرحلة</span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] font-black text-amber-200">حصيلة إنجازك</span>
+                    <b className="mt-0.5 block text-base">أنجزت {formatArabicNumber(completedChallengeCount)} من {formatArabicNumber(challengeCards.length)} تحديات</b>
+                    {nextChallenge ? (
+                      <div className="mt-2 rounded-xl bg-black/20 px-3 py-2">
+                        <small className="block text-[8px] text-emerald-100/70">الإنجاز الأقرب</small>
+                        <span className="mt-0.5 flex items-center justify-between gap-2 text-[10px] font-black"><span className="truncate">{nextChallenge.icon} {nextChallenge.label}</span><bdi className="shrink-0 text-amber-300">{nextChallenge.detail}</bdi></span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 rounded-xl bg-amber-300/15 px-3 py-2 text-[10px] font-black text-amber-200"><Trophy className="h-4 w-4"/>أكملت جميع تحديات الغرفة!</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <b className="flex items-center gap-1.5 text-xs text-amber-950"><Trophy className="h-4 w-4 text-amber-500"/>متصدر تحديات الغرفة</b>
+                    <span className="text-[9px] font-black text-amber-700">{formatArabicNumber(challengeLeaderboard.length)} مشارك</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {challengeLeaderboard.slice(0, 5).map((player, index) => <div key={player.id} className={`flex items-center gap-2 rounded-2xl border px-3 py-2 ${index === 0 ? "border-amber-300 bg-amber-100/80" : "border-slate-200 bg-white"}`}><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-black ${index === 0 ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"}`}>{index + 1}</span><div className="min-w-0 flex-1"><b className="block truncate text-[10px] text-slate-800">{player.name || (player.id === me ? "أنت" : "طالب")}</b><small className="text-[8px] text-slate-500">{player.mission?.text || "بانتظار بدء التحدي"}</small></div><strong className="shrink-0 text-xs text-amber-700">{formatArabicNumber(player.challengePoints)} نقطة</strong></div>)}
+                  </div>
+                </div>
+                <div className={`rounded-2xl border p-3 ${isTimeFinished ? "border-rose-300 bg-rose-50" : "border-emerald-200 bg-emerald-50/70"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <b className="flex items-center gap-1.5 text-[10px] text-emerald-900"><Target className="h-4 w-4"/>هدف الدرس</b>
+                    <bdi className={`rounded-full px-2 py-1 text-[9px] font-black ${isTimeFinished ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>{formatArabicNumber(lessonGoalProgress)} من {formatArabicNumber(lessonGoalTarget)}</bdi>
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-bold leading-5 text-slate-700">{lessonGoalText}</p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/5"><div className={`h-full rounded-full transition-all duration-700 ${isTimeFinished ? "bg-rose-500" : "bg-gradient-to-l from-emerald-500 to-teal-400"}`} style={{ width: `${Math.min(100, Math.round((lessonGoalProgress / lessonGoalTarget) * 100))}%` }} /></div>
+                  <p className={`mt-1.5 text-[9px] font-black ${isTimeFinished ? "text-rose-700" : "text-emerald-700"}`}>{isTimeFinished ? `انتهى الوقت · المتبقي ${formatArabicNumber(lessonGoalRemaining)}` : `بقي ${formatArabicNumber(lessonGoalRemaining)} لإكمال الهدف`}</p>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <b className="text-xs text-slate-800">مسار الإنجازات</b>
+                    <span className="text-[9px] font-black text-slate-400">{formatArabicNumber(completedChallengeCount)}/{formatArabicNumber(challengeCards.length)}</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {challengeCards.map((challenge) => (
+                      <div key={challenge.label} className={`relative overflow-hidden rounded-2xl border p-3 transition ${challenge.complete ? "border-emerald-300 bg-gradient-to-l from-emerald-50 to-teal-50 shadow-[0_5px_18px_rgba(16,185,129,.10)]" : "border-slate-200 bg-white"}`}>
+                        {challenge.complete && <div className="absolute -left-5 -top-6 h-16 w-16 rounded-full bg-emerald-300/20 blur-xl" />}
+                        <div className="relative flex items-center gap-3">
+                          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xl ${challenge.complete ? "bg-emerald-500/15" : "bg-slate-100"}`}>{challenge.complete ? "✓" : challenge.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <b className={`text-[11px] ${challenge.complete ? "text-emerald-950" : "text-slate-700"}`}>{challenge.label}</b>
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black ${challenge.complete ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-800"}`}>{challenge.complete ? "تم الإنجاز" : challenge.detail}</span>
+                            </div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full transition-all duration-700 ${challenge.complete ? "bg-emerald-500" : "bg-gradient-to-l from-amber-400 to-orange-400"}`} style={{ width: `${challenge.progress}%` }} /></div>
+                            <span className="mt-1.5 flex items-center gap-1 text-[8px] font-bold text-slate-500"><Trophy className="h-3 w-3 text-amber-500"/>{challenge.complete ? `حصلت على: ${challenge.reward}` : `مكافأتك: ${challenge.reward}`}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-amber-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <PlantStageVideo stage={Math.max(1, Math.min(12, timedTreeStage + 1))} compact sound={false} className="h-16 w-20 shrink-0"/>
+                    <div>
+                      <b className="block text-xs text-emerald-950">نبتتك تنمو مع تركيزك 🌱</b>
+                      <small className="mt-1 block text-[9px] leading-5 text-emerald-700">قضيت <bdi className="font-black">{elapsedTimerText}</bdi> داخل الغرفة. واصل التعلّم وافتح الإنجاز التالي.</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+        {biologyLabOpen && createPortal(<ScienceLaboratoryModal subjectId="biology" subjectName="الأحياء" chapters={biologyLabChapters} initialChapterNumber={Math.min(3, Math.max(1, Number(currentContent.chapter) || 1))} onClose={() => setBiologyLabOpen(false)}/>, document.body)}
+      </div>
+    );
+
+  return (
+    <div
+      className="live-classroom-root fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-hidden bg-[#071d3a] font-cairo text-white"
+      dir="rtl"
+    >
+      <header className={`flex shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-[#071d3a] to-[#0b2d6b] px-2 py-2 shadow-lg sm:px-3 ${classroom?.contentMode === "board" ? "flex-nowrap" : "flex-wrap"}`}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            onClick={closeClassroom}
+            className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,.35)]"
+          >
+            <X />
+          </button>
+          <div className="min-w-0">
+            <b className="block truncate text-sm">
+              {currentContent.lessonTitle || lessonTitle}
+            </b>
+            <small className="text-cyan-300">
+            {offlineBooklet ? "تجربة أوفلاين" : `رمز الفصل: ${room}`} ·{" "}
+              {visibleStudentCount}/
+              {classroom?.capacity || capacity} طالب
+            </small>
+          </div>
+          {isTeacher && !offlineBooklet && <button onClick={() => void inviteStudents()} className={`flex h-9 items-center justify-center gap-1 rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-[11px] font-black text-cyan-50 transition active:scale-95 ${classroom?.contentMode === "board" ? "w-9 shrink-0" : "px-2"}`} aria-label="دعوة الطلاب" title={inviteCopied ? "تم نسخ الدعوة" : "دعوة الطلاب"}><Share2 className="h-4 w-4"/>{classroom?.contentMode !== "board" && (inviteCopied ? "تم النسخ" : "دعوة")}</button>}
+          {offlineBooklet && <span className="hidden rounded-xl border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-100 sm:inline">وضع المعاينة — لا يحتاج إنترنت للغرفة</span>}
+        </div>
+        {isTeacher && classroom?.contentMode === "board" && <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+          <div className="relative" ref={exerciseMenuRef}>
+            <button onClick={()=>setExerciseMenu(value=>!value)} className="flex h-9 items-center gap-1.5 rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-400/30 to-teal-700/60 px-3 text-xs font-black text-white shadow-lg" aria-label="عرض قائمة التمارين"><Grid2X2 className="h-4 w-4"/><span>التمارين {classroomExercises.length?activeExercisePosition+1:0}/{classroomExercises.length}</span></button>
+            {exerciseMenu&&<div className="absolute left-1/2 top-11 z-[140] grid max-h-[60dvh] w-48 -translate-x-1/2 grid-cols-4 gap-1.5 overflow-y-auto rounded-2xl border border-emerald-300/35 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">{classroomExercises.map((item,index)=><button key={`${item.file}-${item.questionIndex}`} onClick={()=>selectClassroomExercise(item)} className={`rounded-xl px-2 py-2 text-xs font-black ${index===activeExercisePosition?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-emerald-600"}`}>{index+1}</button>)}</div>}
+          </div>
+          <button onClick={()=>setSpeakerMenu(value=>!value)} className="grid h-9 w-9 place-items-center rounded-xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 to-indigo-600" aria-label="أدوات الفصل"><Radio className="h-4 w-4"/></button>
+          <button onClick={()=>send({type:"classroom_control",action:"answers_locked",value:!classroom?.answersLocked})} className={`flex h-9 items-center gap-1 rounded-xl border px-2 text-[10px] font-black ${classroom?.answersLocked?"border-sky-200 bg-sky-500":"border-violet-200/50 bg-violet-600"}`} aria-label={classroom?.answersLocked?"ابدؤوا الحل":"إنهاء المحاولة"}>{classroom?.answersLocked?<UnlockKeyhole className="h-4 w-4"/>:<LockKeyhole className="h-4 w-4"/>}<span>{classroom?.answersLocked?"ابدؤوا الحل":"إنهاء الحل"}</span></button>
+        </div>}
+        {!offlineBooklet && <div className="relative shrink-0" ref={membersMenuRef}>
+          <button
+            onClick={() => { setMembersMenuOpen((value) => !value); setMembersNotice(0); }}
+            className={`relative grid h-10 w-10 place-items-center rounded-2xl border text-cyan-50 transition active:scale-95 ${membersNotice > 0 ? "border-amber-200 bg-amber-400/25 shadow-[0_0_22px_rgba(250,204,21,.8)] animate-pulse" : "border-cyan-200/35 bg-cyan-400/15"}`}
+            aria-label={`أعضاء الدرس: ${activeMembers.length}`}
+            aria-expanded={membersMenuOpen}
+          >
+            <GraduationCap className="h-6 w-6"/>
+            <span className={`absolute -left-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] font-black ${membersNotice > 0 ? "bg-amber-400 text-slate-950" : "bg-cyan-500 text-white"}`}>{activeMembers.length}</span>
+          </button>
+          {membersMenuOpen && <div className="absolute left-1/2 top-[calc(100%+8px)] z-[170] w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-cyan-300/30 bg-slate-950/95 text-white shadow-2xl backdrop-blur" dir="rtl">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+              <div><b className="block text-xs text-cyan-100">أعضاء الدرس</b><small className="text-[9px] text-slate-400">{activeMembers.length} متصل الآن</small></div>
+              <button onClick={() => setMembersMenuOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-white/10" aria-label="إغلاق قائمة الأعضاء"><X className="h-4 w-4"/></button>
+            </div>
+            <div className="max-h-[52dvh] space-y-1.5 overflow-y-auto p-2">
+              {activeMembers.map((player) => <div key={player.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2">
+                {player.avatar ? <img src={player.avatar} alt="" className="h-9 w-9 rounded-full object-cover"/> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-600"><GraduationCap className="h-5 w-5"/></span>}
+                <div className="min-w-0 flex-1"><b className="block truncate text-[11px]">{player.name || "طالب"}{player.id === me ? " (أنت)" : ""}</b><small className="text-[9px] text-cyan-200">المستوى {player.level || 1}{player.id === classroom?.hostId ? " · المدرس" : " · طالب"}</small></div>
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.9)]" title="متصل"/>
+              </div>)}
+              {activeMembers.length === 0 && <p className="py-5 text-center text-xs text-slate-400">لا يوجد أعضاء متصلون</p>}
+            </div>
+          </div>}
+        </div>}
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-100 shadow-inner">
+            <Clock3 className="h-4 w-4" />
+            {timerText}
+          </span>
+          {!isTeacher && <button onClick={() => void toggleMic()} disabled={!self?.micAllowed} className={`rounded-full p-2.5 ${micOn ? "bg-emerald-400 text-slate-950" : "bg-white/10"} disabled:opacity-35`}>{micOn ? <Mic /> : <MicOff />}</button>}
+        </div>
+      </header>
+      {classroom?.contentMode === "booklet" && <div className="border-b border-amber-200/20 bg-gradient-to-l from-amber-950/95 via-[#17304a] to-emerald-950/95 px-3 py-2">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <Target className="h-5 w-5 shrink-0 text-amber-300" />
+          {isTeacher ? <div className="flex min-w-0 flex-1 gap-2"><input value={sharedMissionDraft || classroom.sharedMission || ""} onChange={(event) => setSharedMissionDraft(event.target.value)} placeholder="اكتب المهمة المشتركة للغرفة" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white"/><button onClick={() => send({ type: "classroom_control", action: "shared_mission", value: sharedMissionDraft })} className="rounded-xl bg-amber-400 px-3 text-xs font-black text-slate-950">اعتماد</button></div> : <p className="min-w-0 flex-1 truncate text-xs font-bold text-amber-50">{classroom.sharedMission || "حدّد مهمتك وابدأ الدراسة مع زملائك"}</p>}
+          <span className="hidden rounded-full bg-white/10 px-3 py-1 text-[10px] text-emerald-200 sm:inline">{classroom.studyMode === "together" ? "ندرس معًا" : "مع مدرس"}</span>
+        </div>
+      </div>}
+      {isTeacher && classroom?.contentMode === "board" && speakerMenu && <div className="fixed inset-x-2 top-14 z-[150] max-h-[72dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
+        <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">متابعة الطلاب</b><small className="text-slate-400">راقب التقدم واختر من يعرض حله</small></div><button onClick={()=>setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
+        {classroom?.presenterId && classroom.presenterId !== me && <button onClick={()=>send({type:"classroom_control",action:"restore_presenter"})} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
+        <div className="space-y-2">{state?.players.filter(player=>player.id!==me&&!player.bot).map(player=><div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised?"border-amber-300 bg-amber-400/10":"border-white/10 bg-white/5"}`}><div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised?"✋ ":""}{player.name||"طالب"}</b><small className="text-slate-400">{player.connected?"متصل":"غير متصل"}{player.progress?` · الخطوة ${player.progress.step||1} · ${player.progress.solved||0}/${player.progress.total||0}`:" · لم يبدأ الحل"}</small></div>{classroom?.presenterId===player.id&&<span className="rounded-full bg-fuchsia-500/20 px-2 py-1 text-[9px] text-fuchsia-200">يعرض حله الآن</span>}</div>{answerFor(player)&&<div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100">آخر إجابة: {answerFor(player)}</div>}<div className="mt-2 grid grid-cols-3 gap-1.5"><button onClick={()=>send({type:"classroom_control",action:"select_speaker",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Mic className="mx-auto mb-1 h-4 w-4"/>سماح تحدث</button><button onClick={()=>send({type:"classroom_control",action:"answer_permission",targetId:player.id,value:player.answerFrozen})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><Snowflake className="mx-auto mb-1 h-4 w-4"/>{player.answerFrozen?"فتح الحل":"إيقاف مؤقت"}</button><button onClick={()=>send({type:"classroom_control",action:"select_presenter",targetId:player.id})} className="rounded-xl bg-white/10 p-2 text-[10px] font-black"><PenLine className="mx-auto mb-1 h-4 w-4"/>عرض حله</button></div></div>)}</div>
+      </div>}
+      {isTeacher && classroom?.contentMode === "booklet" && (
+        <div className="border-b border-white/10 bg-[#071126] p-2 text-xs">
+          {!isMathClassroom && (
+            <select value={currentContent.lessonId || ""} onChange={(event) => { const lesson = lessonChoices.find((item) => item.lessonId === event.target.value); if (lesson) send({ type: "classroom_control", action: "change_content", contentMode: classroom?.contentMode, content: { ...currentContent, lessonId: lesson.lessonId, lesson: lesson.lessonNumber, lessonTitle: lesson.title, exerciseFile: "", exerciseIndex: 0, exerciseNumber: 1 } }); }} className="mb-2 w-full rounded-2xl border border-cyan-300/30 bg-slate-800 px-3 py-2 font-black text-white"><option value="">اختر الدرس</option>{lessonChoices.map((lesson) => <option key={lesson.lessonId} value={lesson.lessonId}>{lesson.lessonNumber}. {lesson.title}</option>)}</select>
+          )}
+          <div className="grid grid-cols-3 gap-2 rounded-3xl border border-cyan-300/15 bg-gradient-to-l from-[#10234b] to-[#171947] p-2 shadow-xl">
+          <div className="relative min-w-0">
+            <button
+              onClick={() => setSpeakerMenu((value) => !value)}
+              className="group flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl border border-cyan-300/35 bg-gradient-to-br from-cyan-400 via-sky-500 to-indigo-600 px-2 font-black text-white shadow-[0_8px_24px_rgba(14,165,233,.28)] transition active:scale-95"
+            >
+              <span className="relative grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner">
+                <span className="absolute inset-0 animate-ping rounded-full border border-white/45" />
+                <Radio className="relative h-5 w-5 drop-shadow" />
+              </span>
+              <span className="text-[11px] leading-none">أدوات الفصل</span>
+            </button>
+            {speakerMenu && <div className="fixed inset-x-2 top-[9.5rem] z-[120] max-h-[62dvh] overflow-y-auto rounded-3xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-2xl backdrop-blur" dir="rtl">
+              <div className="mb-3 flex items-center justify-between"><div><b className="block text-cyan-200">أدوات الفصل</b><small className="text-slate-400">التحكم بالتحدث والإجابات والشرح</small></div><button onClick={() => setSpeakerMenu(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div>
+              {classroom?.presenterId && classroom.presenterId !== me && <button onClick={() => send({ type: "classroom_control", action: "restore_presenter" })} className="mb-3 w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 p-3 font-black text-slate-950">استعادة الكتابة والشرح للمعلم</button>}
+              <div className="space-y-2">{state?.players.filter((player) => player.id !== me).map((player) => <div key={player.id} className={`rounded-2xl border p-3 ${player.handRaised ? "border-amber-300 bg-amber-400/10" : "border-white/10 bg-white/5"}`}>
+                <div className="flex items-center justify-between gap-2"><div className="min-w-0"><b className="block truncate">{player.handRaised ? "✋ " : ""}{player.name || "طالب"}</b><small className="text-slate-400">{player.connected ? "متصل" : "غير متصل"}{player.progress ? ` · الخطوة ${player.progress.step || 1} · ${player.progress.solved || 0}/${player.progress.total || 0}` : ""}</small></div>{classroom?.presenterId === player.id && <span className="rounded-full bg-fuchsia-500/20 px-2 py-1 text-[10px] text-fuchsia-200">يشرح الآن</span>}</div>
+                {answerFor(player) && <div className="mt-2 rounded-xl bg-slate-900 p-2 text-[11px] text-cyan-100"><span className="text-slate-400">آخر إجابة: </span>{answerFor(player)}</div>}
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <button onClick={() => send({ type: "classroom_control", action: "select_speaker", targetId: player.id })} className={`rounded-xl p-2 font-black ${player.micAllowed ? "bg-emerald-400 text-slate-950" : "bg-white/10"}`}><Mic className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.micAllowed ? "يتحدث" : "سماح تحدث"}</span></button>
+                  <button onClick={() => send({ type: "classroom_control", action: "answer_permission", targetId: player.id, value: player.answerFrozen })} className={`rounded-xl p-2 font-black ${player.answerFrozen ? "bg-sky-400 text-slate-950" : "bg-white/10"}`}><Snowflake className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">{player.answerFrozen ? "فتح الإجابة" : "تجميد"}</span></button>
+                  <button onClick={() => send({ type: "classroom_control", action: "select_presenter", targetId: player.id })} className={`rounded-xl p-2 font-black ${classroom?.presenterId === player.id ? "bg-fuchsia-500" : "bg-white/10"}`}><PenLine className="mx-auto mb-1 h-4 w-4"/><span className="text-[10px]">كتابة وشرح</span></button>
+                </div>
+              </div>)}</div>
+            </div>}
+          </div>
+          <button
+            onClick={() =>
+              send({
+                type: "classroom_control",
+                action: "answers_locked",
+                value: !classroom?.answersLocked,
+              })
+            }
+            className={`group flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border px-2 font-black shadow-lg transition active:scale-95 ${classroom?.answersLocked ? "border-sky-200/50 bg-gradient-to-br from-sky-400 to-blue-700" : "border-violet-200/45 bg-gradient-to-br from-violet-500 to-fuchsia-700"}`}
+          >
+            {classroom?.answersLocked ? (
+              <>
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner"><UnlockKeyhole className="h-5 w-5 animate-pulse" /></span>
+                <span className="text-[11px] leading-none">فتح الإجابات</span>
+              </>
+            ) : (
+              <>
+                <span className="relative grid h-8 w-8 place-items-center rounded-full bg-white/20 shadow-inner"><Snowflake className="h-5 w-5 animate-spin [animation-duration:4s]" /><LockKeyhole className="absolute h-3 w-3" /></span>
+                <span className="text-[11px] leading-none">تجميد الإجابات</span>
+              </>
+            )}
+          </button>
+          <div className="flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-emerald-200/35 bg-gradient-to-br from-emerald-400/25 to-teal-900/70 px-2 text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,.18)]">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-300/20 shadow-inner">
+              <Apple className="h-6 w-6 animate-bounce fill-emerald-300 text-emerald-100 [animation-duration:2s]" />
+            </span>
+            <span className="text-[11px] font-black leading-none"><b className="text-sm">100</b> تفاحة</span>
+          </div>
+          {!isMathClassroom && <button
+            onClick={() =>
+              send({
+                type: "classroom_control",
+                action: "change_content",
+                contentMode:
+                  classroom?.contentMode === "board" ? "booklet" : "board",
+                content: currentContent,
+              })
+            }
+            className="flex shrink-0 items-center gap-1 rounded-xl bg-indigo-500/20 px-3 py-2"
+          >
+            {classroom?.contentMode === "board" ? (
+              <BookOpen className="h-4 w-4" />
+            ) : (
+              <Presentation className="h-4 w-4" />
+            )}
+            {classroom?.contentMode === "board" ? "عرض الملزمة" : "عرض الصبورة"}
+          </button>}
+          </div>
+        </div>
+      )}
+      <main className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain text-slate-900 ${classroom?.contentMode === "booklet" ? "bg-[#102739]" : "bg-slate-100"}`}>
+        <div className={`relative mx-auto min-h-0 w-full ${classroom?.contentMode === "booklet" ? "grid h-auto max-w-[1600px] grid-cols-1 gap-3 p-2 sm:p-3 lg:h-full lg:grid-cols-[220px_minmax(0,1fr)_190px]" : "h-full"}`}>
+          {classroom?.contentMode === "booklet" ? (
+            <>
+              <aside className="order-2 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-[#0a1a27]/90 p-2 lg:order-1 lg:flex-col lg:overflow-y-auto">
+                <div className="hidden items-center justify-between px-1 text-white lg:flex"><b className="text-xs">رفاق الدراسة</b><span className="text-[10px] text-emerald-300">{state?.players.filter((player) => player.connected).length || 0} متصل</span></div>
+                {state?.players.map((player) => {
+                  const ratio = player.mission ? Math.round((player.mission.progress / Math.max(1, player.mission.target)) * 100) : 0;
+                  return <div key={player.id} className={`relative w-44 shrink-0 overflow-hidden rounded-2xl border p-2 text-white lg:w-full ${player.id === me ? "border-cyan-300/70 bg-cyan-500/15" : player.mission?.completed ? "border-emerald-300/60 bg-emerald-500/15" : "border-white/10 bg-white/5"}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="relative"><img src={player.avatar || `${import.meta.env.BASE_URL}avatars/avatar-owl-scholar.jpg`} alt={player.name || "طالب"} className={`h-11 w-11 rounded-2xl border-2 object-cover ${player.mission?.completed ? "border-emerald-300" : "border-white/20"}`}/><span className={`absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-[#0a1a27] ${player.connected ? "bg-emerald-400" : "bg-slate-500"}`}/></div>
+                      <div className="min-w-0 flex-1"><b className="block truncate text-xs">{player.id === me ? `${player.name || "طالب"} (أنت)` : player.name || "طالب"}</b><span className="flex items-center gap-1 text-[9px] text-slate-300">{player.micAllowed ? <Mic className="h-3 w-3 text-emerald-300"/> : <MicOff className="h-3 w-3"/>}{player.handRaised ? "رفع يده" : player.mission?.completed ? "أنجز مهمته" : "يدرس الآن"}</span></div>
+                    </div>
+                    <div className="mt-2 min-h-8 rounded-xl bg-black/20 px-2 py-1 text-[10px] text-slate-200">{player.mission?.text || "لم يحدد مهمة بعد"}</div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${player.mission?.completed ? "bg-emerald-400" : "bg-cyan-400"}`} style={{ width: `${ratio}%` }}/></div>
+                    <div className="mt-1 flex justify-between text-[9px] text-slate-400"><span>{player.mission ? `${player.mission.progress}/${player.mission.target}` : "بانتظار المهمة"}</span><span>{ratio}%</span></div>
+                  </div>;
+                })}
+              </aside>
+              <aside className="order-1 flex min-h-[70dvh] flex-col items-center justify-between overflow-hidden rounded-3xl border border-emerald-200/15 bg-gradient-to-b from-[#102d35] to-[#071b21] p-3 text-center text-white lg:order-2 lg:min-h-0">
+                <div><TreePine className="mx-auto h-5 w-5 text-emerald-300"/><b className="mt-1 block text-xs">شجرة التركيز</b><small className="text-[9px] text-slate-400">تنمو بإنجاز مهام المجموعة</small></div>
+                <div className="my-3 flex min-h-32 w-full flex-1 items-center justify-center"><PlantStageVideo stage={Math.min(12, Math.max(1, treeStage + 1))} sound volume={0.25} sourceFolder="plant-growth-booklet" /></div>
+                <div className="w-full rounded-2xl bg-white/5 p-2"><b className="block text-lg text-emerald-300">{completedMissions}</b><small className="text-[9px] text-slate-300">مهمة مكتملة</small></div>
+              </aside>
+              <section className="order-3 relative min-h-[70dvh] overflow-visible rounded-[1.5rem] border-4 border-[#7c4a2d] bg-[#f8f1dc] shadow-[0_18px_50px_rgba(0,0,0,.35)] sm:rounded-[2rem] sm:border-[6px] lg:order-3 lg:min-h-0 lg:overflow-auto">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/10 bg-[#fffaf0]/95 px-4 py-2 backdrop-blur"><span className="flex items-center gap-2 text-xs font-black text-amber-950"><BookOpen className="h-4 w-4"/>الملزمة المشتركة</span><span className="text-[10px] text-amber-800">{currentContent.lessonTitle || lessonTitle}</span></div>
+                <div className="p-3"><LessonBookletView bookletData={booklet} isLoading={bookletLoading} error={bookletError || undefined} lessonTitle={currentContent.lessonTitle || lessonTitle}/></div>
+                <canvas
+                  ref={canvasRef}
+                  className={`pointer-events-none absolute inset-0 z-20 h-full w-full touch-auto lg:touch-none ${canDraw ? "lg:pointer-events-auto lg:cursor-crosshair" : ""}`}
+                  onPointerDown={(event) => {
+                    if (canDraw) {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      setDraft([point(event)]);
+                    }
+                  }}
+                  onPointerMove={(event) => {
+                    if (canDraw && draft.length) setDraft((value) => [...value, point(event)]);
+                  }}
+                  onPointerUp={(event) => {
+                    if (draft.length > 1) send({ type: "classroom_stroke", stroke: { id: crypto.randomUUID(), color, size, points: [...draft, point(event)] } });
+                    setDraft([]);
+                  }}
+                />
+              </section>
+            </>
+          ) : (
+            <iframe
+              key={`${currentContent.lessonId || currentContent.lesson || "lesson"}:${currentContent.exerciseFile || "first"}:${Number(currentContent.exerciseIndex || 0)}`}
+              ref={boardFrameRef}
+              src={boardUrl}
+              onLoad={() => {
+                if (!isBoardPresenter && classroom?.presenterState) boardFrameRef.current?.contentWindow?.postMessage(
+                  { type: "classroom_apply_presenter_state", state: classroom.presenterState },
+                  window.location.origin,
+                );
+              }}
+              title="الصبورة المباشرة"
+              className="h-full min-h-0 w-full border-0 bg-white"
+              allow="fullscreen; clipboard-write"
+            />
+          )}
+          {!isTeacher && classroom?.answersLocked && (
+            <div className="pointer-events-none absolute left-2 top-2 z-30 flex max-w-[min(86vw,310px)] items-center gap-2 rounded-xl border border-cyan-200/70 bg-cyan-50/90 px-3 py-2 text-right text-cyan-950 shadow-lg backdrop-blur" dir="rtl">
+              <Snowflake className="h-4 w-4 shrink-0 animate-pulse text-cyan-700" />
+              <span className="truncate text-[10px] font-black">المدرس يشرح الآن · ستفتح محاولتك عند بدء الحل</span>
+            </div>
+          )}
+        </div>
+      </main>
+      {missionOpen && <div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm" onClick={() => setMissionOpen(false)}><div className="w-full max-w-sm rounded-3xl border border-emerald-300/30 bg-[#0d2230] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><div><b className="flex items-center gap-2 text-emerald-200"><Target className="h-5 w-5"/>مهمتي في الجلسة</b><small className="text-slate-400">اختر هدفًا واضحًا يمكنك إنجازه</small></div><button onClick={() => setMissionOpen(false)} className="rounded-full bg-white/10 p-2"><X className="h-4 w-4"/></button></div><div className="mt-4 grid grid-cols-2 gap-2">{["قراءة صفحات", "حل أسئلة", "تلخيص الدرس", "حفظ تعريفات"].map((preset) => <button key={preset} onClick={() => setMissionText(preset)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-xs hover:border-emerald-300">{preset}</button>)}</div><input value={missionText} maxLength={100} onChange={(event) => setMissionText(event.target.value)} placeholder="اكتب مهمتك" className="mt-3 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm"/><label className="mt-3 block text-xs font-bold">العدد المطلوب: <b className="text-emerald-300">{missionTarget}</b></label><input type="range" min="1" max="20" value={missionTarget} onChange={(event) => setMissionTarget(Number(event.target.value))} className="mt-2 w-full accent-emerald-400"/><button onClick={() => saveMission(0)} disabled={!missionText.trim()} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-emerald-400 to-cyan-400 py-3 font-black text-slate-950 disabled:opacity-40">ابدأ المهمة</button></div></div>}
+      <footer className="shrink-0 overflow-x-auto border-t border-white/10 bg-slate-950 p-2">
+        <div className="flex min-w-max items-center gap-2">
+          {classroom?.contentMode === "booklet" && <>
+            <button onClick={() => { setMissionText(self?.mission?.text || ""); setMissionTarget(self?.mission?.target || 4); setMissionOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950"><Target className="h-4 w-4"/>{self?.mission ? "تعديل مهمتي" : "اختر مهمتك"}</button>
+            {self?.mission && <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1"><button onClick={() => updateMissionProgress(self.mission!.progress - 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">−</button><span className="min-w-12 text-center text-xs font-black text-white">{self.mission.progress}/{self.mission.target}</span><button onClick={() => updateMissionProgress(self.mission!.progress + 1)} className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500 text-slate-950">+</button>{self.mission.completed && <CheckCircle2 className="mx-1 h-5 w-5 text-emerald-300"/>}</div>}
+          </>}
+          {!isTeacher && (
+            <button
+              onClick={() =>
+                send({ type: "raise_hand", raised: !self?.handRaised })
+              }
+              className={`mr-auto flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-black ${self?.handRaised ? "bg-amber-400 text-slate-950" : "bg-white/10"}`}
+            >
+              <Hand className="h-4 w-4" />
+              {self?.handRaised ? "تم إرسال طلبك" : "أرغب بشرح حلي"}
+            </button>
+          )}
+          {!isTeacher && classroom?.contentMode === "board" && !classroom?.answersLocked && <span className="rounded-xl bg-emerald-400/15 px-3 py-2 text-[11px] font-black text-emerald-200">حلّ داخل الصبورة؛ تقدمك يصل للمدرس تلقائيًا</span>}
+        </div>
+        {isTeacher && (
+          <div className="mt-2 flex gap-2 overflow-x-auto">
+            {state?.players
+              .filter((player) => player.id !== me && !player.bot)
+              .map((player) => (
+                <div
+                  key={player.id}
+                  className="flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2 text-xs"
+                >
+                  <span>
+                    {player.handRaised ? "✋ " : ""}
+                    {player.name || "طالب"}
+                  </span>
+                  <button
+                    onClick={() =>
+                      send({
+                        type: "classroom_control",
+                        action: "mic_permission",
+                        targetId: player.id,
+                        value: !player.micAllowed,
+                      })
+                    }
+                    className={`rounded-lg p-1.5 ${player.micAllowed ? "bg-emerald-500 text-slate-950" : "bg-white/10"}`}
+                  >
+                    {player.micAllowed ? (
+                      <Mic className="h-4 w-4" />
+                    ) : (
+                      <MicOff className="h-4 w-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() =>
+                      send({
+                        type: "classroom_control",
+                        action: "draw_permission",
+                        targetId: player.id,
+                        value: !player.drawAllowed,
+                      })
+                    }
+                    className={`rounded-lg p-1.5 ${player.drawAllowed ? "bg-cyan-500 text-slate-950" : "bg-white/10"}`}
+                  >
+                    {player.drawAllowed ? (
+                      <UnlockKeyhole className="h-4 w-4" />
+                    ) : (
+                      <LockKeyhole className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              ))}
+          </div>
+        )}
+      </footer>
+    </div>
+  );
+};

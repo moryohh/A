@@ -20,7 +20,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { TrueFalseAuthenticIcon } from './GameIcons';
 import { getTrueFalseReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
-import { ClappingAnimation } from './ClappingAnimation';
+import { ClappingCelebration } from './ClappingCelebration';
 
 interface TrueFalseGameModalProps {
   isOpen: boolean;
@@ -201,7 +201,7 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
     onAssessmentResult?.(isCorrect ? 1 : 0, 1);
 
     setFeedbackBurst(isCorrect ? 'correct' : 'wrong');
-    window.setTimeout(() => setFeedbackBurst(null), 700);
+    window.setTimeout(() => setFeedbackBurst(null), 4000);
 
     if (isCorrect) {
       playAudio('correct');
@@ -216,7 +216,7 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
           setTimeout(() => {
             setFeedbackBurst('streak');
             playAudio('streak');
-            window.setTimeout(() => setFeedbackBurst(null), 700);
+            window.setTimeout(() => setFeedbackBurst(null), 4000);
           }, 300);
         }
         return next;
@@ -273,33 +273,28 @@ export const TrueFalseGameModal: React.FC<TrueFalseGameModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#020617]/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200 font-cairo select-none overscroll-contain">
+      <ClappingCelebration
+        show={isCompleted && accuracy >= 70}
+        label="أكملت التحدي بنجاح!"
+      />
+      <ClappingCelebration
+        show={feedbackBurst === 'correct' || feedbackBurst === 'streak'}
+        label={feedbackBurst === 'streak' ? 'سلسلة إجابات رائعة!' : 'أحسنت!'}
+        compact
+        edge
+      />
       <div className="bg-gradient-to-b from-[#13264a] via-[#0b1731] to-[#050b1d] border-2 border-cyan-400/30 w-full max-w-lg rounded-[30px] p-3 sm:p-5 shadow-[0_0_70px_rgba(14,165,233,0.24)] text-right relative max-h-[94vh] flex flex-col text-white overflow-hidden">
         {/* Lightweight ambient color, kept static enough for smooth scrolling. */}
         <div className="absolute -top-20 -right-16 w-56 h-56 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-16 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent opacity-80 pointer-events-none" />
 
-        {/* Correct answers use four clapping animations kept around the edges, away from the player. */}
-        {feedbackBurst && (
+        {/* Wrong answers keep a small red notice; correct answers use edge clapping above. */}
+        {feedbackBurst === 'wrong' && (
           <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden" aria-hidden="true">
-            {feedbackBurst === 'wrong' ? (
-              <div className="game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-rose-500/90 px-4 py-2 text-sm font-black text-white shadow-2xl shadow-rose-500/30 animate-in zoom-in-95 fade-in duration-200">
-                حاول مرة أخرى
-              </div>
-            ) : (
-              <>
-                {[
-                  'left-2 top-20',
-                  'right-2 top-20',
-                  'left-2 bottom-24',
-                  'right-2 bottom-24',
-                ].map((position, index) => (
-                  <div key={position} className={`absolute ${position} ${index % 2 ? '-rotate-12' : 'rotate-12'}`}>
-                    <ClappingAnimation autoplay className="h-16 w-16 sm:h-20 sm:w-20 drop-shadow-[0_0_14px_rgba(251,191,36,.45)]" />
-                  </div>
-                ))}
-              </>
-            )}
+            <div className="game-pop absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-rose-500/90 px-4 py-2 text-sm font-black text-white shadow-2xl shadow-rose-500/30 animate-in zoom-in-95 fade-in duration-200">
+              حاول مرة أخرى
+            </div>
           </div>
         )}
 

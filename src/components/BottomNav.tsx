@@ -11,6 +11,7 @@ interface BottomNavProps {
   onSelectTab: (tab: NavTab) => void;
   communityUnreadCount?: number;
   avatarUrl?: string;
+  hideCommunity?: boolean;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -18,13 +19,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onSelectTab,
   communityUnreadCount = 0,
   avatarUrl,
+  hideCommunity = false,
 }) => {
   const { theme } = useAppTheme();
 
   const tabs = [
     { id: 'home' as NavTab, label: 'الرئيسية', icon: Home },
     { id: 'subscriptions' as NavTab, label: 'الاشتراكات', icon: Layers },
-    { id: 'community' as NavTab, label: 'المجتمع', icon: Users, badge: communityUnreadCount },
+    ...(!hideCommunity ? [{ id: 'community' as NavTab, label: 'المجتمع', icon: Users, badge: communityUnreadCount }] : []),
     { id: 'profile' as NavTab, label: 'حسابي', avatar: true },
   ];
 

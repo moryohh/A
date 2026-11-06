@@ -26,7 +26,7 @@ import { gameAudio } from '../utils/gameAudio';
 import { getImageChoiceReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
 import { DEFAULT_COMMUNITY_AVATAR } from './CommunityAvatar';
-import { ClappingAnimation } from './ClappingAnimation';
+import { ClappingCelebration, ClappingHandsAnimation } from './ClappingCelebration';
 
 interface GibhaSahGameModalProps {
   isOpen: boolean;
@@ -120,6 +120,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
   const [celebrationBurst, setCelebrationBurst] = useState<'correct' | 'combo' | 'wrong' | null>(null);
   const [clapPlayKey, setClapPlayKey] = useState(0);
+  const [clapActive, setClapActive] = useState(false);
 
   // Scores
   const [team1Score, setTeam1Score] = useState(0);
@@ -154,7 +155,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
     handleRestartInternal(round.questions);
   }, [isOpen, customConfig, lessonId, lessonTitle, category]);
 
-  // Play the supplied 24-second game bed while the game is open.
+  // Play the supplied game bed while the game is open.
   useEffect(() => {
     if (isOpen && soundEnabled) gameAudio.playGameSessionTheme();
     else gameAudio.stopGameSessionTheme();
@@ -175,7 +176,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
 
   // Check victory / finish condition
   useEffect(() => {
-    if (solvedCardNumbers.length >= totalCardsCount - 1 && totalCardsCount > 1) {
+    if (totalCardsCount > 0 && solvedCardNumbers.length >= Math.max(1, totalCardsCount - 1)) {
       setIsFinished(true);
       if (soundEnabled) gameAudio.playVictoryFanfare();
       if (!rewardIssuedRef.current) {
@@ -360,7 +361,7 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       const solvedCountAfterAnswer = solvedCardNumbers.length + 1;
       const isCombo = solvedCountAfterAnswer % 3 === 0;
       setCelebrationBurst(isCombo ? 'combo' : 'correct');
-      window.setTimeout(() => setCelebrationBurst(null), isCombo ? 900 : 650);
+      window.setTimeout(() => setCelebrationBurst(null), 4000);
       playAudio('correct');
       if (isCombo) playAudio('combo');
       setFeedbackStatus('correct');
@@ -549,6 +550,11 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
       id="gibha-sah-modal-root"
       className="fixed inset-0 z-50 bg-[#020617]/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200 font-cairo select-none overscroll-contain"
     >
+      <ClappingCelebration
+        show={celebrationBurst === 'combo' || isFinished}
+        label={isFinished ? 'تحدٍ مكتمل — أحسنتم!' : 'سلسلة ثلاثية رائعة!'}
+        compact={!isFinished}
+      />
       <div
         id="gibha-sah-container"
         className="bg-gradient-to-b from-[#102b58] via-[#081a3b] to-[#040b20] border-2 border-cyan-300/30 w-full max-w-xl sm:max-w-2xl rounded-[32px] shadow-[0_0_80px_rgba(14,165,233,0.25)] text-right relative max-h-[96vh] flex flex-col text-white overflow-hidden"
@@ -632,13 +638,20 @@ export const GibhaSahGameModal: React.FC<GibhaSahGameModalProps> = ({
             type="button"
             onClick={() => {
               setClapPlayKey((value) => value + 1);
+              setClapActive(true);
+              window.setTimeout(() => setClapActive(false), 4000);
               playAudio('click');
             }}
             className="h-12 w-12 overflow-hidden rounded-full border border-amber-200/50 bg-slate-950/45 shadow-[0_0_16px_rgba(251,191,36,.24)] transition-transform active:scale-90"
             title="تصفيق"
             aria-label="تشغيل حركة التصفيق"
           >
-            <ClappingAnimation playKey={clapPlayKey} className="h-full w-full scale-125" />
+            <ClappingHandsAnimation
+              key={`${clapPlayKey}-${clapActive}`}
+              autoplay={clapActive}
+              pingPong={clapActive}
+              className="h-full w-full scale-125"
+            />
           </button>
         </div>
 

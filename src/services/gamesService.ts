@@ -1,20 +1,48 @@
 import { supabase } from '../lib/supabase';
-import { buildLessonKey, fileNameMatchesLesson, getDbSubjectIds, getLessonContentBundle, normalizeSectionId } from './lessonsService';
+import { buildLessonKey, getDbSubjectIds, getLessonContentBundle, normalizeSectionId } from './lessonsService';
 import { MillionaireGameConfig, MillionaireQuestion, OpenLessonContext } from '../types';
-import { TrueFalseGameConfig, TrueFalseQuestion, getTrueFalseGameForLesson } from '../data/mockTrueFalse';
-import { GibhaSahGameConfig, GibhaSahQuestion, GibhaSahCard, getGibhaSahGameForLesson } from '../data/mockGibhaSah';
-import { getMillionaireGameForLesson } from '../data/mockMillionaire';
+import { TrueFalseGameConfig, TrueFalseQuestion } from '../data/mockTrueFalse';
+import { GibhaSahGameConfig, GibhaSahQuestion, GibhaSahCard } from '../data/mockGibhaSah';
 import { extractChapterAndSegment } from './curriculumService';
-import { fetchCloudflareExactSection } from './cloudflareContentService';
+import { fetchCloudflareEducationalRecord } from './cloudflareContentService';
 
 export interface LessonGamesBundle {
   mcqConfig: MillionaireGameConfig;
   trueFalseConfig: TrueFalseGameConfig;
   gibhaSahConfig: GibhaSahGameConfig;
+  flashCards: FlashCard[];
   dailyExamAvailable: boolean;
   source: 'database' | 'fallback';
   loadedAt: number;
   dataSource?: 'cloudflare' | 'supabase' | 'fallback';
+}
+
+export interface FlashCard {
+  id: string;
+  question: string;
+  answer: string;
+  pageId: string;
+  itemId: number;
+}
+
+function parseCurriculumToFlashCards(rawContent: any, lessonId: string): FlashCard[] {
+  const sourceLessonId = String(rawContent?.lesson_info?.lesson_id || '').trim();
+  if (!sourceLessonId || sourceLessonId !== String(lessonId).trim()) return [];
+  const cards: FlashCard[] = [];
+  for (const page of Array.isArray(rawContent?.pages) ? rawContent.pages : []) {
+    const pageId = String(page?.page_id || '').trim();
+    if (!pageId || !Array.isArray(page?.items)) continue;
+    for (const item of page.items) {
+      const itemId = Number(item?.item_id);
+      if (!Number.isFinite(itemId)) continue;
+      if (item?.type === 'question' && String(item.question || '').trim() && String(item.answer || '').trim()) {
+        cards.push({ id: `${pageId}-${itemId}`, question: String(item.question).trim(), answer: String(item.answer).trim(), pageId, itemId });
+      } else if (item?.type === 'paragraph' && String(item.content || '').trim()) {
+        cards.push({ id: `${pageId}-${itemId}`, question: 'ما الفكرة أو المعلومات الأساسية التي يوضحها هذا الجزء؟', answer: String(item.content).trim(), pageId, itemId });
+      }
+    }
+  }
+  return Array.from(new Map(cards.map((card) => [card.id, card])).values());
 }
 
 // In-memory cache for game bundles by key (subject_lessonId)
@@ -53,229 +81,40 @@ async function fetchExactSectionContent(
     : sectionId === 'ph'
       ? ['ph', 'فلاش_كاردز', 'بطاقات']
       : ['mcq', 'MCQ', 'mcqs', 'اختيارات', 'اختيار_من_متعدد'];
-  const baseQuery = () =>
-    supabase
-      .from('educational_data')
-      .select('id, file_name, subject_id, section_id, content')
-      .in('subject_id', dbSubjects)
-      .in('section_id', sectionAliases);
+  // The Supabase index is authoritative. Resolve the exact record_id first;
+  // neither filename parsing nor a neighboring lesson may select content.
+  const { data: indexedRows, error: indexError } = await supabase
+    .from('educational_content_index')
+    .select('record_id, subject_id, section_id, has_content')
+    .in('subject_id', dbSubjects)
+    .in('section_id', sectionAliases)
+    .eq('chapter_number', chapterNumber)
+    .eq('lesson_number', lessonNumber)
+    .limit(50);
+  if (indexError) throw indexError;
 
-  // Cloudflare trial path. The helper only returns a record when its immutable
-  // source ID, subject, section, chapter and lesson all match exactly.
-  try {
-    const cloudContent = await fetchCloudflareExactSection(
-      dbSubjects,
-      sectionAliases,
-      chapterNumber,
-      lessonNumber,
-      () => true,
-    );
-    if (cloudContent) return cloudContent;
-  } catch (error) {
-    console.warn('[gamesService] Cloudflare exact lookup failed; using Supabase fallback:', error);
-  }
+  const recordIds = Array.from(new Set((indexedRows || [])
+    .filter((row) => row.record_id && row.has_content !== false && normalizeSectionId(row.section_id) === sectionId)
+    .map((row) => String(row.record_id))));
+  if (recordIds.length === 0) return null;
 
-  // Prefer the exact content-index relation; file names may use legacy conventions.
-  try {
-    const { data: indexedRows } = await supabase
-      .from('educational_content_index')
-      .select('record_id, subject_id, section_id, file_name, lesson_id, chapter_number, lesson_number, has_content')
-      .in('subject_id', dbSubjects)
-      .eq('chapter_number', chapterNumber)
-      .eq('lesson_number', lessonNumber)
-      .limit(100);
-    const indexedRecordIds = (indexedRows || [])
-      .filter((row) => row.record_id && row.has_content !== false && normalizeSectionId(row.section_id) === sectionId)
-      .map((row) => row.record_id);
-    if (indexedRecordIds.length > 0) {
-      const { data: indexedContent } = await supabase
-        .from('educational_data')
-        .select('content')
-        .in('id', indexedRecordIds)
-        .limit(20);
-      const indexedMatch = indexedContent?.find((row) => row.content);
-      if (indexedMatch?.content) return indexedMatch.content;
-    }
-  } catch (error) {
-    console.warn('[gamesService] Exact content-index lookup failed:', error);
-  }
-
-  // An exact lesson id is safer than a chapter-only search when the database has it.
-  const cleanLessonId = lessonId.replace(/\.json$/i, '').trim();
-  if (cleanLessonId.length > 3) {
-    const { data: directRows } = await baseQuery()
-      .ilike('file_name', `%${cleanLessonId}%`)
-      .limit(20);
-    const directMatch = directRows?.find(
-      (row) => fileNameMatchesLesson(row.file_name, chapterNumber, lessonNumber) && row.content
-    );
-    if (directMatch) return directMatch.content;
-  }
-
-  const { data: chapterRows } = await baseQuery()
-    .or(
-      `file_name.ilike.%ch${chapterNumber}%,file_name.ilike.%chapter${chapterNumber}%,file_name.ilike.%فصل%${chapterNumber}%`
-    )
-    .limit(100);
-
-  const exactMatch = chapterRows?.find(
-    (row) => fileNameMatchesLesson(row.file_name, chapterNumber, lessonNumber) && row.content
-  );
-  return exactMatch?.content || null;
-}
-
-/**
- * Finds the nearest usable section file in the same subject and chapter.
- * The content index carries the lesson numbers even when file_name uses a legacy format.
- */
-async function fetchNearestSectionContent(
-  sectionId: 'mcq' | 'ph',
-  dbSubjects: string[],
-  chapterNumber: number | undefined,
-  lessonNumber: number | undefined,
-  isUsable: (content: any) => boolean
-): Promise<{ content: any; lessonNumber: number } | null> {
-  if (chapterNumber === undefined || lessonNumber === undefined) return null;
-
-  const sectionAliases = sectionId === 'ph'
-    ? ['ph', 'فلاش_كاردز', 'بطاقات']
-    : [sectionId];
-
-  try {
-    const { data: indexRows, error: indexError } = await supabase
-      .from('educational_content_index')
-      .select('record_id, subject_id, section_id, file_name, lesson_id, chapter_number, lesson_number, has_content')
-      .in('subject_id', dbSubjects)
-      .in('section_id', sectionAliases)
-      .eq('chapter_number', chapterNumber)
-      .order('lesson_number', { ascending: true })
-      .limit(300);
-
-    if (!indexError && indexRows?.length) {
-      const candidates = indexRows
-        .filter((row) => row.record_id && row.has_content !== false && Number(row.lesson_number) !== lessonNumber)
-        .sort((a, b) => {
-          const aLesson = Number(a.lesson_number);
-          const bLesson = Number(b.lesson_number);
-          const distance = Math.abs(aLesson - lessonNumber) - Math.abs(bLesson - lessonNumber);
-          if (distance !== 0) return distance;
-          // Prefer the previous lesson when two files are equally near.
-          const aIsPrevious = aLesson < lessonNumber ? 0 : 1;
-          const bIsPrevious = bLesson < lessonNumber ? 0 : 1;
-          return aIsPrevious - bIsPrevious;
-        });
-
-      for (const candidate of candidates) {
-        const { data: rows, error } = await supabase
-          .from('educational_data')
-          .select('content')
-          .eq('id', candidate.record_id)
-          .limit(1);
-        if (!error && rows?.[0]?.content && isUsable(rows[0].content)) {
-          return { content: rows[0].content, lessonNumber: Number(candidate.lesson_number) };
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[gamesService] Nearest section lookup failed:', error);
-  }
-
-  return null;
-}
-
-async function getNearestMcqConfig(
-  context: OpenLessonContext,
-  currentConfig: MillionaireGameConfig
-): Promise<MillionaireGameConfig> {
-  if (currentConfig.questions.length > 0) return currentConfig;
-
-  const dbSubjects = getDbSubjectIds(getSubjectNormalizedKey(context.subjectId));
-  const nearest = await fetchNearestSectionContent(
-    'mcq',
-    dbSubjects,
-    context.chapterNumber,
-    context.lessonNumber,
-    (content) => parseMcqToMillionaire(content, context.lessonId, context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`, context.subjectId).questions.length > 0
-  );
-  if (!nearest) return currentConfig;
-
-  const nearestConfig = parseMcqToMillionaire(
-    nearest.content,
-    context.lessonId,
-    context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`,
-    context.subjectId
-  );
-  return {
-    ...nearestConfig,
-    lessonId: context.lessonId,
-    title: `من سيربح المليون - ${context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`}`,
-    subtitle: `أسئلة ملف قريب داخل الفصل نفسه (الدرس ${nearest.lessonNumber})`,
-  };
-}
-
-async function getNearestLessonGibhaSahConfig(
-  context: OpenLessonContext,
-  currentConfig: GibhaSahGameConfig
-): Promise<GibhaSahGameConfig> {
-  const lessonTitle = context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`;
-  const dbSubjects = getDbSubjectIds(getSubjectNormalizedKey(context.subjectId));
-  const pooled: GibhaSahQuestion[] = [];
-  const seenQuestions = new Set<string>();
-  const seenAnswers = new Set<string>();
-
-  const addConfig = (config: GibhaSahGameConfig) => {
-    const source = config.questionPool?.length ? config.questionPool : config.questions;
-    for (const question of source) {
-      const questionKey = question.question.trim();
-      const answerKey = String(question.answerLabel || config.cards.find((card) => card.number === question.correctCardNumber)?.label || '').trim();
-      if (!questionKey || !answerKey || seenQuestions.has(questionKey) || seenAnswers.has(answerKey)) continue;
-      seenQuestions.add(questionKey);
-      seenAnswers.add(answerKey);
-      pooled.push({ ...question, answerLabel: answerKey });
-      if (pooled.length >= 10) break;
-    }
-  };
-
-  addConfig(currentConfig);
-
-  // Complete a short PH file only from the following lessons in the same chapter.
-  if (pooled.length < 10 && context.lessonNumber !== undefined) {
-    for (let offset = 1; offset <= 20 && pooled.length < 10; offset += 1) {
-      const nextLessonNumber = context.lessonNumber + offset;
-      const nextContent = await fetchExactSectionContent(
-        'ph',
-        dbSubjects,
-        context.chapterNumber,
-        nextLessonNumber,
-        `${context.lessonId}-next-${nextLessonNumber}`
-      );
-      if (!nextContent) continue;
-      addConfig(parsePhToGibhaSah(nextContent, context.lessonId, lessonTitle, context.subjectId));
+  // R2 is attempted by the immutable record_id from the Supabase index.
+  for (const recordId of recordIds) {
+    try {
+      const cloudContent = await fetchCloudflareEducationalRecord(recordId);
+      if (cloudContent) return cloudContent;
+    } catch (_) {
+      // Exact Supabase record below is the only permitted fallback.
     }
   }
 
-  if (pooled.length === 0) return currentConfig;
-
-  const mergedConfig = parsePhToGibhaSah(
-    {
-      lesson_info: { subject: currentConfig.subject || context.subjectId },
-      rounds: pooled.map((question) => ({
-        question: question.question,
-        correct_answer: question.answerLabel,
-      })),
-    },
-    context.lessonId,
-    lessonTitle,
-    context.subjectId
-  );
-
-  return {
-    ...mergedConfig,
-    lessonId: context.lessonId,
-    subtitle: pooled.length >= 10
-      ? 'أسئلة فريدة من الدرس، ويُستكمل النقص من الدروس التالية'
-      : `${pooled.length} أسئلة فريدة متاحة من هذا الدرس والدروس التالية`,
-  };
+  const { data: exactRows, error: contentError } = await supabase
+    .from('educational_data')
+    .select('content')
+    .in('id', recordIds)
+    .limit(recordIds.length);
+  if (contentError) throw contentError;
+  return exactRows?.find((row) => row.content)?.content || null;
 }
 
 /**
@@ -565,6 +404,62 @@ function parsePhToGibhaSah(
   };
 }
 
+
+async function completeGibhaFromFollowingLessons(
+  context: OpenLessonContext,
+  currentConfig: GibhaSahGameConfig
+): Promise<GibhaSahGameConfig> {
+  const lessonTitle = context.title || context.lessonTitle || `الدرس ${context.lessonNumber}`;
+  const dbSubjects = getDbSubjectIds(getSubjectNormalizedKey(context.subjectId));
+  const pooled: GibhaSahQuestion[] = [];
+  const seenQuestions = new Set<string>();
+  const seenAnswers = new Set<string>();
+
+  const addConfig = (config: GibhaSahGameConfig) => {
+    const source = config.questionPool?.length ? config.questionPool : config.questions;
+    for (const question of source) {
+      const questionKey = question.question.trim();
+      const answerKey = String(question.answerLabel || config.cards.find((card) => card.number === question.correctCardNumber)?.label || '').trim();
+      if (!questionKey || !answerKey || seenQuestions.has(questionKey) || seenAnswers.has(answerKey)) continue;
+      seenQuestions.add(questionKey);
+      seenAnswers.add(answerKey);
+      pooled.push({ ...question, answerLabel: answerKey });
+      if (pooled.length >= 10) break;
+    }
+  };
+
+  addConfig(currentConfig);
+  for (let offset = 1; offset <= 20 && pooled.length < 10; offset += 1) {
+    const nextLessonNumber = context.lessonNumber + offset;
+    const nextContent = await fetchExactSectionContent(
+      'ph',
+      dbSubjects,
+      context.chapterNumber,
+      nextLessonNumber,
+      buildLessonKey(context.subjectId, context.chapterNumber, nextLessonNumber)
+    );
+    if (!nextContent) continue;
+    addConfig(parsePhToGibhaSah(nextContent, context.lessonId, lessonTitle, context.subjectId));
+  }
+
+  if (pooled.length === 0) return currentConfig;
+  const merged = parsePhToGibhaSah(
+    {
+      lesson_info: { subject: currentConfig.subject || context.subjectId },
+      rounds: pooled.map((question) => ({ question: question.question, correct_answer: question.answerLabel })),
+    },
+    context.lessonId,
+    lessonTitle,
+    context.subjectId
+  );
+  return {
+    ...merged,
+    subtitle: pooled.length >= 10
+      ? 'أسئلة فريدة من الدرس، ويُستكمل النقص من الدروس التالية'
+      : `${pooled.length} أسئلة فريدة متاحة من هذا الدرس والدروس التالية`,
+  };
+}
+
 /**
  * Main On-Demand Loader for Interactive Games
  * ONLY downloads data when the user opens the games modal.
@@ -605,27 +500,23 @@ export async function fetchLessonGamesData(
           bundle.phData || fetchExactSectionContent('ph', exactDbSubjects, ctx.chapterNumber, ctx.lessonNumber, ctx.lessonId),
         ]);
 
-        const currentMcqConfig = exactMcqData
-          ? parseMcqToMillionaire(exactMcqData, actualLessonId, actualLessonTitle, actualCategory)
-          : getMillionaireGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
-        const mcqConfig = await getNearestMcqConfig(ctx, currentMcqConfig);
+        const currentMcqConfig = parseMcqToMillionaire(exactMcqData, actualLessonId, actualLessonTitle, actualCategory);
+        // Never substitute a neighbouring lesson's questions. If the exact
+        // R2 record is absent, fetchExactSectionContent already falls back to
+        // the exact Supabase record; otherwise leave this game's questions
+        // empty rather than mixing lessons.
+        const mcqConfig = currentMcqConfig;
 
-        const trueFalseConfig = exactTrueFalseData
-          ? parseTrueFalseConfig(exactTrueFalseData, actualLessonId, actualLessonTitle, actualCategory)
-          : getTrueFalseGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
+        const trueFalseConfig = parseTrueFalseConfig(exactTrueFalseData, actualLessonId, actualLessonTitle, actualCategory);
 
-        const currentGibhaSahConfig = exactPhData
-          ? parsePhToGibhaSah(exactPhData, actualLessonId, actualLessonTitle, actualCategory)
-          : getGibhaSahGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
-        const gibhaSahConfig = await getNearestLessonGibhaSahConfig(
-          ctx,
-          currentGibhaSahConfig
-        );
+        const currentGibhaSahConfig = parsePhToGibhaSah(exactPhData, actualLessonId, actualLessonTitle, actualCategory);
+        const gibhaSahConfig = await completeGibhaFromFollowingLessons(ctx, currentGibhaSahConfig);
 
         return {
           mcqConfig,
           trueFalseConfig,
           gibhaSahConfig,
+          flashCards: parseCurriculumToFlashCards(bundle.curriculumData, actualLessonId),
           dailyExamAvailable: Boolean(bundle.curriculumData?.pages?.length),
           source: 'database',
           dataSource: bundle.dataSource || 'supabase',
@@ -672,17 +563,11 @@ export async function fetchLessonGamesData(
     ]);
 
     // Parse configs
-    const currentMcqConfig = mcqRes
-      ? parseMcqToMillionaire(mcqRes, actualLessonId, actualLessonTitle, actualCategory)
-      : getMillionaireGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
+    const currentMcqConfig = parseMcqToMillionaire(mcqRes, actualLessonId, actualLessonTitle, actualCategory);
 
-    const trueFalseConfig = tfRes
-      ? parseTrueFalseConfig(tfRes, actualLessonId, actualLessonTitle, actualCategory)
-      : getTrueFalseGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
+    const trueFalseConfig = parseTrueFalseConfig(tfRes, actualLessonId, actualLessonTitle, actualCategory);
 
-    const currentGibhaSahConfig = phRes
-      ? parsePhToGibhaSah(phRes, actualLessonId, actualLessonTitle, actualCategory)
-      : getGibhaSahGameForLesson(actualLessonId, actualLessonTitle, actualCategory);
+    const currentGibhaSahConfig = parsePhToGibhaSah(phRes, actualLessonId, actualLessonTitle, actualCategory);
     const standardContext: OpenLessonContext | null =
       targetChapter !== undefined && targetSegment !== undefined
         ? {
@@ -695,17 +580,16 @@ export async function fetchLessonGamesData(
             lessonTitle: actualLessonTitle,
           }
         : null;
-    const mcqConfig = standardContext
-      ? await getNearestMcqConfig(standardContext, currentMcqConfig)
-      : currentMcqConfig;
+    const mcqConfig = currentMcqConfig;
     const gibhaSahConfig = standardContext
-      ? await getNearestLessonGibhaSahConfig(standardContext, currentGibhaSahConfig)
+      ? await completeGibhaFromFollowingLessons(standardContext, currentGibhaSahConfig)
       : currentGibhaSahConfig;
 
     const bundle: LessonGamesBundle = {
       mcqConfig,
       trueFalseConfig,
       gibhaSahConfig,
+      flashCards: [],
       dailyExamAvailable: false,
       source: mcqRes || tfRes || phRes ? 'database' : 'fallback',
       dataSource: mcqRes || tfRes || phRes ? 'cloudflare' : 'fallback',
@@ -717,9 +601,10 @@ export async function fetchLessonGamesData(
   } catch (err) {
     console.error('Error fetching games bundle on-demand:', err);
     const fallbackBundle: LessonGamesBundle = {
-      mcqConfig: getMillionaireGameForLesson(actualLessonId, actualLessonTitle, actualCategory),
-      trueFalseConfig: getTrueFalseGameForLesson(actualLessonId, actualLessonTitle, actualCategory),
-      gibhaSahConfig: getGibhaSahGameForLesson(actualLessonId, actualLessonTitle, actualCategory),
+      mcqConfig: parseMcqToMillionaire(null, actualLessonId, actualLessonTitle, actualCategory),
+      trueFalseConfig: parseTrueFalseConfig(null, actualLessonId, actualLessonTitle, actualCategory),
+      gibhaSahConfig: parsePhToGibhaSah(null, actualLessonId, actualLessonTitle, actualCategory),
+      flashCards: [],
       dailyExamAvailable: false,
       source: 'fallback',
       dataSource: 'fallback',
@@ -728,4 +613,95 @@ export async function fetchLessonGamesData(
     gamesCache[cacheKey] = fallbackBundle;
     return fallbackBundle;
   }
+}
+
+/** Loads Millionaire team questions lazily from the selected lesson first,
+ * then neighbouring lessons in the same chapter only. */
+export async function fetchMillionaireTeamQuestions(context: OpenLessonContext, minimum = 20): Promise<MillionaireQuestion[]> {
+  const collected: MillionaireQuestion[] = [];
+  const seen = new Set<string>();
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8];
+  for (const offset of offsets) {
+    const lessonNumber = context.lessonNumber + offset;
+    if (lessonNumber < 1) continue;
+    const lessonContext: OpenLessonContext = {
+      ...context,
+      lessonNumber,
+      lessonId: offset === 0 ? context.lessonId : buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      lessonKey: buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      title: offset === 0 ? (context.title || context.lessonTitle) : `الدرس ${lessonNumber}`,
+      lessonTitle: offset === 0 ? (context.lessonTitle || context.title) : `الدرس ${lessonNumber}`,
+    };
+    const bundle = await fetchLessonGamesData(lessonContext);
+    if (bundle.source !== 'database') continue;
+    const questions = bundle.mcqConfig.questionPool || bundle.mcqConfig.questions || [];
+    for (const question of questions) {
+      const key = `${question.question.trim()}|${question.options.join('|')}`;
+      if (!seen.has(key)) { seen.add(key); collected.push(question); }
+      if (collected.length >= minimum) return collected;
+    }
+  }
+  if (!collected.length) return [];
+  return Array.from({ length: minimum }, (_, index) => collected[index % collected.length]);
+}
+
+export interface GibhaSahOnlineQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+}
+
+/** Builds a 24-question online deck from the selected lesson first, then only
+ * neighbouring lessons that belong to the same subject and chapter. Six answer
+ * cards are shown initially; after three are consumed, three new cards enter. */
+export async function fetchGibhaSahOnlineQuestions(context: OpenLessonContext, minimum = 24): Promise<GibhaSahOnlineQuestion[]> {
+  const collected: Array<{ question: string; answer: string }> = [];
+  const seenQuestions = new Set<string>();
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8];
+
+  for (const offset of offsets) {
+    const lessonNumber = context.lessonNumber + offset;
+    if (lessonNumber < 1) continue;
+    const lessonContext: OpenLessonContext = {
+      ...context,
+      lessonNumber,
+      lessonId: offset === 0 ? context.lessonId : buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      lessonKey: buildLessonKey(context.subjectId, context.chapterNumber, lessonNumber),
+      title: offset === 0 ? (context.title || context.lessonTitle) : `الدرس ${lessonNumber}`,
+      lessonTitle: offset === 0 ? (context.lessonTitle || context.title) : `الدرس ${lessonNumber}`,
+    };
+    const bundle = await fetchLessonGamesData(lessonContext);
+    if (bundle.source !== 'database') continue;
+    const source = bundle.gibhaSahConfig;
+    const pool = source.questionPool?.length ? source.questionPool : source.questions;
+    for (const item of pool) {
+      const question = item.question.trim();
+      const answer = (item.answerLabel || source.cards.find(card => card.number === item.correctCardNumber)?.label || '').trim();
+      if (!question || !answer || seenQuestions.has(question)) continue;
+      seenQuestions.add(question);
+      collected.push({ question, answer });
+      if (collected.length >= minimum) break;
+    }
+    if (collected.length >= minimum) break;
+  }
+
+  if (!collected.length) return [];
+  const deck = collected.length >= minimum
+    ? collected.slice(0, minimum)
+    : Array.from({ length: minimum }, (_, index) => collected[index % collected.length]);
+
+  return deck.map((item, index) => {
+    const refillStart = Math.floor(index / 3) * 3;
+    const windowEnd = Math.min(deck.length, refillStart + 6);
+    const visibleAnswers = deck.slice(index, windowEnd).map(entry => entry.answer);
+    const uniqueAnswers = Array.from(new Set(visibleAnswers));
+    if (uniqueAnswers.length < 2) {
+      for (const candidate of deck) {
+        if (!uniqueAnswers.includes(candidate.answer)) uniqueAnswers.push(candidate.answer);
+        if (uniqueAnswers.length >= 2) break;
+      }
+    }
+    const options = uniqueAnswers.sort(() => Math.random() - 0.5);
+    return { question: item.question, options, correctAnswer: options.indexOf(item.answer) };
+  }).filter(item => item.correctAnswer >= 0 && item.options.length >= 2);
 }

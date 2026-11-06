@@ -11,7 +11,6 @@ import {
   XCircle,
   Users,
   User,
-  Swords,
   BookOpen,
   GraduationCap,
   Phone,
@@ -30,9 +29,11 @@ import {
   Smile,
   Check,
 } from 'lucide-react';
+import { ClappingCelebration } from './ClappingCelebration';
 import { MillionaireGameConfig, MillionaireQuestion, StudentGameResult } from '../types';
 import { getMillionaireGameForLesson } from '../data/mockMillionaire';
 import { gameAudio } from '../utils/gameAudio';
+import { millionaireAudio } from '../utils/millionaireAudio';
 import { getMillionaireReward } from '../services/pointsService';
 import { ScientificText } from './ScientificText';
 
@@ -45,21 +46,30 @@ interface MillionaireGameModalProps {
   onScoreUpdate?: (points: number) => void;
   onAssessmentResult?: (correctPoints: number, totalPoints: number) => void;
   customConfig?: MillionaireGameConfig;
+  onOpenTeam?: () => void;
 }
+
+const IRAQI_NUMBER_FORMATTER = new Intl.NumberFormat('ar-IQ', {
+  useGrouping: true,
+  maximumFractionDigits: 0,
+});
+
+const formatIraqiNumber = (value: number) => IRAQI_NUMBER_FORMATTER.format(value);
+const formatIraqiPrize = (value: number) => `${formatIraqiNumber(value)} د.ع`;
 
 // 11-level Iraqi dinar prize ladder shown inside the game.
 const LADDER_LEVELS = [
-  { level: 1, points: 250, label: '250 د.ع', isSafety: false },
-  { level: 2, points: 500, label: '500 د.ع', isSafety: false },
-  { level: 3, points: 1000, label: '1 000 د.ع', isSafety: false },
-  { level: 4, points: 5000, label: '5 000 د.ع', isSafety: false },
-  { level: 5, points: 10000, label: '10 000 د.ع', isSafety: true },
-  { level: 6, points: 25000, label: '25 000 د.ع', isSafety: false },
-  { level: 7, points: 50000, label: '50 000 د.ع', isSafety: false },
-  { level: 8, points: 100000, label: '100 000 د.ع', isSafety: false },
-  { level: 9, points: 250000, label: '250 000 د.ع', isSafety: true },
-  { level: 10, points: 500000, label: '500 000 د.ع', isSafety: false },
-  { level: 11, points: 1000000, label: '1 000 000 د.ع', isSafety: true },
+  { level: 1, points: 250, label: formatIraqiPrize(250), isSafety: false },
+  { level: 2, points: 500, label: formatIraqiPrize(500), isSafety: false },
+  { level: 3, points: 1000, label: formatIraqiPrize(1000), isSafety: false },
+  { level: 4, points: 5000, label: formatIraqiPrize(5000), isSafety: false },
+  { level: 5, points: 10000, label: formatIraqiPrize(10000), isSafety: true },
+  { level: 6, points: 25000, label: formatIraqiPrize(25000), isSafety: false },
+  { level: 7, points: 50000, label: formatIraqiPrize(50000), isSafety: false },
+  { level: 8, points: 100000, label: formatIraqiPrize(100000), isSafety: false },
+  { level: 9, points: 250000, label: formatIraqiPrize(250000), isSafety: true },
+  { level: 10, points: 500000, label: formatIraqiPrize(500000), isSafety: false },
+  { level: 11, points: 1000000, label: formatIraqiPrize(1000000), isSafety: true },
 ];
 
 function shuffleMillionaire<T>(values: T[]): T[] {
@@ -90,10 +100,10 @@ function buildMillionaireRound(source: MillionaireGameConfig): MillionaireGameCo
   };
 }
 
-const MILLIONAIRE_WRONG_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-wrong.mp3`;
-const MILLIONAIRE_CORRECT_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-correct.mp3`;
-const MILLIONAIRE_THINKING_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-thinking.mp3`;
-const MILLIONAIRE_PRIZE_AUDIO_URL = `${import.meta.env.BASE_URL}audio/millionaire-prize.mp3`;
+const MILLIONAIRE_WRONG_AUDIO_URL = millionaireAudio.wrong;
+const MILLIONAIRE_CORRECT_AUDIO_URL = millionaireAudio.correct;
+const MILLIONAIRE_THINKING_AUDIO_URL = millionaireAudio.thinking;
+const MILLIONAIRE_PRIZE_AUDIO_URL = millionaireAudio.prize;
 
 export interface OpponentProfile {
   id: string;
@@ -291,6 +301,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   onScoreUpdate,
   onAssessmentResult,
   customConfig,
+  onOpenTeam,
 }) => {
   // Game Configuration & Load (fresh round from the exact lesson-file pool)
   const [gameConfig, setGameConfig] = useState<MillionaireGameConfig>(() =>
@@ -807,7 +818,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
       isOpen && gameState === 'playing' && isYourTurn && !showPrizeProgressionModal;
 
     if (shouldPlayThinkingAudio) {
-      gameAudio.playExternal('millionaire-thinking', MILLIONAIRE_THINKING_AUDIO_URL, 0.65, true);
+      gameAudio.playExternal('millionaire-thinking', MILLIONAIRE_THINKING_AUDIO_URL, 0.42, true);
     } else {
       gameAudio.stopExternal('millionaire-thinking');
     }
@@ -843,7 +854,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
 
   if (gameConfig.questions.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 font-cairo">
+      <div data-motion="off" className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 font-cairo">
         <div className="w-full max-w-sm rounded-3xl border border-amber-400/40 bg-[#08152e] p-6 text-center text-white shadow-2xl">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/10 text-amber-300">
             <BookOpen className="h-7 w-7" aria-hidden="true" />
@@ -1257,9 +1268,11 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
   return (
     <div
       id="millionaire-game-modal"
+      data-motion="off"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none font-cairo"
       dir="rtl"
     >
+      <ClappingCelebration show={gameState === 'victory'} label="ألف مبروك — ربحت المليون!" />
       {/* Outer Studio Frame */}
       <div className="relative w-full max-w-5xl h-[92vh] sm:h-[88vh] bg-gradient-to-b from-[#020617] via-[#050e2d] to-[#020617] rounded-3xl border-2 border-[#1e4193] shadow-[0_0_50px_rgba(30,65,147,0.5)] flex flex-col overflow-hidden text-white">
         {/* Subtle Background Glows */}
@@ -1389,7 +1402,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   </p>
                 </div>
 
-                {/* The 3 Action Buttons (اللعب فردي + اللعب جماعي + خروج) */}
+                {/* Main actions: single player + online team challenge + exit */}
                 <div className="w-full space-y-3 pt-2">
                   {/* 1. Single Player Button */}
                   <button
@@ -1411,24 +1424,23 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     <ArrowRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
                   </button>
 
-                  {/* 2. Multiplayer Button */}
+                  {/* 2. Online 2v2 team challenge */}
                   <button
-                    id="btn-millionaire-multiplayer"
-                    onClick={handleStartMultiplayerSearch}
-                    className="w-full py-4 bg-gradient-to-r from-sky-500 via-cyan-400 to-blue-600 hover:from-sky-400 hover:to-cyan-300 text-black font-black rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-between px-6 text-sm sm:text-base transition-all active:scale-95 group cursor-pointer border border-cyan-300/40"
+                    id="btn-millionaire-team"
+                    onClick={onOpenTeam}
+                    disabled={!onOpenTeam || !import.meta.env.VITE_ONLINE_CHALLENGE_API_URL}
+                    className="w-full py-4 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-purple-700 hover:from-violet-500 hover:to-fuchsia-500 text-white font-black rounded-2xl shadow-[0_0_25px_rgba(168,85,247,0.35)] flex items-center justify-between px-6 text-sm sm:text-base transition-all active:scale-95 group cursor-pointer border border-fuchsia-300/40 disabled:opacity-40"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-black">
-                        <Swords className="w-5 h-5 animate-pulse" />
+                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center">
+                        <Users className="w-5 h-5" />
                       </div>
                       <div className="text-right">
-                        <span className="block font-black text-base">اللعب جماعي (تحدي مباشر)</span>
-                        <span className="text-[10px] text-black/80 font-bold block">
-                          بحث عن لاعب قريب وتبادل الأدوار
-                        </span>
+                        <span className="block font-black text-base">تحدّي أونلاين</span>
+                        <span className="text-[10px] text-white/80 font-bold block">فريقان 2 ضد 2 — قائد وتوصيات وتناوب أدوار</span>
                       </div>
                     </div>
-                    <Radio className="w-5 h-5 text-black group-hover:scale-110 transition-transform animate-spin" />
+                    <Trophy className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
                   </button>
 
                   {/* 3. Exit Button */}
@@ -1704,7 +1716,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     <div className="text-right">
                       <div className="text-[11px] font-extrabold text-blue-200 flex items-center gap-1.5">
                         <span className="text-amber-400">السؤال:</span>
-                        <span>{currentQuestionIndex + 1} من 11</span>
+                        <span>{formatIraqiNumber(currentQuestionIndex + 1)} من {formatIraqiNumber(LADDER_LEVELS.length)}</span>
                       </div>
                       <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
                         <span className="text-blue-300">الجائزة:</span>
@@ -1931,7 +1943,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   <div className="bg-[#050d26] p-3 rounded-xl border border-blue-900/40">
                     <span className="text-[10px] text-blue-300 block">الجائزة المحققة</span>
                     <span className="text-base font-black text-amber-400 mt-0.5 block font-mono">
-                      1 000 000 د.ع
+                      {formatIraqiPrize(1000000)}
                     </span>
                   </div>
 
@@ -1981,17 +1993,17 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     <span className="text-[10px] text-blue-300 block">الرصيد المضمون المحقق</span>
                     <span className="text-base font-black text-amber-400 mt-0.5 block font-mono">
                       {accumulatedPoints >= 500000
-                        ? '500 000 د.ع'
+                        ? formatIraqiPrize(500000)
                         : accumulatedPoints >= 100000
-                        ? '100 000 د.ع'
-                        : '0 د.ع'}
+                        ? formatIraqiPrize(100000)
+                        : formatIraqiPrize(0)}
                     </span>
                   </div>
 
                   <div className="bg-[#050d26] p-3 rounded-xl border border-blue-900/40">
                     <span className="text-[10px] text-blue-300 block">وصلت للسؤال</span>
                     <span className="text-base font-bold text-white mt-0.5 block">
-                      {currentQuestionIndex + 1} من 11
+                      {formatIraqiNumber(currentQuestionIndex + 1)} من {formatIraqiNumber(LADDER_LEVELS.length)}
                     </span>
                   </div>
                 </div>
@@ -2106,7 +2118,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   <Award className="w-4 h-4 text-amber-400" />
                   سلم جوائز المليون دينار
                 </span>
-                <span className="text-[10px] text-blue-300">11 سؤالاً</span>
+                <span className="text-[10px] text-blue-300">{formatIraqiNumber(LADDER_LEVELS.length)} سؤالاً</span>
               </div>
 
               <div className="space-y-1 text-xs overflow-y-auto max-h-[380px] pr-1">
@@ -2131,18 +2143,19 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                     return (
                       <div
                         key={item.level}
-                        className={`p-1 px-2 rounded-xl border flex items-center justify-between transition-all ${rowStyle}`}
+                        dir="rtl"
+                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-1 px-2 rounded-xl border transition-all ${rowStyle}`}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="w-3.5 text-center font-mono text-[10px] font-bold">
-                            {item.level}
+                          <span dir="ltr" className="w-4 shrink-0 text-center text-[10px] font-bold tabular-nums [unicode-bidi:isolate]">
+                            {formatIraqiNumber(item.level)}
                           </span>
                           <span className="text-[10px]">
                             {item.isSafety ? '🛡️ أمان' : 'سؤال'}
                           </span>
                         </div>
 
-                        <span className="font-mono font-black tracking-wider text-[11px]">
+                        <span dir="ltr" className="whitespace-nowrap text-[11px] font-black tabular-nums [unicode-bidi:isolate]">
                           {item.label}
                         </span>
                       </div>
@@ -2155,7 +2168,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
             <div className="pt-2 border-t border-blue-900/60 text-center">
               <span className="text-[10px] text-blue-300 block">السؤال الحالي</span>
               <span className="text-xs font-bold text-amber-400">
-                {currentQuestionIndex + 1} من 11 — {currentLadder.label}
+                {formatIraqiNumber(currentQuestionIndex + 1)} من {formatIraqiNumber(LADDER_LEVELS.length)} — <bdi>{currentLadder.label}</bdi>
               </span>
             </div>
           </div>
@@ -2280,7 +2293,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
               <div className="flex items-center gap-2 bg-[#0a1845] border border-sky-400/40 px-3 py-1 rounded-full text-xs text-sky-200">
                 <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
                 <span>الانتقال التلقائي خلال</span>
-                <span className="font-mono font-black text-amber-300">{progressionTimer}</span>
+                <bdi className="font-black text-amber-300">{formatIraqiNumber(progressionTimer)}</bdi>
                 <span>ثوانٍ...</span>
               </div>
             </div>
@@ -2298,9 +2311,10 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                   <div className="py-2">
                     <span
                       id="ascending-prize-counter"
-                      className="text-3xl sm:text-4xl lg:text-5xl font-mono font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-200 drop-shadow-[0_0_25px_rgba(245,158,11,0.6)]"
+                      dir="ltr"
+                      className="inline-block text-3xl sm:text-4xl lg:text-5xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-200 drop-shadow-[0_0_25px_rgba(245,158,11,0.6)] [unicode-bidi:isolate]"
                     >
-                      {animatedPrizeValue.toLocaleString('en-US').replace(/,/g, ' ')}
+                      {formatIraqiNumber(animatedPrizeValue)}
                     </span>
                     <span className="text-sm sm:text-base font-bold text-amber-200 block mt-1">
                       دينار عراقي (د.ع)
@@ -2309,7 +2323,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
 
                   <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-black px-3 py-1 rounded-full">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>اجتزت السؤال رقم ({activeClimbLevel}) بنجاح!</span>
+                    <span>اجتزت السؤال رقم <bdi>({formatIraqiNumber(activeClimbLevel)})</bdi> بنجاح!</span>
                   </div>
                 </div>
 
@@ -2341,7 +2355,8 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                         return (
                           <div
                             key={item.level}
-                            className={`relative flex items-center justify-between px-3 py-1 rounded-xl transition-all duration-300 ${
+                            dir="rtl"
+                            className={`relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-1 rounded-xl transition-all duration-300 ${
                               isCurrentActive
                                 ? 'bg-gradient-to-r from-amber-500/30 via-yellow-400/40 to-amber-500/30 border-2 border-yellow-300 shadow-[0_0_20px_rgba(250,204,21,0.8)] scale-[1.04] z-10'
                                 : isPassedLevel
@@ -2351,9 +2366,10 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                                 : 'text-blue-100/80'
                             }`}
                           >
-                            <div className="flex items-center gap-1.5 font-mono">
+                            <div className="flex min-w-0 items-center gap-1.5">
                               <span
-                                className={`text-[11px] sm:text-xs font-bold ${
+                                dir="ltr"
+                                className={`shrink-0 text-[11px] sm:text-xs font-bold tabular-nums [unicode-bidi:isolate] ${
                                   isCurrentActive
                                     ? 'text-yellow-200 font-black'
                                     : item.isSafety
@@ -2361,7 +2377,7 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                                     : 'text-blue-300'
                                 }`}
                               >
-                                {item.level}.
+                                {formatIraqiNumber(item.level)}
                               </span>
 
                               <span
@@ -2385,9 +2401,10 @@ export const MillionaireGameModal: React.FC<MillionaireGameModalProps> = ({
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center justify-end gap-1">
                               <span
-                                className={`font-mono tracking-wider sm:text-sm font-black ${
+                                dir="ltr"
+                                className={`whitespace-nowrap tabular-nums sm:text-sm font-black [unicode-bidi:isolate] ${
                                   isCurrentActive
                                     ? 'text-yellow-200 text-sm sm:text-base drop-shadow-[0_0_10px_rgba(250,204,21,0.9)]'
                                     : item.isSafety
