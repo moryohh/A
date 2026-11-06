@@ -384,7 +384,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
           window.setTimeout(() => gameAudio.playGibhaWrong(), 1480);
         }
         else gameAudio.playClick(payload.kind === 'angry' ? 180 : 620);
-        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.targetId && payload.kind === 'laugh' ? 3400 : payload.targetId && payload.kind === 'angry' ? 2400 : payload.targetId && payload.kind === 'think' ? 1200 : payload.targetId ? 1500 : 1100);
+        window.setTimeout(() => setReactionFx(null), payload.kind === 'clap' ? 4000 : payload.kind === 'rocket' ? 2500 : payload.targetId && payload.kind === 'laugh' ? 3400 : payload.targetId && payload.kind === 'angry' ? 5200 : payload.targetId && payload.kind === 'think' ? 3300 : payload.targetId ? 1500 : 1100);
       }
       if (payload.type === 'state') {
         if (payload.gameType === 'millionaire' || payload.gameType === 'millionaire_team' || payload.gameType === 'true_false' || payload.gameType === 'gibha_sah') {
@@ -503,7 +503,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       // The room server broadcasts them to the other players but may not echo
       // the same reaction back to the socket that sent it.
       setReactionFx({ kind, from: meRef.current, targetId, nonce });
-      const visibleFor = kind === 'laugh' ? 3400 : kind === 'angry' ? 2400 : 1800;
+      const visibleFor = kind === 'laugh' ? 3400 : kind === 'angry' ? 5200 : 3300;
       window.setTimeout(() => setReactionFx(current => current?.nonce === nonce ? null : current), visibleFor);
       gameAudio.playClick(kind === 'angry' ? 180 : kind === 'think' ? 760 : 620);
     }
@@ -703,7 +703,7 @@ const CurrentOnlineChallengeModal: React.FC<Props> = ({ onClose, questions, less
       <div data-gibha-avatar={player?.id || ''} className={`absolute top-8 z-10 h-14 w-14 overflow-hidden rounded-full border-2 border-cyan-200 bg-slate-800 shadow-[0_0_14px_rgba(34,211,238,.45)] ${avatarSide}`}>{player?.avatar ? <img src={player.avatar} alt={label} className="h-full w-full object-cover"/> : <UserRound className="m-3 h-7 w-7 text-cyan-200"/>}</div>
       {showCorrectClaps && <div className="pointer-events-none absolute inset-1 z-30" aria-label="تصفيق للإجابة الصحيحة">{['left-0 top-0','right-0 top-0','left-0 bottom-0','right-0 bottom-0'].map((position, index) => <ClappingHandsAnimation key={`${player.id}-${position}-${roundResult?.question}`} pingPong className={`absolute ${position} h-10 w-10 ${index % 2 ? '-rotate-12' : 'rotate-12'}`} />)}</div>}
       <div className={`${seat % 2 === 0 ? 'pr-[4.25rem]' : 'pl-[4.25rem]'}`}><strong className="relative z-10 mt-1 block truncate text-xs">{label}</strong><small className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/10 px-2 py-0.5 font-black text-amber-200">{player ? <><span aria-hidden="true">⭐</span><span>{player.score}</span></> : 'بانتظار لاعب'}{(player?.streak || 0) >= 3 && <b className="mr-1 text-orange-300">🔥 ×2</b>}</small>{active && <small className={`relative z-10 block font-black ${activeMe ? 'text-emerald-200' : 'text-amber-200'}`}>{player?.bot ? 'يفكر' : 'دوره الآن'}{player?.bot && <span className="gibha-thinking-dots mr-1">•••</span>}</small>}</div>
-      {(targetedReaction === 'laugh' || targetedReaction === 'think' || targetedReaction === 'angry') && reactionFx && <div key={reactionFx.nonce} className={`pointer-events-none absolute -top-5 z-40 h-36 w-44 overflow-visible ${seat % 2 === 0 ? '-right-8' : '-left-8'}`}><PixelReactionEffect kind={targetedReaction} nonce={reactionFx.nonce} /></div>}
+      {(targetedReaction === 'laugh' || targetedReaction === 'think' || targetedReaction === 'angry') && reactionFx && <div key={reactionFx.nonce} className={`pointer-events-none absolute z-40 overflow-visible ${targetedReaction === 'laugh' ? '-top-5 h-36 w-44' : targetedReaction === 'think' ? '-top-28 h-64 w-60' : '-top-20 h-56 w-64'} ${seat % 2 === 0 ? '-right-8' : '-left-8'}`}><PixelReactionEffect kind={targetedReaction} nonce={reactionFx.nonce} /></div>}
       {showMessage && <div key={playerMessageBubble?.nonce} className={`gibha-message-bubble absolute top-2 z-30 max-w-[calc(100%_-_5.4rem)] rounded-2xl border border-cyan-200/80 bg-cyan-50 px-3 py-2 text-right text-[11px] font-bold leading-5 text-slate-900 shadow-[0_8px_25px_rgba(34,211,238,.35)] after:absolute after:top-7 after:border-y-[7px] after:border-y-transparent ${bubbleSide} ${bubbleTail}`}><span className="mb-0.5 block text-[9px] font-black text-cyan-700">{label}</span><span className="line-clamp-3">{playerMessageBubble?.text}</span></div>}
       {player && player.id !== me && <button type="button" onClick={event => { event.stopPropagation(); toggleRemoteAudio(); }} className={`absolute bottom-1 z-20 rounded-full bg-black/45 p-1 ${seat % 2 === 0 ? 'right-2' : 'left-2'}`} aria-label="كتم صوت اللاعب">{remoteAudioEnabled ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}</button>}
     </div>;
